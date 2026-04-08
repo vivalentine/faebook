@@ -16,8 +16,7 @@ export default function NpcCard({
   savingSlug = "",
 }: Props) {
   const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
-  const detailsHref =
-    mode === "dm" ? `/dm/npcs/${npc.slug}` : `/player/npcs/${npc.slug}`;
+  const detailsHref = `/directory/${npc.slug}`;
 
   return (
     <article className="npc-card">

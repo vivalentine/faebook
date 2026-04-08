@@ -14,12 +14,7 @@ import {
   type ReactFlowInstance,
   type Viewport,
 } from "@xyflow/react";
-import {
-  Link,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import "@xyflow/react/dist/style.css";
 
 import { useAuth } from "../auth/AuthContext";
@@ -50,12 +45,9 @@ const AUTOSAVE_DELAY_MS = 1200;
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 
 function BoardCanvas() {
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
-  const isPlayerView = location.pathname.startsWith("/player");
   const isDm = user?.role === "dm";
 
   const [visibleNpcs, setVisibleNpcs] = useState<Npc[]>([]);
@@ -63,7 +55,6 @@ function BoardCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<BoardEdge>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState("");
   const [rfInstance, setRfInstance] = useState<
@@ -519,23 +510,6 @@ function BoardCanvas() {
     [isDm, persistBoard, searchParams, selectedBoardUserId, setSearchParams, user],
   );
 
-  async function handleLogout() {
-    try {
-      if (dirtyRef.current) {
-        await persistBoard();
-      }
-
-      setLoggingOut(true);
-      setError("");
-      await logout();
-      navigate("/login", { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Logout failed");
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
   const sidebarNpcs = useMemo(() => visibleNpcs, [visibleNpcs]);
   const boardOwnerLabel =
     boardOwner?.display_name || boardOwner?.username || user?.display_name || "User";
@@ -551,23 +525,8 @@ function BoardCanvas() {
         <div className="topbar-meta topbar-meta-stack">
           <span>{nodes.length} nodes</span>
           <span>Viewing {boardOwnerLabel}&apos;s board</span>
-          <button
-            className="action-button secondary-link topbar-action"
-            onClick={handleLogout}
-            disabled={loggingOut}
-          >
-            {loggingOut ? "Signing out..." : "Sign out"}
-          </button>
         </div>
       </header>
-
-      <div className="page-back-link board-nav">
-        {isPlayerView ? (
-          <Link to="/player">← Player Directory</Link>
-        ) : (
-          <Link to="/">← DM Panel</Link>
-        )}
-      </div>
 
       {error ? (
         <div className="state-card error-card small-card board-error">

@@ -33,7 +33,7 @@ export default function ProtectedRoute({ allowRoles, children }: Props) {
   }
 
   if (!allowRoles.includes(user.role)) {
-    return <Navigate to={user.role === "dm" ? "/" : "/player"} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;

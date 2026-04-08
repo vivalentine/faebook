@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import NpcCard from "../components/NpcCard";
-import { useAuth } from "../auth/AuthContext";
 import { apiFetch } from "../lib/api";
 import type { Npc } from "../types";
 
@@ -27,14 +25,11 @@ function matchesNpc(npc: Npc, query: string) {
 }
 
 export default function DmDirectoryPage() {
-  const navigate = useNavigate();
-  const { user, logout } = useAuth();
 
   const [npcs, setNpcs] = useState<Npc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [savingSlug, setSavingSlug] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
   const [search, setSearch] = useState("");
   const [houseFilter, setHouseFilter] = useState("all");
   const [visibilityFilter, setVisibilityFilter] = useState("all");
@@ -90,19 +85,6 @@ export default function DmDirectoryPage() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      setLoggingOut(true);
-      setError("");
-      await logout();
-      navigate("/login", { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Logout failed");
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
   const houses = useMemo(() => {
     const values = Array.from(
       new Set(npcs.map((npc) => npc.house).filter(Boolean) as string[])
@@ -142,19 +124,6 @@ export default function DmDirectoryPage() {
           <span>
             Showing {filteredNpcs.length} of {npcs.length} NPCs
           </span>
-          <span>Signed in as {user?.display_name || user?.username || "DM"}</span>
-
-          <div className="topbar-links">
-            <Link to="/dm/board">Open board</Link>
-          </div>
-
-          <button
-            className="action-button secondary-link topbar-action"
-            onClick={handleLogout}
-            disabled={loggingOut}
-          >
-            {loggingOut ? "Signing out..." : "Sign out"}
-          </button>
         </div>
       </header>
 

@@ -136,7 +136,7 @@ export default function DmNpcPage() {
   return (
     <div className="app-shell">
       <div className="page-back-link">
-        <Link to="/">← Back to DM panel</Link>
+        <Link to="/directory">← Back to directory</Link>
       </div>
 
       <section className="detail-shell">
