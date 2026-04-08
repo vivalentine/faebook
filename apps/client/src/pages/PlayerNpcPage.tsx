@@ -1,25 +1,23 @@
 import { useEffect, useState } from "react";
 import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
 import { apiFetch, apiUrl } from "../lib/api";
-import type { Npc, NpcNote } from "../types";
+import type { Npc, NpcAlias } from "../types";
 
 export default function PlayerNpcPage() {
   const { slug = "" } = useParams();
-  const { user } = useAuth();
 
   const [npc, setNpc] = useState<Npc | null>(null);
-  const [notes, setNotes] = useState<NpcNote[]>([]);
+  const [canonicalAliases, setCanonicalAliases] = useState<NpcAlias[]>([]);
+  const [personalAliases, setPersonalAliases] = useState<NpcAlias[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [content, setContent] = useState("");
+  const [aliasInput, setAliasInput] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
-  const [editingContent, setEditingContent] = useState("");
-  const [updatingNoteId, setUpdatingNoteId] = useState<number | null>(null);
-  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
+  const [editingAliasId, setEditingAliasId] = useState<number | null>(null);
+  const [editingAliasValue, setEditingAliasValue] = useState("");
+  const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
+  const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadPage() {
@@ -32,16 +30,17 @@ export default function PlayerNpcPage() {
           throw new Error(`Failed to load NPC: ${npcResponse.status}`);
         }
 
-        const notesResponse = await apiFetch(`/api/npcs/${slug}/notes`);
-        if (!notesResponse.ok) {
-          throw new Error(`Failed to load notes: ${notesResponse.status}`);
+        const aliasesResponse = await apiFetch(`/api/npcs/${slug}/aliases`);
+        if (!aliasesResponse.ok) {
+          throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
         }
 
         const npcData = await npcResponse.json();
-        const notesData = await notesResponse.json();
+        const aliasesData = await aliasesResponse.json();
 
         setNpc(npcData);
-        setNotes(notesData);
+        setCanonicalAliases(aliasesData.canonical || []);
+        setPersonalAliases(aliasesData.personal || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -55,8 +54,8 @@ export default function PlayerNpcPage() {
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
-    if (!content.trim()) {
-      setError("Please enter a note.");
+    if (!aliasInput.trim()) {
+      setError("Please enter an alias.");
       return;
     }
 
@@ -64,21 +63,21 @@ export default function PlayerNpcPage() {
       setSaving(true);
       setError("");
 
-      const response = await apiFetch(`/api/npcs/${slug}/notes`, {
+      const response = await apiFetch(`/api/npcs/${slug}/aliases`, {
         method: "POST",
-        body: JSON.stringify({
-          content: content.trim(),
-        }),
+        body: JSON.stringify({ alias: aliasInput.trim() }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to save note: ${response.status}`);
+        throw new Error(data.error || `Failed to save alias: ${response.status}`);
       }
 
-      setNotes((current) => [...current, data]);
-      setContent("");
+      setPersonalAliases((current) =>
+        [...current, data].sort((a, b) => a.alias.localeCompare(b.alias))
+      );
+      setAliasInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -86,68 +85,68 @@ export default function PlayerNpcPage() {
     }
   };
 
-  async function handleSaveEdit(noteId: number) {
-    if (!editingContent.trim()) {
-      setError("Please enter a note.");
+  async function handleSaveEdit(aliasId: number) {
+    if (!editingAliasValue.trim()) {
+      setError("Please enter an alias.");
       return;
     }
 
     try {
-      setUpdatingNoteId(noteId);
+      setUpdatingAliasId(aliasId);
       setError("");
 
-      const response = await apiFetch(`/api/npc-notes/${noteId}`, {
+      const response = await apiFetch(`/api/npc-aliases/${aliasId}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          content: editingContent.trim(),
-        }),
+        body: JSON.stringify({ alias: editingAliasValue.trim() }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to update note: ${response.status}`);
+        throw new Error(data.error || `Failed to update alias: ${response.status}`);
       }
 
-      setNotes((current) =>
-        current.map((note) => (note.id === noteId ? data : note))
+      setPersonalAliases((current) =>
+        current
+          .map((alias) => (alias.id === aliasId ? data : alias))
+          .sort((a, b) => a.alias.localeCompare(b.alias))
       );
-      setEditingNoteId(null);
-      setEditingContent("");
+      setEditingAliasId(null);
+      setEditingAliasValue("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setUpdatingNoteId(null);
+      setUpdatingAliasId(null);
     }
   }
 
-  async function handleDelete(noteId: number) {
-    if (!window.confirm("Delete this note?")) return;
+  async function handleDelete(aliasId: number) {
+    if (!window.confirm("Remove this alias from your active list?")) return;
 
     try {
-      setDeletingNoteId(noteId);
+      setDeletingAliasId(aliasId);
       setError("");
 
-      const response = await apiFetch(`/api/npc-notes/${noteId}`, {
+      const response = await apiFetch(`/api/npc-aliases/${aliasId}`, {
         method: "DELETE",
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to delete note: ${response.status}`);
+        throw new Error(data.error || `Failed to remove alias: ${response.status}`);
       }
 
-      setNotes((current) => current.filter((note) => note.id !== noteId));
+      setPersonalAliases((current) => current.filter((alias) => alias.id !== aliasId));
 
-      if (editingNoteId === noteId) {
-        setEditingNoteId(null);
-        setEditingContent("");
+      if (editingAliasId === aliasId) {
+        setEditingAliasId(null);
+        setEditingAliasValue("");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setDeletingNoteId(null);
+      setDeletingAliasId(null);
     }
   }
 
@@ -217,11 +216,29 @@ export default function PlayerNpcPage() {
 
         <section className="notes-section">
           <div className="notes-header">
-            <h2>Party Notes</h2>
-            <p>Shared notes everyone can read during the session.</p>
-            <p className="summary-label">
-              Posting as {user?.display_name || user?.username || "Unknown User"}
-            </p>
+            <h2>Known Names</h2>
+            <p>Canonical aliases managed by your DM for visible NPC records.</p>
+          </div>
+
+          {canonicalAliases.length === 0 ? (
+            <div className="state-card small-card">
+              <p>No canonical aliases yet.</p>
+            </div>
+          ) : (
+            <div className="notes-list">
+              {canonicalAliases.map((alias) => (
+                <article className="note-card" key={alias.id}>
+                  <p>{alias.alias}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>My Nicknames</h2>
+            <p>Private aliases only visible to you and the DM.</p>
           </div>
 
           {error ? (
@@ -231,63 +248,65 @@ export default function PlayerNpcPage() {
           ) : null}
 
           <form className="note-form" onSubmit={handleSubmit}>
-            <textarea
-              className="text-area"
-              placeholder="Write a note about this NPC..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={5}
+            <input
+              className="text-input"
+              type="text"
+              placeholder="Add your personal alias..."
+              value={aliasInput}
+              onChange={(e) => setAliasInput(e.target.value)}
+              maxLength={80}
             />
             <button className="action-button" type="submit" disabled={saving}>
-              {saving ? "Saving..." : "Add note"}
+              {saving ? "Saving..." : "Add alias"}
             </button>
           </form>
 
           <div className="notes-list">
-            {notes.length === 0 ? (
+            {personalAliases.length === 0 ? (
               <div className="state-card small-card">
-                <p>No notes yet.</p>
+                <p>No personal aliases yet.</p>
               </div>
             ) : (
-              notes.map((note) => {
-                const isEditing = editingNoteId === note.id;
-                const wasEdited = note.updated_at !== note.created_at;
+              personalAliases.map((alias) => {
+                const isEditing = editingAliasId === alias.id;
+                const wasEdited = alias.updated_at !== alias.created_at;
 
                 return (
-                  <article className="note-card" key={note.id}>
+                  <article className="note-card" key={alias.id}>
                     <div className="note-card-header">
-                      <strong>{note.author_name}</strong>
+                      <strong>{alias.alias}</strong>
                       <span>
-                        {new Date(note.created_at).toLocaleString()}
+                        {new Date(alias.created_at).toLocaleString()}
                         {wasEdited ? " • edited" : ""}
                       </span>
                     </div>
 
                     {isEditing ? (
                       <>
-                        <textarea
-                          className="text-area"
-                          value={editingContent}
-                          onChange={(e) => setEditingContent(e.target.value)}
-                          rows={4}
+                        <input
+                          className="text-input"
+                          type="text"
+                          value={editingAliasValue}
+                          onChange={(e) => setEditingAliasValue(e.target.value)}
+                          maxLength={80}
                         />
 
                         <div className="note-actions">
                           <button
                             className="action-button"
                             type="button"
-                            onClick={() => handleSaveEdit(note.id)}
-                            disabled={updatingNoteId === note.id}
+                            onClick={() => handleSaveEdit(alias.id)}
+                            disabled={updatingAliasId === alias.id}
                           >
-                            {updatingNoteId === note.id ? "Saving..." : "Save"}
+                            {updatingAliasId === alias.id ? "Saving..." : "Save"}
                           </button>
 
                           <button
                             className="action-button secondary-link"
                             type="button"
                             onClick={() => {
-                              setEditingNoteId(null);
-                              setEditingContent("");
+                              setEditingAliasId(null);
+                              setEditingAliasValue("");
                             }}
                           >
                             Cancel
@@ -295,39 +314,27 @@ export default function PlayerNpcPage() {
                         </div>
                       </>
                     ) : (
-                      <>
-                        <p>{note.content}</p>
+                      <div className="note-actions">
+                        <button
+                          className="action-button secondary-link"
+                          type="button"
+                          onClick={() => {
+                            setEditingAliasId(alias.id);
+                            setEditingAliasValue(alias.alias);
+                          }}
+                        >
+                          Edit
+                        </button>
 
-                        {note.can_edit || note.can_delete ? (
-                          <div className="note-actions">
-                            {note.can_edit ? (
-                              <button
-                                className="action-button secondary-link"
-                                type="button"
-                                onClick={() => {
-                                  setEditingNoteId(note.id);
-                                  setEditingContent(note.content);
-                                }}
-                              >
-                                Edit
-                              </button>
-                            ) : null}
-
-                            {note.can_delete ? (
-                              <button
-                                className="action-button secondary-link"
-                                type="button"
-                                onClick={() => handleDelete(note.id)}
-                                disabled={deletingNoteId === note.id}
-                              >
-                                {deletingNoteId === note.id
-                                  ? "Deleting..."
-                                  : "Delete"}
-                              </button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </>
+                        <button
+                          className="action-button secondary-link"
+                          type="button"
+                          onClick={() => handleDelete(alias.id)}
+                          disabled={deletingAliasId === alias.id}
+                        >
+                          {deletingAliasId === alias.id ? "Removing..." : "Remove"}
+                        </button>
+                      </div>
                     )}
                   </article>
                 );

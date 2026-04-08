@@ -110,27 +110,35 @@ function mapNpcForPlayer(npc) {
     met_summary: npc.met_summary,
     short_blurb: npc.short_blurb,
     is_visible: npc.is_visible,
+    canonical_aliases: Array.isArray(npc.canonical_aliases)
+      ? npc.canonical_aliases
+      : [],
+    personal_aliases: Array.isArray(npc.personal_aliases)
+      ? npc.personal_aliases
+      : [],
     created_at: npc.created_at,
     updated_at: npc.updated_at,
   };
 }
 
-function noteCanEdit(sessionUser, noteRow) {
-  if (!sessionUser) return false;
-  if (sessionUser.role === "dm") return true;
-  return noteRow.author_user_id === sessionUser.id;
+function normalizeAlias(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
 }
 
-function mapNoteForClient(sessionUser, noteRow) {
+function mapAliasForClient(aliasRow) {
   return {
-    id: noteRow.id,
-    author_name: noteRow.author_name,
-    author_user_id: noteRow.author_user_id,
-    content: noteRow.content,
-    created_at: noteRow.created_at,
-    updated_at: noteRow.updated_at,
-    can_edit: noteCanEdit(sessionUser, noteRow),
-    can_delete: noteCanEdit(sessionUser, noteRow),
+    id: aliasRow.id,
+    npc_id: aliasRow.npc_id,
+    user_id: aliasRow.user_id,
+    owner_display_name: aliasRow.owner_display_name || null,
+    owner_username: aliasRow.owner_username || null,
+    alias: aliasRow.alias,
+    alias_type: aliasRow.alias_type,
+    created_at: aliasRow.created_at,
+    updated_at: aliasRow.updated_at,
   };
 }
 
@@ -282,6 +290,63 @@ function getLatestRecap() {
       `
     )
     .get();
+}
+
+function getCanonicalAliasesByNpcIds(npcIds) {
+  if (!npcIds.length) return new Map();
+
+  const placeholders = npcIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `
+        SELECT npc_id, alias
+        FROM npc_aliases
+        WHERE npc_id IN (${placeholders})
+          AND alias_type = 'canonical'
+          AND archived_at IS NULL
+        ORDER BY alias COLLATE NOCASE ASC
+      `
+    )
+    .all(...npcIds);
+
+  const byNpcId = new Map();
+  for (const row of rows) {
+    if (!byNpcId.has(row.npc_id)) {
+      byNpcId.set(row.npc_id, []);
+    }
+    byNpcId.get(row.npc_id).push(row.alias);
+  }
+
+  return byNpcId;
+}
+
+function getPersonalAliasesByNpcIds(npcIds, userId) {
+  if (!npcIds.length || !userId) return new Map();
+
+  const placeholders = npcIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `
+        SELECT npc_id, alias
+        FROM npc_aliases
+        WHERE npc_id IN (${placeholders})
+          AND alias_type = 'personal'
+          AND user_id = ?
+          AND archived_at IS NULL
+        ORDER BY alias COLLATE NOCASE ASC
+      `
+    )
+    .all(...npcIds, userId);
+
+  const byNpcId = new Map();
+  for (const row of rows) {
+    if (!byNpcId.has(row.npc_id)) {
+      byNpcId.set(row.npc_id, []);
+    }
+    byNpcId.get(row.npc_id).push(row.alias);
+  }
+
+  return byNpcId;
 }
 
 function safeParseBoard(rawJson) {
@@ -448,7 +513,15 @@ app.get("/api/dm/npcs", requireRole("dm"), (_req, res) => {
     )
     .all();
 
-  res.json(rows);
+  const npcIds = rows.map((row) => row.id);
+  const canonicalByNpcId = getCanonicalAliasesByNpcIds(npcIds);
+  const payload = rows.map((row) => ({
+    ...row,
+    canonical_aliases: canonicalByNpcId.get(row.id) || [],
+    personal_aliases: [],
+  }));
+
+  res.json(payload);
 });
 
 app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
@@ -469,7 +542,7 @@ app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
   res.json(npc);
 });
 
-app.get("/api/dm/npcs/:slug/notes", requireRole("dm"), (req, res) => {
+app.get("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
   const npc = db
     .prepare(
       `
@@ -484,18 +557,196 @@ app.get("/api/dm/npcs/:slug/notes", requireRole("dm"), (req, res) => {
     return res.status(404).json({ error: "NPC not found" });
   }
 
-  const notes = db
+  const aliases = db
     .prepare(
       `
-        SELECT id, author_name, author_user_id, content, created_at, updated_at
-        FROM npc_notes
+        SELECT
+          npc_aliases.id,
+          npc_aliases.npc_id,
+          npc_aliases.user_id,
+          npc_aliases.alias,
+          npc_aliases.alias_type,
+          npc_aliases.created_at,
+          npc_aliases.updated_at,
+          users.display_name AS owner_display_name,
+          users.username AS owner_username
+        FROM npc_aliases
+        LEFT JOIN users
+          ON users.id = npc_aliases.user_id
         WHERE npc_id = ?
-        ORDER BY created_at ASC
+          AND npc_aliases.archived_at IS NULL
+        ORDER BY
+          CASE WHEN npc_aliases.alias_type = 'canonical' THEN 0 ELSE 1 END,
+          users.display_name COLLATE NOCASE ASC,
+          npc_aliases.alias COLLATE NOCASE ASC
       `
     )
     .all(npc.id);
 
-  res.json(notes.map((note) => mapNoteForClient(req.session.user, note)));
+  const canonical = aliases
+    .filter((alias) => alias.alias_type === "canonical")
+    .map(mapAliasForClient);
+
+  const personalByUser = {};
+  for (const aliasRow of aliases.filter((alias) => alias.alias_type === "personal")) {
+    const key = String(aliasRow.user_id);
+    if (!personalByUser[key]) {
+      personalByUser[key] = {
+        user_id: aliasRow.user_id,
+        display_name: aliasRow.owner_display_name || aliasRow.owner_username || "Unknown User",
+        username: aliasRow.owner_username || "",
+        aliases: [],
+      };
+    }
+    personalByUser[key].aliases.push(mapAliasForClient(aliasRow));
+  }
+
+  res.json({
+    canonical,
+    personal_by_user: Object.values(personalByUser),
+  });
+});
+
+app.post("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT id
+        FROM npcs
+        WHERE slug = ?
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const alias = limitString(req.body.alias, 80).trim();
+  if (!alias) {
+    return res.status(400).json({ error: "alias is required" });
+  }
+
+  const aliasNormalized = normalizeAlias(alias);
+  const now = new Date().toISOString();
+
+  try {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO npc_aliases (
+            npc_id,
+            user_id,
+            alias,
+            alias_normalized,
+            alias_type,
+            created_at,
+            updated_at
+          )
+          VALUES (?, NULL, ?, ?, 'canonical', ?, ?)
+        `
+      )
+      .run(npc.id, alias, aliasNormalized, now, now);
+
+    const created = db
+      .prepare(
+        `
+          SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+          FROM npc_aliases
+          WHERE id = ?
+        `
+      )
+      .get(result.lastInsertRowid);
+
+    return res.status(201).json(mapAliasForClient(created));
+  } catch (error) {
+    if (String(error.message || "").includes("idx_npc_aliases_canonical_unique")) {
+      return res.status(409).json({ error: "Canonical alias already exists for this NPC" });
+    }
+    return res.status(500).json({ error: "Failed to create alias" });
+  }
+});
+
+app.patch("/api/dm/npc-aliases/:id", requireRole("dm"), (req, res) => {
+  const aliasId = Number(req.params.id);
+  const alias = limitString(req.body.alias, 80).trim();
+
+  if (!alias) {
+    return res.status(400).json({ error: "alias is required" });
+  }
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id, npc_id, alias_type
+        FROM npc_aliases
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(aliasId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Alias not found" });
+  }
+
+  const now = new Date().toISOString();
+  const aliasNormalized = normalizeAlias(alias);
+
+  try {
+    db.prepare(
+      `
+        UPDATE npc_aliases
+        SET alias = ?, alias_normalized = ?, updated_at = ?
+        WHERE id = ?
+      `
+    ).run(alias, aliasNormalized, now, aliasId);
+
+    const updated = db
+      .prepare(
+        `
+          SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+          FROM npc_aliases
+          WHERE id = ?
+        `
+      )
+      .get(aliasId);
+
+    return res.json(mapAliasForClient(updated));
+  } catch (error) {
+    if (String(error.message || "").includes("idx_npc_aliases_")) {
+      return res.status(409).json({ error: "Alias already exists in this scope" });
+    }
+    return res.status(500).json({ error: "Failed to update alias" });
+  }
+});
+
+app.delete("/api/dm/npc-aliases/:id", requireRole("dm"), (req, res) => {
+  const aliasId = Number(req.params.id);
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM npc_aliases
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(aliasId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Alias not found" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE npc_aliases
+      SET archived_at = ?, archived_by_user_id = ?, updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, req.session.user.id, now, aliasId);
+
+  res.json({ ok: true, id: aliasId });
 });
 
 app.patch("/api/dm/npcs/:slug/reveal", requireRole("dm"), (req, res) => {
@@ -950,7 +1201,7 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
   res.json(latest || null);
 });
 
-app.get("/api/npcs", requireRole("player", "dm"), (_req, res) => {
+app.get("/api/npcs", requireRole("player", "dm"), (req, res) => {
   const rows = db
     .prepare(
       `
@@ -962,7 +1213,22 @@ app.get("/api/npcs", requireRole("player", "dm"), (_req, res) => {
     )
     .all();
 
-  res.json(rows.map(mapNpcForPlayer));
+  const npcIds = rows.map((row) => row.id);
+  const canonicalByNpcId = getCanonicalAliasesByNpcIds(npcIds);
+  const personalByNpcId =
+    req.session.user.role === "player"
+      ? getPersonalAliasesByNpcIds(npcIds, req.session.user.id)
+      : new Map();
+
+  const payload = rows.map((row) =>
+    mapNpcForPlayer({
+      ...row,
+      canonical_aliases: canonicalByNpcId.get(row.id) || [],
+      personal_aliases: personalByNpcId.get(row.id) || [],
+    })
+  );
+
+  res.json(payload);
 });
 
 app.get("/api/npcs/:slug", requireRole("player", "dm"), (req, res) => {
@@ -983,7 +1249,7 @@ app.get("/api/npcs/:slug", requireRole("player", "dm"), (req, res) => {
   res.json(mapNpcForPlayer(npc));
 });
 
-app.get("/api/npcs/:slug/notes", requireRole("player", "dm"), (req, res) => {
+app.get("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
   const npc = db
     .prepare(
       `
@@ -998,21 +1264,40 @@ app.get("/api/npcs/:slug/notes", requireRole("player", "dm"), (req, res) => {
     return res.status(404).json({ error: "NPC not found" });
   }
 
-  const notes = db
+  const canonicalAliases = db
     .prepare(
       `
-        SELECT id, author_name, author_user_id, content, created_at, updated_at
-        FROM npc_notes
+        SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+        FROM npc_aliases
         WHERE npc_id = ?
-        ORDER BY created_at ASC
+          AND alias_type = 'canonical'
+          AND archived_at IS NULL
+        ORDER BY alias COLLATE NOCASE ASC
       `
     )
     .all(npc.id);
 
-  res.json(notes.map((note) => mapNoteForClient(req.session.user, note)));
+  const personalAliases = db
+    .prepare(
+      `
+        SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+        FROM npc_aliases
+        WHERE npc_id = ?
+          AND alias_type = 'personal'
+          AND user_id = ?
+          AND archived_at IS NULL
+        ORDER BY alias COLLATE NOCASE ASC
+      `
+    )
+    .all(npc.id, req.session.user.id);
+
+  res.json({
+    canonical: canonicalAliases.map(mapAliasForClient),
+    personal: personalAliases.map(mapAliasForClient),
+  });
 });
 
-app.post("/api/npcs/:slug/notes", requireRole("player", "dm"), (req, res) => {
+app.post("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
   const npc = db
     .prepare(
       `
@@ -1027,151 +1312,168 @@ app.post("/api/npcs/:slug/notes", requireRole("player", "dm"), (req, res) => {
     return res.status(404).json({ error: "NPC not found" });
   }
 
-  const content = String(req.body.content || "").trim();
-
-  if (!content) {
-    return res.status(400).json({ error: "content is required" });
+  const alias = limitString(req.body.alias, 80).trim();
+  if (!alias) {
+    return res.status(400).json({ error: "alias is required" });
   }
-
-  const authorUser = req.session.user;
-  const authorName =
-    authorUser?.display_name || authorUser?.username || "Unknown User";
 
   const now = new Date().toISOString();
+  const aliasNormalized = normalizeAlias(alias);
 
-  const result = db
-    .prepare(
-      `
-        INSERT INTO npc_notes (
-          npc_id,
-          author_user_id,
-          author_name,
-          content,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-      `
-    )
-    .run(npc.id, authorUser.id, authorName, content, now, now);
+  try {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO npc_aliases (
+            npc_id,
+            user_id,
+            alias,
+            alias_normalized,
+            alias_type,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, 'personal', ?, ?)
+        `
+      )
+      .run(npc.id, req.session.user.id, alias, aliasNormalized, now, now);
 
-  const note = db
-    .prepare(
-      `
-        SELECT id, author_name, author_user_id, content, created_at, updated_at
-        FROM npc_notes
-        WHERE id = ?
-      `
-    )
-    .get(result.lastInsertRowid);
+    const created = db
+      .prepare(
+        `
+          SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+          FROM npc_aliases
+          WHERE id = ?
+        `
+      )
+      .get(result.lastInsertRowid);
 
-  res.status(201).json(mapNoteForClient(req.session.user, note));
+    return res.status(201).json(mapAliasForClient(created));
+  } catch (error) {
+    if (String(error.message || "").includes("idx_npc_aliases_personal_unique")) {
+      return res.status(409).json({ error: "You already have this alias for this NPC" });
+    }
+    return res.status(500).json({ error: "Failed to create alias" });
+  }
 });
 
-app.patch("/api/npc-notes/:id", requireRole("player", "dm"), (req, res) => {
-  const noteId = Number(req.params.id);
-  const content = String(req.body.content || "").trim();
+app.patch("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {
+  const aliasId = Number(req.params.id);
+  const alias = limitString(req.body.alias, 80).trim();
 
-  if (!content) {
-    return res.status(400).json({ error: "content is required" });
+  if (!alias) {
+    return res.status(400).json({ error: "alias is required" });
   }
 
-  const note = db
+  const existing = db
     .prepare(
       `
         SELECT
-          npc_notes.id,
-          npc_notes.npc_id,
-          npc_notes.author_name,
-          npc_notes.author_user_id,
-          npc_notes.content,
-          npc_notes.created_at,
-          npc_notes.updated_at,
+          npc_aliases.id,
+          npc_aliases.npc_id,
+          npc_aliases.user_id,
+          npc_aliases.alias_type,
           npcs.is_visible
-        FROM npc_notes
-        JOIN npcs ON npcs.id = npc_notes.npc_id
-        WHERE npc_notes.id = ?
+        FROM npc_aliases
+        JOIN npcs ON npcs.id = npc_aliases.npc_id
+        WHERE npc_aliases.id = ?
+          AND npc_aliases.archived_at IS NULL
       `
     )
-    .get(noteId);
+    .get(aliasId);
 
-  if (!note) {
-    return res.status(404).json({ error: "Note not found" });
+  if (!existing) {
+    return res.status(404).json({ error: "Alias not found" });
   }
 
-  if (req.session.user.role !== "dm" && !note.is_visible) {
-    return res.status(404).json({ error: "Note not found" });
+  if (req.session.user.role !== "dm" && !existing.is_visible) {
+    return res.status(404).json({ error: "Alias not found" });
   }
 
-  if (!noteCanEdit(req.session.user, note)) {
+  if (existing.alias_type !== "personal") {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  if (req.session.user.role !== "dm" && existing.user_id !== req.session.user.id) {
     return res.status(403).json({ error: "Forbidden" });
   }
 
   const now = new Date().toISOString();
+  const aliasNormalized = normalizeAlias(alias);
 
-  db.prepare(
-    `
-      UPDATE npc_notes
-      SET content = ?, updated_at = ?
-      WHERE id = ?
-    `
-  ).run(content, now, noteId);
-
-  const updatedNote = db
-    .prepare(
+  try {
+    db.prepare(
       `
-        SELECT id, author_name, author_user_id, content, created_at, updated_at
-        FROM npc_notes
+        UPDATE npc_aliases
+        SET alias = ?, alias_normalized = ?, updated_at = ?
         WHERE id = ?
       `
-    )
-    .get(noteId);
+    ).run(alias, aliasNormalized, now, aliasId);
 
-  res.json(mapNoteForClient(req.session.user, updatedNote));
+    const updated = db
+      .prepare(
+        `
+          SELECT id, npc_id, user_id, alias, alias_type, created_at, updated_at
+          FROM npc_aliases
+          WHERE id = ?
+        `
+      )
+      .get(aliasId);
+
+    return res.json(mapAliasForClient(updated));
+  } catch (error) {
+    if (String(error.message || "").includes("idx_npc_aliases_personal_unique")) {
+      return res.status(409).json({ error: "You already have this alias for this NPC" });
+    }
+    return res.status(500).json({ error: "Failed to update alias" });
+  }
 });
 
-app.delete("/api/npc-notes/:id", requireRole("player", "dm"), (req, res) => {
-  const noteId = Number(req.params.id);
+app.delete("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {
+  const aliasId = Number(req.params.id);
 
-  const note = db
+  const existing = db
     .prepare(
       `
         SELECT
-          npc_notes.id,
-          npc_notes.npc_id,
-          npc_notes.author_name,
-          npc_notes.author_user_id,
-          npc_notes.content,
-          npc_notes.created_at,
-          npc_notes.updated_at,
+          npc_aliases.id,
+          npc_aliases.user_id,
+          npc_aliases.alias_type,
           npcs.is_visible
-        FROM npc_notes
-        JOIN npcs ON npcs.id = npc_notes.npc_id
-        WHERE npc_notes.id = ?
+        FROM npc_aliases
+        JOIN npcs ON npcs.id = npc_aliases.npc_id
+        WHERE npc_aliases.id = ?
+          AND npc_aliases.archived_at IS NULL
       `
     )
-    .get(noteId);
+    .get(aliasId);
 
-  if (!note) {
-    return res.status(404).json({ error: "Note not found" });
+  if (!existing) {
+    return res.status(404).json({ error: "Alias not found" });
   }
 
-  if (req.session.user.role !== "dm" && !note.is_visible) {
-    return res.status(404).json({ error: "Note not found" });
+  if (req.session.user.role !== "dm" && !existing.is_visible) {
+    return res.status(404).json({ error: "Alias not found" });
   }
 
-  if (!noteCanEdit(req.session.user, note)) {
+  if (existing.alias_type !== "personal") {
     return res.status(403).json({ error: "Forbidden" });
   }
 
+  if (req.session.user.role !== "dm" && existing.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const now = new Date().toISOString();
   db.prepare(
     `
-      DELETE FROM npc_notes
+      UPDATE npc_aliases
+      SET archived_at = ?, archived_by_user_id = ?, updated_at = ?
       WHERE id = ?
     `
-  ).run(noteId);
+  ).run(now, req.session.user.id, now, aliasId);
 
-  res.json({ ok: true, id: noteId });
+  res.json({ ok: true, id: aliasId });
 });
 
 app.get("/api/board", requireRole("player", "dm"), (req, res) => {

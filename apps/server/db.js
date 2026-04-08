@@ -118,6 +118,36 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_session_recaps_published_at
   ON session_recaps(published_at DESC, session_number DESC);
+
+  CREATE TABLE IF NOT EXISTS npc_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    npc_id INTEGER NOT NULL,
+    user_id INTEGER,
+    alias TEXT NOT NULL,
+    alias_normalized TEXT NOT NULL,
+    alias_type TEXT NOT NULL CHECK (alias_type IN ('canonical', 'personal')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (npc_id) REFERENCES npcs(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_npc_aliases_npc_active
+  ON npc_aliases(npc_id, archived_at, alias_type);
+
+  CREATE INDEX IF NOT EXISTS idx_npc_aliases_user_active
+  ON npc_aliases(user_id, archived_at, alias_type);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_aliases_canonical_unique
+  ON npc_aliases(npc_id, alias_type, alias_normalized)
+  WHERE alias_type = 'canonical' AND archived_at IS NULL;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_aliases_personal_unique
+  ON npc_aliases(npc_id, user_id, alias_type, alias_normalized)
+  WHERE alias_type = 'personal' AND archived_at IS NULL;
 `);
 
 function tableExists(tableName) {
