@@ -178,7 +178,7 @@ export default function PlayerNpcPage() {
   return (
     <div className="app-shell">
       <div className="page-back-link">
-        <Link to="/player">← Back to directory</Link>
+        <Link to="/directory">← Back to directory</Link>
       </div>
 
       <section className="detail-shell">

@@ -24,10 +24,9 @@ export default function LoginPage() {
       setSaving(true);
       setError("");
 
-      const user = await login(username.trim().toLowerCase(), password);
+      await login(username.trim().toLowerCase(), password);
 
-      const fallbackRoute = user.role === "dm" ? "/" : "/player";
-      navigate(state?.from || fallbackRoute, { replace: true });
+      navigate(state?.from || "/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
