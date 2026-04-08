@@ -14,8 +14,8 @@ short_blurb: Empress of Ever Summer and Regent of the Solar Throne. High and mig
 canonical_aliases:
   - Empress of Ever Summer
   - Sovereign of the Solar Throne
-portrait_filename: Titania_faebook.webp
-source_file_label: fixtures/npcs/Titania.md
+portrait_filename: titania.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Titania.md"
 tags:
   - npc
   - major

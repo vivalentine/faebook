@@ -11,8 +11,8 @@ met_summary: Met on the walk to the Gealach Estate.
 short_blurb: Outer Ring florist, courier, and deniable contract operative. Works for the Underground Salons. Married to Belladonna.
 canonical_aliases:
   - Pip
-portrait_filename: Pip_faebook.webp
-source_file_label: fixtures/npcs/Pip Foxglove.md
+portrait_filename: pip-foxglove.webp
+source_file_label: "04_NPC Folio/Summer/Outer Ring/Pip Foxglove.md"
 tags:
   - npc
   - major

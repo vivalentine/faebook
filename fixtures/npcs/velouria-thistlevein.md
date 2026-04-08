@@ -14,8 +14,8 @@ short_blurb: House Thistlevein matriarch. Social and emotional anchor of the Hou
 canonical_aliases:
   - Grand Hostess
   - Lori
-portrait_filename: Velouria_faebook.webp
-source_file_label: fixtures/npcs/Velouria Thistlevein.md
+portrait_filename: velouria-thistlevein.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Velouria Thistlevein.md"
 tags:
   - npc
   - major

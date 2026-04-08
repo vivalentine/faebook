@@ -13,8 +13,8 @@ met_summary: Met at the Thistlevein Estate.
 short_blurb: Scion of House Thistlevein. Son of Phaela and Lily. Seems to have a hard time speaking. Close with Eiluned Gealach.
 canonical_aliases:
   - Young Lord Cyrinthe
-portrait_filename: Cyrinthe_faebook.webp
-source_file_label: fixtures/npcs/Cyrinthe Thistlevein.md
+portrait_filename: cyrinthe-thistlevein.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Cyrinthe Thistlevein.md"
 tags:
   - npc
   - major

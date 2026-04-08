@@ -84,7 +84,7 @@ Players can:
 │  └─ codex/         # Codex setup and verification scripts
 ├─ AGENTS.md         # project operating rules for coding agents
 └─ .env.example      # safe example environment values
-````
+```
 
 ## Local development
 

@@ -13,8 +13,8 @@ met_summary: Met at the Thistlevein Estate.
 short_blurb: Young Gealach heir. Calm, careful, and composed under pressure. Close with Cyrinthe Thistlevein.
 canonical_aliases:
   - Loony
-portrait_filename: Eiluned_faebook.webp
-source_file_label: fixtures/npcs/Eiluned Gealach.md
+portrait_filename: eiluned-gealach.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Eiluned Gealach.md"
 tags:
   - npc
   - major

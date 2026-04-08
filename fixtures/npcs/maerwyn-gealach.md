@@ -13,8 +13,8 @@ met_summary: Met at the Gealach Estate.
 short_blurb: Gealach matriarch. Compassionate. Full of regrets and normally also wine.
 canonical_aliases:
   - Mae
-portrait_filename: Maerwyn_faebook.webp
-source_file_label: fixtures/npcs/Maerwyn Gealach.md
+portrait_filename: maerwyn-gealach.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Maerwyn Gealach.md"
 tags:
   - npc
   - major

@@ -12,8 +12,8 @@ short_blurb: Outer Ring florist, herbalist, poisoner, and deniable contract oper
 canonical_aliases:
   - Belladonna
   - Bella
-portrait_filename: Belladonna_faebook.webp
-source_file_label: fixtures/npcs/Belladonna Sableroot.md
+portrait_filename: belladonna-sableroot.webp
+source_file_label: "04_NPC Folio/Summer/Outer Ring/Belladonna Sableroot.md"
 tags:
   - npc
   - major

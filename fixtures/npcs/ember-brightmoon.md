@@ -13,8 +13,8 @@ met_summary: Met at the Banquet Hall.
 short_blurb: Head Lady-in-waiting to Velouria Thistlevein. Gentle. Steady. Worried about her sister.
 canonical_aliases:
   - Em
-portrait_filename: Ember_faebook.webp
-source_file_label: fixtures/npcs/Ember Brightmoon.md
+portrait_filename: ember-brightmoon.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Ember Brightmoon.md"
 tags:
   - npc
   - major

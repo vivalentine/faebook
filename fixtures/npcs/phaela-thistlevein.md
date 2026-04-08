@@ -11,8 +11,8 @@ ring: Inner Ring
 introduced_in: House Thistlevein estate scenes following the Masquerade
 met_summary: Met at the Thistlevein Estate.
 short_blurb: Former heir to House Thistlevein before Xyrene. Quiet. Intimidating. Wife to Lily. Mother to Cyrinthe.
-portrait_filename: Phaela_faebook.webp
-source_file_label: fixtures/npcs/Phaela Thistlevein.md
+portrait_filename: phaela-thistlevein.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Phaela Thistlevein.md"
 tags:
   - npc
   - major

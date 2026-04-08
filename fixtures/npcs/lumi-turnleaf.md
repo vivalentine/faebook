@@ -13,8 +13,8 @@ canonical_aliases:
   - Lumi
   - The Chronicler
   - The Narrator
-portrait_filename: Lumi_faebook.webp
-source_file_label: fixtures/npcs/Lumi Turnleaf.md
+portrait_filename: lumi-turnleaf.webp
+source_file_label: "04_NPC Folio/Winter/Lumi Turnleaf.md"
 tags:
   - npc
   - major

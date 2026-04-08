@@ -13,8 +13,8 @@ met_summary: Met at the Thistlevein Estate.
 short_blurb: Formerly Lily Venerestra of the Spring Court. Soft. Sweet. A little clingy. Wife to Phaela. Mother to Cyrinthe.
 canonical_aliases:
   - Lily Verenestra
-portrait_filename: Lily_faebook.webp
-source_file_label: fixtures/npcs/Lily Thistlevein.md
+portrait_filename: lily-thistlevein.webp
+source_file_label: "04_NPC Folio/Summer/Inner Ring/Lily Thistlevein.md"
 tags:
   - npc
   - major
