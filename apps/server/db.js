@@ -72,6 +72,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_board_states_owner_user_id
   ON board_states(owner_user_id);
 
+  CREATE TABLE IF NOT EXISTS boards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    is_default INTEGER NOT NULL DEFAULT 0 CHECK (is_default IN (0, 1)),
+    json_data TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_boards_owner_active
+  ON boards(owner_user_id, archived_at, updated_at DESC, id DESC);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_boards_owner_default_active
+  ON boards(owner_user_id)
+  WHERE is_default = 1 AND archived_at IS NULL;
+
   CREATE TABLE IF NOT EXISTS dashboard_suspects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -290,6 +311,60 @@ if (tableExists("board_state")) {
         legacyBoard.updated_at
       );
     }
+  }
+}
+
+if (tableExists("board_states")) {
+  const boardCount = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM boards
+      `
+    )
+    .get();
+
+  if (Number(boardCount?.count || 0) === 0) {
+    const now = new Date().toISOString();
+    const legacyRows = db
+      .prepare(
+        `
+          SELECT owner_user_id, json_data, created_at, updated_at
+          FROM board_states
+          ORDER BY owner_user_id ASC
+        `
+      )
+      .all();
+
+    const insertBoard = db.prepare(
+      `
+        INSERT INTO boards (
+          owner_user_id,
+          name,
+          is_default,
+          json_data,
+          created_at,
+          updated_at,
+          archived_at,
+          archived_by_user_id
+        )
+        VALUES (?, ?, 1, ?, ?, ?, NULL, NULL)
+      `
+    );
+
+    const migrateTx = db.transaction(() => {
+      for (const row of legacyRows) {
+        insertBoard.run(
+          row.owner_user_id,
+          "Investigation Board",
+          row.json_data,
+          row.created_at || row.updated_at || now,
+          row.updated_at || now
+        );
+      }
+    });
+
+    migrateTx();
   }
 }
 

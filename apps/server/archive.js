@@ -80,6 +80,85 @@ function createArchiveRecord(db, {
 }
 
 const RESTORE_STRATEGIES = {
+  board: {
+    tableName: "boards",
+    objectType: "board",
+    restoreRow(db, archiveRecord, now) {
+      const objectId = Number(archiveRecord.object_id);
+      const existing = db
+        .prepare(
+          `
+            SELECT *
+            FROM boards
+            WHERE id = ?
+          `
+        )
+        .get(objectId);
+
+      if (existing) {
+        db.prepare(
+          `
+            UPDATE boards
+            SET archived_at = NULL,
+                archived_by_user_id = NULL,
+                updated_at = ?
+            WHERE id = ?
+          `
+        ).run(now, objectId);
+      } else {
+        const payload = parsePayload(archiveRecord.payload_json);
+        const row = payload.row || {};
+
+        db.prepare(
+          `
+            INSERT INTO boards (
+              id,
+              owner_user_id,
+              name,
+              is_default,
+              json_data,
+              created_at,
+              updated_at,
+              archived_at,
+              archived_by_user_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+          `
+        ).run(
+          objectId,
+          row.owner_user_id,
+          row.name || "Restored Board",
+          row.is_default ? 1 : 0,
+          row.json_data || "{\"nodes\":[],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}",
+          row.created_at || now,
+          now
+        );
+      }
+
+      const rowAfter = db
+        .prepare(
+          `
+            SELECT id, owner_user_id
+            FROM boards
+            WHERE id = ?
+          `
+        )
+        .get(objectId);
+
+      db.prepare(
+        `
+          UPDATE boards
+          SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END,
+              updated_at = ?
+          WHERE owner_user_id = ?
+            AND archived_at IS NULL
+            AND (is_default = 1 OR id = ?)
+        `
+      ).run(objectId, now, rowAfter.owner_user_id, objectId);
+
+      return objectId;
+    },
+  },
   dashboard_suspect: {
     tableName: "dashboard_suspects",
     objectType: "dashboard_suspect",
