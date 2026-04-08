@@ -221,6 +221,69 @@ function limitString(value, maxLength) {
   return String(value || "").slice(0, maxLength);
 }
 
+function sanitizeSuspectStatus(value) {
+  return ["active", "cleared", "unknown"].includes(value) ? value : "unknown";
+}
+
+function mapSuspectForClient(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    status: row.status,
+    note: row.note,
+    sort_order: row.sort_order,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function mapDashboardNoteForClient(row) {
+  return {
+    id: row.id,
+    content: row.content,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function getActiveDashboardNoteByUserId(userId) {
+  return db
+    .prepare(
+      `
+        SELECT id, content, created_at, updated_at
+        FROM dashboard_notes
+        WHERE user_id = ? AND archived_at IS NULL
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+      `
+    )
+    .get(userId);
+}
+
+function getLatestRecap() {
+  return db
+    .prepare(
+      `
+        SELECT
+          session_recaps.id,
+          session_recaps.session_number,
+          session_recaps.title,
+          session_recaps.content,
+          session_recaps.published_at,
+          session_recaps.updated_at,
+          session_recaps.published_by_user_id,
+          users.display_name AS published_by_display_name,
+          users.username AS published_by_username
+        FROM session_recaps
+        LEFT JOIN users
+          ON users.id = session_recaps.published_by_user_id
+        ORDER BY session_recaps.published_at DESC, session_recaps.session_number DESC
+        LIMIT 1
+      `
+    )
+    .get();
+}
+
 function safeParseBoard(rawJson) {
   try {
     const parsed = JSON.parse(rawJson);
@@ -518,6 +581,373 @@ app.get("/api/dm/board-users", requireRole("dm"), (_req, res) => {
     .all();
 
   res.json(rows);
+});
+
+app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+
+  const suspects = db
+    .prepare(
+      `
+        SELECT id, name, status, note, sort_order, created_at, updated_at
+        FROM dashboard_suspects
+        WHERE user_id = ? AND archived_at IS NULL
+        ORDER BY sort_order ASC, id ASC
+      `
+    )
+    .all(sessionUser.id)
+    .map(mapSuspectForClient);
+
+  const note = getActiveDashboardNoteByUserId(sessionUser.id);
+  const latestRecap = getLatestRecap() || null;
+
+  const recentlyUnlockedNpcs = db
+    .prepare(
+      `
+        SELECT id, slug, name, updated_at
+        FROM npcs
+        WHERE is_visible = 1
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 5
+      `
+    )
+    .all();
+
+  const boardUpdated = db
+    .prepare(
+      `
+        SELECT updated_at
+        FROM board_states
+        WHERE owner_user_id = ?
+      `
+    )
+    .get(sessionUser.id);
+
+  const recentActivity = [
+    boardUpdated?.updated_at
+      ? { type: "board", label: "Investigation board edited", updated_at: boardUpdated.updated_at }
+      : null,
+    suspects[0]
+      ? { type: "suspect", label: "Suspect list updated", updated_at: suspects[0].updated_at }
+      : null,
+    note
+      ? { type: "note", label: "Personal notes updated", updated_at: note.updated_at }
+      : null,
+  ]
+    .filter(Boolean)
+    .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+    .slice(0, 5);
+
+  const payload = {
+    role: sessionUser.role,
+    quick_links: {
+      board: "/board",
+      maps: "/maps",
+    },
+    recently_unlocked_npcs: recentlyUnlockedNpcs,
+    suspects,
+    personal_note: note ? mapDashboardNoteForClient(note) : null,
+    latest_recap: latestRecap,
+    recent_personal_activity: recentActivity,
+  };
+
+  if (sessionUser.role === "dm") {
+    const playerBoardLinks = db
+      .prepare(
+        `
+          SELECT
+            users.id,
+            users.display_name,
+            users.username,
+            board_states.updated_at AS board_updated_at
+          FROM users
+          LEFT JOIN board_states
+            ON board_states.owner_user_id = users.id
+          WHERE users.role = 'player'
+          ORDER BY board_states.updated_at DESC, users.display_name ASC
+        `
+      )
+      .all();
+
+    payload.player_board_links = playerBoardLinks;
+    payload.recent_imports = [];
+    payload.archive_activity_summary = {
+      archived_recently: 0,
+      restored_recently: 0,
+      note: "Archive reporting will expand with archive browser APIs.",
+    };
+    payload.recently_changed_npcs = db
+      .prepare(
+        `
+          SELECT id, slug, name, updated_at
+          FROM npcs
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 5
+        `
+      )
+      .all();
+  }
+
+  res.json(payload);
+});
+
+app.post("/api/dashboard/suspects", requireRole("player", "dm"), (req, res) => {
+  const name = limitString(req.body.name, 160).trim();
+  const note = limitString(req.body.note, 1200).trim();
+  const status = sanitizeSuspectStatus(String(req.body.status || "unknown"));
+
+  if (!name) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const now = new Date().toISOString();
+  const maxSortRow = db
+    .prepare(
+      `
+        SELECT COALESCE(MAX(sort_order), 0) AS max_sort_order
+        FROM dashboard_suspects
+        WHERE user_id = ? AND archived_at IS NULL
+      `
+    )
+    .get(req.session.user.id);
+
+  const sortOrder = Number(maxSortRow?.max_sort_order || 0) + 1;
+
+  const result = db
+    .prepare(
+      `
+        INSERT INTO dashboard_suspects (
+          user_id,
+          name,
+          status,
+          note,
+          sort_order,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(req.session.user.id, name, status, note, sortOrder, now, now);
+
+  const suspect = db
+    .prepare(
+      `
+        SELECT id, name, status, note, sort_order, created_at, updated_at
+        FROM dashboard_suspects
+        WHERE id = ?
+      `
+    )
+    .get(result.lastInsertRowid);
+
+  res.status(201).json(mapSuspectForClient(suspect));
+});
+
+app.patch("/api/dashboard/suspects/:id", requireRole("player", "dm"), (req, res) => {
+  const suspectId = Number(req.params.id);
+  const suspect = db
+    .prepare(
+      `
+        SELECT *
+        FROM dashboard_suspects
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(suspectId);
+
+  if (!suspect) {
+    return res.status(404).json({ error: "Suspect not found" });
+  }
+
+  if (suspect.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const hasName = Object.prototype.hasOwnProperty.call(req.body, "name");
+  const hasNote = Object.prototype.hasOwnProperty.call(req.body, "note");
+  const hasStatus = Object.prototype.hasOwnProperty.call(req.body, "status");
+  const hasSortOrder = Object.prototype.hasOwnProperty.call(req.body, "sort_order");
+
+  const name = hasName ? limitString(req.body.name, 160).trim() : suspect.name;
+  const note = hasNote ? limitString(req.body.note, 1200).trim() : suspect.note;
+  const status = hasStatus
+    ? sanitizeSuspectStatus(String(req.body.status || "unknown"))
+    : suspect.status;
+  const sortOrder = hasSortOrder
+    ? Math.max(0, Number.parseInt(String(req.body.sort_order), 10) || 0)
+    : suspect.sort_order;
+
+  if (!name) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE dashboard_suspects
+      SET name = ?, status = ?, note = ?, sort_order = ?, updated_at = ?
+      WHERE id = ?
+    `
+  ).run(name, status, note, sortOrder, now, suspectId);
+
+  const updated = db
+    .prepare(
+      `
+        SELECT id, name, status, note, sort_order, created_at, updated_at
+        FROM dashboard_suspects
+        WHERE id = ?
+      `
+    )
+    .get(suspectId);
+
+  res.json(mapSuspectForClient(updated));
+});
+
+app.delete("/api/dashboard/suspects/:id", requireRole("player", "dm"), (req, res) => {
+  const suspectId = Number(req.params.id);
+  const suspect = db
+    .prepare(
+      `
+        SELECT *
+        FROM dashboard_suspects
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(suspectId);
+
+  if (!suspect) {
+    return res.status(404).json({ error: "Suspect not found" });
+  }
+
+  if (suspect.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE dashboard_suspects
+      SET archived_at = ?, archived_by_user_id = ?, updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, req.session.user.id, now, suspectId);
+
+  res.json({ ok: true, id: suspectId });
+});
+
+app.get("/api/dashboard/notes", requireRole("player", "dm"), (req, res) => {
+  const note = getActiveDashboardNoteByUserId(req.session.user.id);
+  res.json(note ? mapDashboardNoteForClient(note) : null);
+});
+
+app.put("/api/dashboard/notes", requireRole("player", "dm"), (req, res) => {
+  const content = limitString(req.body.content, 20000).trim();
+  const now = new Date().toISOString();
+  const existing = getActiveDashboardNoteByUserId(req.session.user.id);
+
+  if (!existing) {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO dashboard_notes (user_id, content, created_at, updated_at)
+          VALUES (?, ?, ?, ?)
+        `
+      )
+      .run(req.session.user.id, content, now, now);
+
+    const created = db
+      .prepare(
+        `
+          SELECT id, content, created_at, updated_at
+          FROM dashboard_notes
+          WHERE id = ?
+        `
+      )
+      .get(result.lastInsertRowid);
+
+    return res.status(201).json(mapDashboardNoteForClient(created));
+  }
+
+  db.prepare(
+    `
+      UPDATE dashboard_notes
+      SET content = ?, updated_at = ?
+      WHERE id = ?
+    `
+  ).run(content, now, existing.id);
+
+  const updated = db
+    .prepare(
+      `
+        SELECT id, content, created_at, updated_at
+        FROM dashboard_notes
+        WHERE id = ?
+      `
+    )
+    .get(existing.id);
+
+  res.json(mapDashboardNoteForClient(updated));
+});
+
+app.get("/api/session-recaps/latest", requireRole("player", "dm"), (_req, res) => {
+  const recap = getLatestRecap();
+  if (!recap) {
+    return res.json(null);
+  }
+
+  res.json(recap);
+});
+
+app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
+  const sessionNumber = Number.parseInt(String(req.body.session_number), 10);
+  const title = limitString(req.body.title || "Lumi’s Session Recap", 120).trim();
+  const content = limitString(req.body.content, 20000).trim();
+
+  if (!Number.isInteger(sessionNumber) || sessionNumber <= 0) {
+    return res.status(400).json({ error: "session_number must be a positive integer" });
+  }
+
+  if (!content) {
+    return res.status(400).json({ error: "content is required" });
+  }
+
+  const now = new Date().toISOString();
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM session_recaps
+        WHERE session_number = ?
+      `
+    )
+    .get(sessionNumber);
+
+  if (existing) {
+    db.prepare(
+      `
+        UPDATE session_recaps
+        SET title = ?, content = ?, published_at = ?, published_by_user_id = ?, updated_at = ?
+        WHERE id = ?
+      `
+    ).run(title, content, now, req.session.user.id, now, existing.id);
+  } else {
+    db.prepare(
+      `
+        INSERT INTO session_recaps (
+          session_number,
+          title,
+          content,
+          published_at,
+          published_by_user_id,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    ).run(sessionNumber, title, content, now, req.session.user.id, now);
+  }
+
+  const latest = getLatestRecap();
+  res.json(latest || null);
 });
 
 app.get("/api/npcs", requireRole("player", "dm"), (_req, res) => {
