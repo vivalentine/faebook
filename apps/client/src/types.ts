@@ -153,3 +153,19 @@ export type DashboardData = {
     note: string;
   };
 };
+
+export type ArchiveRecord = {
+  id: number;
+  object_type: "dashboard_suspect" | "dashboard_note" | "npc_alias" | string;
+  object_id: string;
+  owner_user_id: number | null;
+  archived_by_user_id: number;
+  archived_at: string;
+  object_label: string | null;
+  source_table: string | null;
+  archive_reason: string | null;
+  owner_username?: string | null;
+  owner_display_name?: string | null;
+  archived_by_username?: string | null;
+  archived_by_display_name?: string | null;
+};

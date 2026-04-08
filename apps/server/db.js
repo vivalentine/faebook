@@ -148,6 +148,44 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_aliases_personal_unique
   ON npc_aliases(npc_id, user_id, alias_type, alias_normalized)
   WHERE alias_type = 'personal' AND archived_at IS NULL;
+
+  CREATE TABLE IF NOT EXISTS archive_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    object_type TEXT NOT NULL,
+    object_id TEXT NOT NULL,
+    owner_user_id INTEGER,
+    archived_by_user_id INTEGER NOT NULL,
+    archived_at TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    object_label TEXT,
+    source_table TEXT,
+    archive_reason TEXT,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_archive_records_object_type
+  ON archive_records(object_type, archived_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_archive_records_owner_user
+  ON archive_records(owner_user_id, archived_at DESC);
+
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_user_id INTEGER NOT NULL,
+    action_type TEXT NOT NULL,
+    object_type TEXT NOT NULL,
+    object_id TEXT,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (actor_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at
+  ON audit_logs(created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type
+  ON audit_logs(action_type, created_at DESC);
 `);
 
 function tableExists(tableName) {
