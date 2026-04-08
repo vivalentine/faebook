@@ -7,6 +7,7 @@ const bcrypt = require("bcryptjs");
 const fs = require("fs");
 const path = require("path");
 const db = require("./db");
+const { createArchiveRecord, createAuditLog, getRestoreStrategy } = require("./archive");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -231,6 +232,46 @@ function limitString(value, maxLength) {
 
 function sanitizeSuspectStatus(value) {
   return ["active", "cleared", "unknown"].includes(value) ? value : "unknown";
+}
+
+function archiveRecordAndLog({
+  objectType,
+  objectId,
+  ownerUserId,
+  archivedByUserId,
+  payload,
+  objectLabel,
+  sourceTable,
+  archiveReason,
+  auditMessage,
+}) {
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    const archiveRecord = createArchiveRecord(db, {
+      objectType,
+      objectId,
+      ownerUserId,
+      archivedByUserId,
+      archivedAt: now,
+      payload,
+      objectLabel,
+      sourceTable,
+      archiveReason,
+    });
+
+    createAuditLog(db, {
+      actorUserId: archivedByUserId,
+      actionType: "archive",
+      objectType,
+      objectId,
+      message: auditMessage,
+      createdAt: now,
+    });
+
+    return archiveRecord;
+  });
+
+  return tx();
 }
 
 function mapSuspectForClient(row) {
@@ -726,7 +767,7 @@ app.delete("/api/dm/npc-aliases/:id", requireRole("dm"), (req, res) => {
   const existing = db
     .prepare(
       `
-        SELECT id
+        SELECT *
         FROM npc_aliases
         WHERE id = ? AND archived_at IS NULL
       `
@@ -745,6 +786,18 @@ app.delete("/api/dm/npc-aliases/:id", requireRole("dm"), (req, res) => {
       WHERE id = ?
     `
   ).run(now, req.session.user.id, now, aliasId);
+
+  archiveRecordAndLog({
+    objectType: "npc_alias",
+    objectId: aliasId,
+    ownerUserId: existing.user_id || req.session.user.id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: existing },
+    objectLabel: existing.alias,
+    sourceTable: "npc_aliases",
+    archiveReason: "dm-remove",
+    auditMessage: `DM archived alias ${aliasId}`,
+  });
 
   res.json({ ok: true, id: aliasId });
 });
@@ -903,6 +956,20 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
   };
 
   if (sessionUser.role === "dm") {
+    const archiveSummaryCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const archiveSummary = db
+      .prepare(
+        `
+          SELECT
+            SUM(CASE WHEN action_type = 'archive' THEN 1 ELSE 0 END) AS archived_recently,
+            SUM(CASE WHEN action_type = 'restore' THEN 1 ELSE 0 END) AS restored_recently
+          FROM audit_logs
+          WHERE created_at >= ?
+            AND action_type IN ('archive', 'restore')
+        `
+      )
+      .get(archiveSummaryCutoff);
+
     const playerBoardLinks = db
       .prepare(
         `
@@ -923,9 +990,9 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
     payload.player_board_links = playerBoardLinks;
     payload.recent_imports = [];
     payload.archive_activity_summary = {
-      archived_recently: 0,
-      restored_recently: 0,
-      note: "Archive reporting will expand with archive browser APIs.",
+      archived_recently: Number(archiveSummary?.archived_recently || 0),
+      restored_recently: Number(archiveSummary?.restored_recently || 0),
+      note: "Counts include archive and restore actions from the last 7 days.",
     };
     payload.recently_changed_npcs = db
       .prepare(
@@ -1083,6 +1150,18 @@ app.delete("/api/dashboard/suspects/:id", requireRole("player", "dm"), (req, res
     `
   ).run(now, req.session.user.id, now, suspectId);
 
+  archiveRecordAndLog({
+    objectType: "dashboard_suspect",
+    objectId: suspectId,
+    ownerUserId: suspect.user_id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: suspect },
+    objectLabel: suspect.name,
+    sourceTable: "dashboard_suspects",
+    archiveReason: req.session.user.role === "dm" ? "dm-remove" : "player-remove",
+    auditMessage: `Archived dashboard suspect ${suspectId}`,
+  });
+
   res.json({ ok: true, id: suspectId });
 });
 
@@ -1138,6 +1217,50 @@ app.put("/api/dashboard/notes", requireRole("player", "dm"), (req, res) => {
     .get(existing.id);
 
   res.json(mapDashboardNoteForClient(updated));
+});
+
+app.delete("/api/dashboard/notes/:id", requireRole("player", "dm"), (req, res) => {
+  const noteId = Number(req.params.id);
+  const note = db
+    .prepare(
+      `
+        SELECT *
+        FROM dashboard_notes
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(noteId);
+
+  if (!note) {
+    return res.status(404).json({ error: "Dashboard note not found" });
+  }
+
+  if (note.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE dashboard_notes
+      SET archived_at = ?, archived_by_user_id = ?, updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, req.session.user.id, now, noteId);
+
+  archiveRecordAndLog({
+    objectType: "dashboard_note",
+    objectId: noteId,
+    ownerUserId: note.user_id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: note },
+    objectLabel: "Personal note",
+    sourceTable: "dashboard_notes",
+    archiveReason: req.session.user.role === "dm" ? "dm-remove" : "player-remove",
+    auditMessage: `Archived dashboard note ${noteId}`,
+  });
+
+  return res.json({ ok: true, id: noteId });
 });
 
 app.get("/api/session-recaps/latest", requireRole("player", "dm"), (_req, res) => {
@@ -1436,9 +1559,7 @@ app.delete("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {
     .prepare(
       `
         SELECT
-          npc_aliases.id,
-          npc_aliases.user_id,
-          npc_aliases.alias_type,
+          npc_aliases.*,
           npcs.is_visible
         FROM npc_aliases
         JOIN npcs ON npcs.id = npc_aliases.npc_id
@@ -1473,7 +1594,177 @@ app.delete("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {
     `
   ).run(now, req.session.user.id, now, aliasId);
 
+  archiveRecordAndLog({
+    objectType: "npc_alias",
+    objectId: aliasId,
+    ownerUserId: existing.user_id || req.session.user.id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: existing },
+    objectLabel: existing.alias,
+    sourceTable: "npc_aliases",
+    archiveReason: req.session.user.role === "dm" ? "dm-remove" : "player-remove",
+    auditMessage: `Archived NPC alias ${aliasId}`,
+  });
+
   res.json({ ok: true, id: aliasId });
+});
+
+app.get("/api/archive", requireRole("dm"), (req, res) => {
+  const filters = [];
+  const params = [];
+
+  if (req.query.object_type) {
+    filters.push("archive_records.object_type = ?");
+    params.push(String(req.query.object_type));
+  }
+
+  const ownerUserId = Number(req.query.owner_user_id);
+  if (Number.isInteger(ownerUserId) && ownerUserId > 0) {
+    filters.push("archive_records.owner_user_id = ?");
+    params.push(ownerUserId);
+  }
+
+  if (req.query.date_from) {
+    filters.push("archive_records.archived_at >= ?");
+    params.push(String(req.query.date_from));
+  }
+
+  if (req.query.date_to) {
+    filters.push("archive_records.archived_at <= ?");
+    params.push(String(req.query.date_to));
+  }
+
+  const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          archive_records.id,
+          archive_records.object_type,
+          archive_records.object_id,
+          archive_records.owner_user_id,
+          archive_records.archived_by_user_id,
+          archive_records.archived_at,
+          archive_records.object_label,
+          archive_records.source_table,
+          archive_records.archive_reason,
+          owner.username AS owner_username,
+          owner.display_name AS owner_display_name,
+          archived_by.username AS archived_by_username,
+          archived_by.display_name AS archived_by_display_name
+        FROM archive_records
+        LEFT JOIN users AS owner
+          ON owner.id = archive_records.owner_user_id
+        LEFT JOIN users AS archived_by
+          ON archived_by.id = archive_records.archived_by_user_id
+        ${whereClause}
+        ORDER BY archive_records.archived_at DESC, archive_records.id DESC
+        LIMIT 300
+      `
+    )
+    .all(...params);
+
+  res.json(rows);
+});
+
+app.post("/api/archive/:id/restore", requireRole("dm"), (req, res) => {
+  const archiveId = Number(req.params.id);
+  const archiveRecord = db
+    .prepare(
+      `
+        SELECT *
+        FROM archive_records
+        WHERE id = ?
+      `
+    )
+    .get(archiveId);
+
+  if (!archiveRecord) {
+    return res.status(404).json({ error: "Archive record not found" });
+  }
+
+  const restoreStrategy = getRestoreStrategy(archiveRecord.object_type);
+  if (!restoreStrategy) {
+    return res.status(400).json({ error: "This object type is not restorable in v1" });
+  }
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    const restoredObjectId = restoreStrategy.restoreRow(db, archiveRecord, now);
+
+    db.prepare(
+      `
+        DELETE FROM archive_records
+        WHERE id = ?
+      `
+    ).run(archiveId);
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "restore",
+      objectType: archiveRecord.object_type,
+      objectId: restoredObjectId,
+      message: `Restored ${archiveRecord.object_type} ${restoredObjectId} from archive ${archiveId}`,
+      createdAt: now,
+    });
+
+    return restoredObjectId;
+  });
+
+  const restoredObjectId = tx();
+  res.json({ ok: true, restored_id: restoredObjectId, archive_id: archiveId });
+});
+
+app.delete("/api/archive/:id", requireRole("dm"), (req, res) => {
+  const archiveId = Number(req.params.id);
+  const archiveRecord = db
+    .prepare(
+      `
+        SELECT *
+        FROM archive_records
+        WHERE id = ?
+      `
+    )
+    .get(archiveId);
+
+  if (!archiveRecord) {
+    return res.status(404).json({ error: "Archive record not found" });
+  }
+
+  const restoreStrategy = getRestoreStrategy(archiveRecord.object_type);
+  if (!restoreStrategy) {
+    return res.status(400).json({ error: "This object type is not hard-deletable in v1" });
+  }
+
+  const objectId = Number(archiveRecord.object_id);
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        DELETE FROM ${restoreStrategy.tableName}
+        WHERE id = ?
+      `
+    ).run(objectId);
+
+    db.prepare(
+      `
+        DELETE FROM archive_records
+        WHERE id = ?
+      `
+    ).run(archiveId);
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "hard_delete",
+      objectType: archiveRecord.object_type,
+      objectId,
+      message: `Hard deleted ${archiveRecord.object_type} ${objectId} from archive ${archiveId}`,
+      createdAt: now,
+    });
+  });
+
+  tx();
+  res.json({ ok: true, id: archiveId, hard_deleted_object_id: objectId });
 });
 
 app.get("/api/board", requireRole("player", "dm"), (req, res) => {

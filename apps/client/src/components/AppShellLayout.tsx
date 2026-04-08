@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "NPC Directory", to: "/directory" },
   { label: "Investigation Board", to: "/board" },
   { label: "Maps", to: "/maps" },
+  { label: "Archive", to: "/archive", dmOnly: true },
   { label: "DM Tools", to: "/dm-tools", dmOnly: true },
 ];
 

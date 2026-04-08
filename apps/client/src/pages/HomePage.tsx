@@ -210,6 +210,45 @@ export default function HomePage() {
     }
   }
 
+  async function archivePersonalNote() {
+    if (!dashboard?.personal_note) {
+      return;
+    }
+
+    if (!window.confirm("Archive your active personal note?")) {
+      return;
+    }
+
+    try {
+      setNoteSaving(true);
+      setNoteStatus("");
+
+      const response = await apiFetch(`/api/dashboard/notes/${dashboard.personal_note.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to archive personal note");
+      }
+
+      setDashboard((current) =>
+        current
+          ? {
+              ...current,
+              personal_note: null,
+            }
+          : current,
+      );
+      setNoteDraft("");
+      setNoteStatus("Archived");
+    } catch (archiveError) {
+      setError(archiveError instanceof Error ? archiveError.message : "Failed to archive personal note");
+    } finally {
+      setNoteSaving(false);
+    }
+  }
+
   async function saveRecap() {
     if (!user || user.role !== "dm") {
       return;
@@ -416,6 +455,14 @@ export default function HomePage() {
           <div className="dashboard-row-actions">
             <button className="action-button" type="button" disabled={noteSaving} onClick={() => void saveNotes()}>
               {noteSaving ? "Saving..." : "Save Notes"}
+            </button>
+            <button
+              className="board-node-delete-button"
+              type="button"
+              disabled={noteSaving || !dashboard.personal_note}
+              onClick={() => void archivePersonalNote()}
+            >
+              Archive Note
             </button>
             <span className="topbar-meta">{noteStatus}</span>
           </div>
