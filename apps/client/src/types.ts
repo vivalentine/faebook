@@ -15,20 +15,23 @@ export type Npc = {
   met_summary: string | null;
   short_blurb: string | null;
   is_visible: number;
+  canonical_aliases: string[];
+  personal_aliases: string[];
   source_file?: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type NpcNote = {
+export type NpcAlias = {
   id: number;
-  author_name: string;
-  author_user_id: number | null;
-  content: string;
+  npc_id: number;
+  user_id: number | null;
+  owner_display_name?: string | null;
+  owner_username?: string | null;
+  alias: string;
+  alias_type: "canonical" | "personal";
   created_at: string;
   updated_at: string;
-  can_edit: boolean;
-  can_delete: boolean;
 };
 
 export type BoardCardData = {

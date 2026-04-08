@@ -1,19 +1,30 @@
 import { useEffect, useState } from "react";
+import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch, apiUrl } from "../lib/api";
-import type { Npc, NpcNote } from "../types";
+import type { Npc, NpcAlias } from "../types";
+
+type PersonalAliasGroup = {
+  user_id: number;
+  display_name: string;
+  username: string;
+  aliases: NpcAlias[];
+};
 
 export default function DmNpcPage() {
   const { slug = "" } = useParams();
 
   const [npc, setNpc] = useState<Npc | null>(null);
-  const [notes, setNotes] = useState<NpcNote[]>([]);
+  const [canonicalAliases, setCanonicalAliases] = useState<NpcAlias[]>([]);
+  const [personalAliasGroups, setPersonalAliasGroups] = useState<PersonalAliasGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
-  const [editingContent, setEditingContent] = useState("");
-  const [updatingNoteId, setUpdatingNoteId] = useState<number | null>(null);
-  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
+  const [aliasInput, setAliasInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editingAliasId, setEditingAliasId] = useState<number | null>(null);
+  const [editingAliasValue, setEditingAliasValue] = useState("");
+  const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
+  const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadNpcPage() {
@@ -26,16 +37,17 @@ export default function DmNpcPage() {
           throw new Error(`Failed to load NPC: ${npcResponse.status}`);
         }
 
-        const notesResponse = await apiFetch(`/api/dm/npcs/${slug}/notes`);
-        if (!notesResponse.ok) {
-          throw new Error(`Failed to load notes: ${notesResponse.status}`);
+        const aliasesResponse = await apiFetch(`/api/dm/npcs/${slug}/aliases`);
+        if (!aliasesResponse.ok) {
+          throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
         }
 
         const npcData = await npcResponse.json();
-        const notesData = await notesResponse.json();
+        const aliasesData = await aliasesResponse.json();
 
         setNpc(npcData);
-        setNotes(notesData);
+        setCanonicalAliases(aliasesData.canonical || []);
+        setPersonalAliasGroups(aliasesData.personal_by_user || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -46,68 +58,99 @@ export default function DmNpcPage() {
     loadNpcPage();
   }, [slug]);
 
-  async function handleSaveEdit(noteId: number) {
-    if (!editingContent.trim()) {
-      setError("Please enter a note.");
+  const handleCreateCanonicalAlias: SubmitEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault();
+
+    if (!aliasInput.trim()) {
+      setError("Please enter an alias.");
       return;
     }
 
     try {
-      setUpdatingNoteId(noteId);
+      setSaving(true);
       setError("");
 
-      const response = await apiFetch(`/api/npc-notes/${noteId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          content: editingContent.trim(),
-        }),
+      const response = await apiFetch(`/api/dm/npcs/${slug}/aliases`, {
+        method: "POST",
+        body: JSON.stringify({ alias: aliasInput.trim() }),
       });
-
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to update note: ${response.status}`);
+        throw new Error(data.error || `Failed to create alias: ${response.status}`);
       }
 
-      setNotes((current) =>
-        current.map((note) => (note.id === noteId ? data : note))
+      setCanonicalAliases((current) =>
+        [...current, data].sort((a, b) => a.alias.localeCompare(b.alias))
       );
-      setEditingNoteId(null);
-      setEditingContent("");
+      setAliasInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setUpdatingNoteId(null);
+      setSaving(false);
+    }
+  };
+
+  async function handleSaveCanonicalAlias(aliasId: number) {
+    if (!editingAliasValue.trim()) {
+      setError("Please enter an alias.");
+      return;
+    }
+
+    try {
+      setUpdatingAliasId(aliasId);
+      setError("");
+
+      const response = await apiFetch(`/api/dm/npc-aliases/${aliasId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ alias: editingAliasValue.trim() }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to update alias: ${response.status}`);
+      }
+
+      setCanonicalAliases((current) =>
+        current
+          .map((alias) => (alias.id === aliasId ? data : alias))
+          .sort((a, b) => a.alias.localeCompare(b.alias))
+      );
+      setEditingAliasId(null);
+      setEditingAliasValue("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setUpdatingAliasId(null);
     }
   }
 
-  async function handleDelete(noteId: number) {
-    if (!window.confirm("Delete this note?")) return;
+  async function handleDeleteCanonicalAlias(aliasId: number) {
+    if (!window.confirm("Archive this canonical alias?")) return;
 
     try {
-      setDeletingNoteId(noteId);
+      setDeletingAliasId(aliasId);
       setError("");
 
-      const response = await apiFetch(`/api/npc-notes/${noteId}`, {
+      const response = await apiFetch(`/api/dm/npc-aliases/${aliasId}`, {
         method: "DELETE",
       });
-
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || `Failed to delete note: ${response.status}`);
+        throw new Error(data.error || `Failed to archive alias: ${response.status}`);
       }
 
-      setNotes((current) => current.filter((note) => note.id !== noteId));
+      setCanonicalAliases((current) => current.filter((alias) => alias.id !== aliasId));
 
-      if (editingNoteId === noteId) {
-        setEditingNoteId(null);
-        setEditingContent("");
+      if (editingAliasId === aliasId) {
+        setEditingAliasId(null);
+        setEditingAliasValue("");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setDeletingNoteId(null);
+      setDeletingAliasId(null);
     }
   }
 
@@ -187,8 +230,8 @@ export default function DmNpcPage() {
 
         <section className="notes-section">
           <div className="notes-header">
-            <h2>Player Notes</h2>
-            <p>Shared notes currently attached to this NPC.</p>
+            <h2>Canonical Aliases</h2>
+            <p>DM-managed known names shown to players when this NPC is visible.</p>
           </div>
 
           {error ? (
@@ -197,51 +240,66 @@ export default function DmNpcPage() {
             </div>
           ) : null}
 
-          {notes.length === 0 ? (
+          <form className="note-form" onSubmit={handleCreateCanonicalAlias}>
+            <input
+              className="text-input"
+              type="text"
+              placeholder="Add canonical alias..."
+              value={aliasInput}
+              onChange={(e) => setAliasInput(e.target.value)}
+              maxLength={80}
+            />
+            <button className="action-button" type="submit" disabled={saving}>
+              {saving ? "Saving..." : "Add alias"}
+            </button>
+          </form>
+
+          {canonicalAliases.length === 0 ? (
             <div className="state-card small-card">
-              <p>No notes yet.</p>
+              <p>No canonical aliases yet.</p>
             </div>
           ) : (
             <div className="notes-list">
-              {notes.map((note) => {
-                const isEditing = editingNoteId === note.id;
-                const wasEdited = note.updated_at !== note.created_at;
+              {canonicalAliases.map((alias) => {
+                const isEditing = editingAliasId === alias.id;
+                const wasEdited = alias.updated_at !== alias.created_at;
 
                 return (
-                  <article className="note-card" key={note.id}>
+                  <article className="note-card" key={alias.id}>
                     <div className="note-card-header">
-                      <strong>{note.author_name}</strong>
+                      <strong>{alias.alias}</strong>
                       <span>
-                        {new Date(note.created_at).toLocaleString()}
+                        {new Date(alias.created_at).toLocaleString()}
                         {wasEdited ? " • edited" : ""}
                       </span>
                     </div>
 
                     {isEditing ? (
                       <>
-                        <textarea
-                          className="text-area"
-                          value={editingContent}
-                          onChange={(e) => setEditingContent(e.target.value)}
-                          rows={4}
+                        <input
+                          className="text-input"
+                          type="text"
+                          value={editingAliasValue}
+                          onChange={(e) => setEditingAliasValue(e.target.value)}
+                          maxLength={80}
                         />
 
                         <div className="note-actions">
                           <button
                             className="action-button"
                             type="button"
-                            onClick={() => handleSaveEdit(note.id)}
-                            disabled={updatingNoteId === note.id}
+                            onClick={() => handleSaveCanonicalAlias(alias.id)}
+                            disabled={updatingAliasId === alias.id}
                           >
-                            {updatingNoteId === note.id ? "Saving..." : "Save"}
+                            {updatingAliasId === alias.id ? "Saving..." : "Save"}
                           </button>
 
                           <button
                             className="action-button secondary-link"
                             type="button"
                             onClick={() => {
-                              setEditingNoteId(null);
-                              setEditingContent("");
+                              setEditingAliasId(null);
+                              setEditingAliasValue("");
                             }}
                           >
                             Cancel
@@ -249,36 +307,59 @@ export default function DmNpcPage() {
                         </div>
                       </>
                     ) : (
-                      <>
-                        <p>{note.content}</p>
+                      <div className="note-actions">
+                        <button
+                          className="action-button secondary-link"
+                          type="button"
+                          onClick={() => {
+                            setEditingAliasId(alias.id);
+                            setEditingAliasValue(alias.alias);
+                          }}
+                        >
+                          Edit
+                        </button>
 
-                        <div className="note-actions">
-                          <button
-                            className="action-button secondary-link"
-                            type="button"
-                            onClick={() => {
-                              setEditingNoteId(note.id);
-                              setEditingContent(note.content);
-                            }}
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            className="action-button secondary-link"
-                            type="button"
-                            onClick={() => handleDelete(note.id)}
-                            disabled={deletingNoteId === note.id}
-                          >
-                            {deletingNoteId === note.id ? "Deleting..." : "Delete"}
-                          </button>
-                        </div>
-                      </>
+                        <button
+                          className="action-button secondary-link"
+                          type="button"
+                          onClick={() => handleDeleteCanonicalAlias(alias.id)}
+                          disabled={deletingAliasId === alias.id}
+                        >
+                          {deletingAliasId === alias.id ? "Archiving..." : "Archive"}
+                        </button>
+                      </div>
                     )}
                   </article>
                 );
               })}
             </div>
+          )}
+        </section>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>Player Personal Aliases</h2>
+            <p>Private player aliases visible in DM admin context only.</p>
+          </div>
+
+          {personalAliasGroups.length === 0 ? (
+            <div className="state-card small-card">
+              <p>No personal aliases added by players yet.</p>
+            </div>
+          ) : (
+            personalAliasGroups.map((group) => (
+              <div className="state-card small-card" key={group.user_id}>
+                <p className="summary-label">
+                  {group.display_name}
+                  {group.username ? ` (@${group.username})` : ""}
+                </p>
+                <ul>
+                  {group.aliases.map((alias) => (
+                    <li key={alias.id}>{alias.alias}</li>
+                  ))}
+                </ul>
+              </div>
+            ))
           )}
         </section>
       </section>

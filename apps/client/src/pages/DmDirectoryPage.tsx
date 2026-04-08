@@ -16,6 +16,7 @@ function matchesNpc(npc: Npc, query: string) {
     npc.short_blurb,
     npc.met_summary,
     npc.introduced_in,
+    ...(npc.canonical_aliases || []),
   ]
     .filter(Boolean)
     .join(" ")
