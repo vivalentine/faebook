@@ -778,6 +778,132 @@
   margin-bottom: 16px;
 }
 
+.dashboard-shell {
+  padding-bottom: 24px;
+}
+
+.dashboard-error {
+  margin-bottom: 14px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-card {
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dashboard-quick-actions {
+  grid-column: span 12;
+}
+
+.dashboard-suspects {
+  grid-column: span 12;
+}
+
+.dashboard-pill-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dashboard-pill-links .secondary-link {
+  width: auto;
+}
+
+.dashboard-inline-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1.5fr auto;
+  gap: 10px;
+}
+
+.dashboard-suspect-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.dashboard-suspect-item {
+  border-radius: 12px;
+  border: 1px solid #31374a;
+  background: #171b25;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-row-actions .secondary-link {
+  width: auto;
+  min-width: 44px;
+}
+
+.dashboard-row-actions .action-button {
+  width: auto;
+}
+
+.dashboard-notes-text {
+  min-height: 220px;
+}
+
+.dashboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #2d3344;
+  padding-bottom: 8px;
+}
+
+.dashboard-list li span {
+  color: #c4bdd5;
+  font-size: 13px;
+}
+
+.dashboard-list a {
+  color: #e8e0ff;
+  text-decoration: none;
+}
+
+.dashboard-prewrap {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.dashboard-recap-editor {
+  border-top: 1px solid #2d3344;
+  margin-top: 8px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-recap-editor h3 {
+  margin: 0;
+}
+
 @media (max-width: 980px) {
   .app-drawer {
     position: fixed;
@@ -808,6 +934,14 @@
   .app-shell-layout.drawer-open .drawer-backdrop {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .dashboard-card {
+    grid-column: span 12;
+  }
+
+  .dashboard-inline-form {
+    grid-template-columns: 1fr;
   }
 }
 

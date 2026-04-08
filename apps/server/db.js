@@ -71,6 +71,53 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_board_states_owner_user_id
   ON board_states(owner_user_id);
+
+  CREATE TABLE IF NOT EXISTS dashboard_suspects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'unknown' CHECK (status IN ('active', 'cleared', 'unknown')),
+    note TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_dashboard_suspects_user_sort
+  ON dashboard_suspects(user_id, archived_at, sort_order, id);
+
+  CREATE TABLE IF NOT EXISTS dashboard_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_dashboard_notes_user_active
+  ON dashboard_notes(user_id, archived_at, updated_at);
+
+  CREATE TABLE IF NOT EXISTS session_recaps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_number INTEGER NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    published_at TEXT NOT NULL,
+    published_by_user_id INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (published_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_session_recaps_published_at
+  ON session_recaps(published_at DESC, session_number DESC);
 `);
 
 function tableExists(tableName) {
@@ -108,6 +155,18 @@ if (!columnExists("npc_notes", "author_user_id")) {
       LIMIT 1
     )
     WHERE author_user_id IS NULL
+  `);
+}
+
+if (!columnExists("session_recaps", "updated_at")) {
+  db.exec(`
+    ALTER TABLE session_recaps
+    ADD COLUMN updated_at TEXT
+  `);
+
+  db.exec(`
+    UPDATE session_recaps
+    SET updated_at = COALESCE(updated_at, published_at)
   `);
 }
 
