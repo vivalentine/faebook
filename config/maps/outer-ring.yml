@@ -1,0 +1,9 @@
+map_id: outer-ring
+label: Outer Ring
+image_filename: outer-ring-map.png
+width: 4096
+height: 4096
+default_zoom: 1
+min_zoom: 0.5
+max_zoom: 4
+pin_scale: 1

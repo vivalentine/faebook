@@ -1,0 +1,9 @@
+map_id: inner-ring
+label: Inner Ring
+image_filename: inner-ring-map.png
+width: 4096
+height: 4096
+default_zoom: 1
+min_zoom: 0.5
+max_zoom: 4
+pin_scale: 1
