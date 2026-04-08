@@ -12,9 +12,14 @@ export default function BoardCardNode({
   selected,
 }: NodeProps<BoardNode>) {
   const isNote = data.kind === "note";
+  const noteColorClass = isNote ? `note-${data.noteColor || "yellow"}` : "";
+  const noteRotation = isNote ? data.noteRotation || 0 : 0;
 
   return (
-    <div className={`board-node ${isNote ? "note-node" : "npc-node"}`}>
+    <div
+      className={`board-node ${isNote ? `note-node ${noteColorClass}` : "npc-node"}`}
+      style={isNote ? { transform: `rotate(${noteRotation}deg)` } : undefined}
+    >
       <NodeToolbar isVisible={selected}>
         <button
           className="board-node-delete-button nodrag"

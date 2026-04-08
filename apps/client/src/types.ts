@@ -36,9 +36,12 @@ export type NpcAlias = {
 
 export type BoardCardData = {
   kind: "npc" | "note";
+  npcId?: number;
   title: string;
   body?: string;
   imageUrl?: string;
+  noteColor?: "yellow" | "pink" | "mint" | "blue";
+  noteRotation?: number;
   onTitleChange?: (nodeId: string, value: string) => void;
   onBodyChange?: (nodeId: string, value: string) => void;
   onDelete?: (nodeId: string) => void;
@@ -77,9 +80,21 @@ export type BoardUserSummary = {
 };
 
 export type BoardResponse = {
+  board_id: number;
+  board_name: string;
+  is_default: boolean;
   board: BoardSnapshot;
   updated_at: string;
   owner: AuthUser;
+};
+
+export type BoardListItem = {
+  id: number;
+  owner_user_id: number;
+  name: string;
+  is_default: boolean;
+  updated_at: string;
+  created_at: string;
 };
 
 export type DashboardSuspect = {
@@ -156,7 +171,7 @@ export type DashboardData = {
 
 export type ArchiveRecord = {
   id: number;
-  object_type: "dashboard_suspect" | "dashboard_note" | "npc_alias" | string;
+  object_type: "board" | "dashboard_suspect" | "dashboard_note" | "npc_alias" | string;
   object_id: string;
   owner_user_id: number | null;
   archived_by_user_id: number;
