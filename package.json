@@ -1,0 +1,20 @@
+{
+  "name": "faebook",
+  "version": "1.0.0",
+  "description": "Local LAN wiki and investigation board for FaeBook",
+  "main": "index.js",
+  "scripts": {
+    "dev:client": "npm --prefix apps/client run dev",
+    "dev:server": "npm --prefix apps/server run dev",
+    "build": "npm --prefix apps/client run build",
+    "start": "npm --prefix apps/server run start",
+    "seed:users": "npm --prefix apps/server run seed:users"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "volta": {
+    "node": "24.14.1"
+  }
+}
