@@ -38,6 +38,18 @@ export type NpcAlias = {
   updated_at: string;
 };
 
+export type NpcNote = {
+  id: number;
+  npc_id: number;
+  author_user_id: number | null;
+  author_name: string;
+  author_display_name?: string | null;
+  author_username?: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BoardCardData = {
   kind: "npc" | "note";
   npcId?: number;

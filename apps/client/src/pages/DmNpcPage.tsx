@@ -2,13 +2,20 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch, apiUrl } from "../lib/api";
-import type { Npc, NpcAlias } from "../types";
+import type { Npc, NpcAlias, NpcNote } from "../types";
 
 type PersonalAliasGroup = {
   user_id: number;
   display_name: string;
   username: string;
   aliases: NpcAlias[];
+};
+
+type PersonalNoteGroup = {
+  user_id: number;
+  display_name: string;
+  username: string;
+  note: NpcNote | null;
 };
 
 type NpcEditForm = {
@@ -49,6 +56,7 @@ export default function DmNpcPage() {
   const [npc, setNpc] = useState<Npc | null>(null);
   const [canonicalAliases, setCanonicalAliases] = useState<NpcAlias[]>([]);
   const [personalAliasGroups, setPersonalAliasGroups] = useState<PersonalAliasGroup[]>([]);
+  const [personalNoteGroups, setPersonalNoteGroups] = useState<PersonalNoteGroup[]>([]);
   const [form, setForm] = useState<NpcEditForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -79,13 +87,20 @@ export default function DmNpcPage() {
         throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
       }
 
+      const notesResponse = await apiFetch(`/api/dm/npcs/${slug}/notes`);
+      if (!notesResponse.ok) {
+        throw new Error(`Failed to load notes: ${notesResponse.status}`);
+      }
+
       const npcData = await npcResponse.json();
       const aliasesData = await aliasesResponse.json();
+      const notesData = await notesResponse.json();
 
       setNpc(npcData);
       setForm(toForm(npcData));
       setCanonicalAliases(aliasesData.canonical || []);
       setPersonalAliasGroups(aliasesData.personal_by_user || []);
+      setPersonalNoteGroups(notesData.personal_by_user || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -480,6 +495,34 @@ export default function DmNpcPage() {
                   ))}
                 </ul>
               </div>
+            ))
+          )}
+        </section>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>Player Private Notes</h2>
+            <p>Private per-player NPC notes visible in DM admin context only.</p>
+          </div>
+
+          {personalNoteGroups.length === 0 ? (
+            <div className="state-card small-card">
+              <p>No private player notes added for this NPC yet.</p>
+            </div>
+          ) : (
+            personalNoteGroups.map((group) => (
+              <article className="note-card" key={group.user_id}>
+                <div className="note-card-header">
+                  <strong>
+                    {group.display_name}
+                    {group.username ? ` (@${group.username})` : ""}
+                  </strong>
+                  {group.note ? (
+                    <span>Updated {new Date(group.note.updated_at).toLocaleString()}</span>
+                  ) : null}
+                </div>
+                <p>{group.note?.content || "No note content."}</p>
+              </article>
             ))
           )}
         </section>

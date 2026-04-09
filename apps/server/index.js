@@ -156,6 +156,22 @@ function mapAliasForClient(aliasRow) {
   };
 }
 
+function mapNpcNoteForClient(noteRow) {
+  if (!noteRow) return null;
+
+  return {
+    id: noteRow.id,
+    npc_id: noteRow.npc_id,
+    author_user_id: noteRow.author_user_id,
+    author_name: noteRow.author_name,
+    author_display_name: noteRow.author_display_name || null,
+    author_username: noteRow.author_username || null,
+    content: noteRow.content,
+    created_at: noteRow.created_at,
+    updated_at: noteRow.updated_at,
+  };
+}
+
 function getDefaultBoard() {
   return {
     nodes: [],
@@ -1090,6 +1106,65 @@ app.get("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
   });
 });
 
+app.get("/api/dm/npcs/:slug/notes", requireRole("dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT id
+        FROM npcs
+        WHERE slug = ?
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const notes = db
+    .prepare(
+      `
+        SELECT
+          npc_notes.id,
+          npc_notes.npc_id,
+          npc_notes.author_user_id,
+          npc_notes.author_name,
+          npc_notes.content,
+          npc_notes.created_at,
+          npc_notes.updated_at,
+          users.display_name AS author_display_name,
+          users.username AS author_username
+        FROM npc_notes
+        LEFT JOIN users
+          ON users.id = npc_notes.author_user_id
+        WHERE npc_notes.npc_id = ?
+          AND npc_notes.author_user_id IS NOT NULL
+        ORDER BY users.display_name COLLATE NOCASE ASC, users.username COLLATE NOCASE ASC
+      `
+    )
+    .all(npc.id);
+
+  const groupedByUser = {};
+  for (const noteRow of notes) {
+    const key = String(noteRow.author_user_id);
+    if (!groupedByUser[key]) {
+      groupedByUser[key] = {
+        user_id: noteRow.author_user_id,
+        display_name:
+          noteRow.author_display_name || noteRow.author_username || noteRow.author_name || "Unknown User",
+        username: noteRow.author_username || "",
+        note: null,
+      };
+    }
+
+    groupedByUser[key].note = mapNpcNoteForClient(noteRow);
+  }
+
+  return res.json({
+    personal_by_user: Object.values(groupedByUser),
+  });
+});
+
 app.post("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
   const npc = db
     .prepare(
@@ -1954,6 +2029,115 @@ app.get("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
   res.json({
     canonical: canonicalAliases.map(mapAliasForClient),
     personal: personalAliases.map(mapAliasForClient),
+  });
+});
+
+app.get("/api/npcs/:slug/note", requireRole("player", "dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT id
+        FROM npcs
+        WHERE slug = ? AND is_visible = 1
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const note = db
+    .prepare(
+      `
+        SELECT
+          npc_notes.id,
+          npc_notes.npc_id,
+          npc_notes.author_user_id,
+          npc_notes.author_name,
+          npc_notes.content,
+          npc_notes.created_at,
+          npc_notes.updated_at,
+          users.display_name AS author_display_name,
+          users.username AS author_username
+        FROM npc_notes
+        LEFT JOIN users
+          ON users.id = npc_notes.author_user_id
+        WHERE npc_notes.npc_id = ?
+          AND npc_notes.author_user_id = ?
+        LIMIT 1
+      `
+    )
+    .get(npc.id, req.session.user.id);
+
+  return res.json({
+    note: mapNpcNoteForClient(note),
+  });
+});
+
+app.put("/api/npcs/:slug/note", requireRole("player", "dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT id
+        FROM npcs
+        WHERE slug = ? AND is_visible = 1
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const content = limitString(req.body.content, 20000).trim();
+  const now = new Date().toISOString();
+  const authorName = req.session.user.display_name || req.session.user.username;
+
+  db.prepare(
+    `
+      INSERT INTO npc_notes (
+        npc_id,
+        author_user_id,
+        author_name,
+        content,
+        created_at,
+        updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(npc_id, author_user_id)
+      DO UPDATE SET
+        author_name = excluded.author_name,
+        content = excluded.content,
+        updated_at = excluded.updated_at
+    `
+  ).run(npc.id, req.session.user.id, authorName, content, now, now);
+
+  const saved = db
+    .prepare(
+      `
+        SELECT
+          npc_notes.id,
+          npc_notes.npc_id,
+          npc_notes.author_user_id,
+          npc_notes.author_name,
+          npc_notes.content,
+          npc_notes.created_at,
+          npc_notes.updated_at,
+          users.display_name AS author_display_name,
+          users.username AS author_username
+        FROM npc_notes
+        LEFT JOIN users
+          ON users.id = npc_notes.author_user_id
+        WHERE npc_notes.npc_id = ?
+          AND npc_notes.author_user_id = ?
+        LIMIT 1
+      `
+    )
+    .get(npc.id, req.session.user.id);
+
+  return res.json({
+    note: mapNpcNoteForClient(saved),
   });
 });
 
