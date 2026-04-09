@@ -1,167 +1,104 @@
 const fs = require("fs");
 const path = require("path");
-const matter = require("gray-matter");
 const db = require("./db");
+const {
+  addStagedMarkdownFiles,
+  addStagedPortraitFiles,
+  clearStage,
+  getStagingSummary,
+  finalizeImport,
+} = require("./dm-npc-import");
 
-function slugify(value) {
-  return String(value || "")
-    .toLowerCase()
-    .trim()
-    .replace(/['"]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+function getDmUserId() {
+  const dm = db
+    .prepare(
+      `
+        SELECT id
+        FROM users
+        WHERE role = 'dm'
+        ORDER BY id ASC
+        LIMIT 1
+      `
+    )
+    .get();
 
-function ensureUploadsDir() {
-  const uploadsDir = path.join(__dirname, "../../uploads/npcs");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  return uploadsDir;
-}
-
-function copyPortraitIfNeeded(mdFilePath, portraitFileName, slug) {
-  if (!portraitFileName) {
-    return null;
-  }
-
-  const sourceDir = path.dirname(mdFilePath);
-  const sourcePath = path.join(sourceDir, portraitFileName);
-
-  if (!fs.existsSync(sourcePath)) {
-    console.warn(`Portrait file not found: ${sourcePath}`);
-    return null;
+  if (!dm) {
+    throw new Error("No DM user found. Seed users before running import.");
   }
 
-  const uploadsDir = ensureUploadsDir();
-  const ext = path.extname(portraitFileName).toLowerCase() || ".png";
-  const finalFileName = `${slug}${ext}`;
-  const destPath = path.join(uploadsDir, finalFileName);
-
-  fs.copyFileSync(sourcePath, destPath);
-
-  return `/uploads/npcs/${finalFileName}`;
+  return dm.id;
 }
 
-function importNpc(mdFilePath) {
+function stageSingleMarkdown(dmUserId, mdFilePath) {
   if (!fs.existsSync(mdFilePath)) {
     throw new Error(`Markdown file not found: ${mdFilePath}`);
   }
 
-  const raw = fs.readFileSync(mdFilePath, "utf8");
-  const { data } = matter(raw);
+  const fileBuffer = fs.readFileSync(mdFilePath);
+  addStagedMarkdownFiles(dmUserId, [
+    {
+      originalname: path.basename(mdFilePath),
+      size: fileBuffer.length,
+      buffer: fileBuffer,
+    },
+  ]);
+}
 
-  if (!data.name) {
-    throw new Error("Missing required frontmatter field: name");
-  }
+function stageSiblingPortraits(dmUserId, mdFilePath) {
+  const sourceDir = path.dirname(mdFilePath);
+  const supportedExts = new Set([".png", ".webp", ".jpg", ".jpeg"]);
+  const portraitFiles = fs
+    .readdirSync(sourceDir)
+    .filter((name) => supportedExts.has(path.extname(name).toLowerCase()));
 
-  const slug = data.slug || slugify(data.name);
-  const playerCard = data.player_card || {};
-  const now = new Date().toISOString();
+  const asUploads = portraitFiles.map((filename) => {
+    const filePath = path.join(sourceDir, filename);
+    const buffer = fs.readFileSync(filePath);
+    return {
+      originalname: filename,
+      size: buffer.length,
+      buffer,
+      mimetype: "",
+    };
+  });
 
-  const portraitPath = copyPortraitIfNeeded(mdFilePath, playerCard.portrait, slug);
-
-  const npc = {
-    slug,
-    name: data.name || "",
-    house: data.house || "",
-    faction: data.faction || "",
-    court: data.court || "",
-    ring: data.ring || "",
-    rank_title: data.rank_title || "",
-    role: data.role || "",
-    introduced_in: data.introduced_in || "",
-    portrait_path: portraitPath,
-    met_summary: playerCard.met_summary || "",
-    short_blurb: playerCard.short_blurb || "",
-    is_visible: playerCard.visible ? 1 : 0,
-    source_file: mdFilePath,
-    created_at: now,
-    updated_at: now,
-  };
-
-  const existing = db
-    .prepare("SELECT id, portrait_path FROM npcs WHERE slug = ?")
-    .get(npc.slug);
-
-  if (existing && !npc.portrait_path) {
-    npc.portrait_path = existing.portrait_path;
-  }
-
-  if (existing) {
-    db.prepare(`
-      UPDATE npcs
-      SET
-        name = @name,
-        house = @house,
-        faction = @faction,
-        court = @court,
-        ring = @ring,
-        rank_title = @rank_title,
-        role = @role,
-        introduced_in = @introduced_in,
-        portrait_path = @portrait_path,
-        met_summary = @met_summary,
-        short_blurb = @short_blurb,
-        is_visible = @is_visible,
-        source_file = @source_file,
-        updated_at = @updated_at
-      WHERE slug = @slug
-    `).run(npc);
-
-    console.log(`Updated NPC: ${npc.name}`);
-  } else {
-    db.prepare(`
-      INSERT INTO npcs (
-        slug,
-        name,
-        house,
-        faction,
-        court,
-        ring,
-        rank_title,
-        role,
-        introduced_in,
-        portrait_path,
-        met_summary,
-        short_blurb,
-        is_visible,
-        source_file,
-        created_at,
-        updated_at
-      ) VALUES (
-        @slug,
-        @name,
-        @house,
-        @faction,
-        @court,
-        @ring,
-        @rank_title,
-        @role,
-        @introduced_in,
-        @portrait_path,
-        @met_summary,
-        @short_blurb,
-        @is_visible,
-        @source_file,
-        @created_at,
-        @updated_at
-      )
-    `).run(npc);
-
-    console.log(`Imported NPC: ${npc.name}`);
+  if (asUploads.length) {
+    addStagedPortraitFiles(dmUserId, asUploads);
   }
 }
 
-const mdFilePath = process.argv[2];
+function main() {
+  const mdFilePath = process.argv[2];
 
-if (!mdFilePath) {
-  console.error('Usage: node import-npc.js "C:\\path\\to\\npc-file.md"');
-  process.exit(1);
+  if (!mdFilePath) {
+    console.error('Usage: node import-npc.js "path/to/npc-file.md"');
+    process.exit(1);
+  }
+
+  const resolvedPath = path.resolve(mdFilePath);
+  const dmUserId = getDmUserId();
+  clearStage(dmUserId);
+
+  stageSingleMarkdown(dmUserId, resolvedPath);
+  stageSiblingPortraits(dmUserId, resolvedPath);
+
+  const preview = getStagingSummary(db, dmUserId);
+  const item = preview.files[0];
+
+  if (!item) {
+    throw new Error("No markdown file was staged.");
+  }
+
+  if ((item.validation_issues || []).length) {
+    throw new Error(`Import validation failed: ${item.validation_issues.join("; ")}`);
+  }
+
+  const result = finalizeImport(db, dmUserId);
+  console.log(`Import complete for ${item.filename}: ${result.results.map((r) => r.result).join(", ")}`);
 }
 
 try {
-  importNpc(path.resolve(mdFilePath));
+  main();
   process.exit(0);
 } catch (error) {
   console.error(error.message);

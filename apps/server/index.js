@@ -4,10 +4,19 @@ const express = require("express");
 const cors = require("cors");
 const session = require("express-session");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const db = require("./db");
 const { createArchiveRecord, createAuditLog, getRestoreStrategy } = require("./archive");
+const {
+  addStagedMarkdownFiles,
+  addStagedPortraitFiles,
+  clearStage,
+  getStagingSummary,
+  finalizeImport,
+  stageFixtures,
+} = require("./dm-npc-import");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -17,6 +26,7 @@ const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
 const MAPS_CONFIG_DIR = path.join(__dirname, "../../config/maps");
 const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
 const MAP_PIN_CATEGORIES = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
+const upload = multer({ storage: multer.memoryStorage() });
 
 const allowedOrigins = new Set(
   String(process.env.CLIENT_URLS || "")
@@ -839,6 +849,182 @@ app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
   res.json(npc);
 });
 
+app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
+  const { slug } = req.params;
+  const now = new Date().toISOString();
+  const existing = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+      `
+    )
+    .get(slug);
+
+  if (!existing) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const payload = req.body || {};
+  const name = limitString(payload.name, 120).trim();
+  if (!name) {
+    return res.status(400).json({ error: "name is required" });
+  }
+
+  const visibility =
+    payload.visibility === "visible" || payload.is_visible === 1 || payload.is_visible === true
+      ? 1
+      : 0;
+
+  db.prepare(
+    `
+      UPDATE npcs
+      SET
+        name = ?,
+        rank_title = ?,
+        house = ?,
+        faction = ?,
+        court = ?,
+        ring = ?,
+        introduced_in = ?,
+        met_summary = ?,
+        short_blurb = ?,
+        source_file_label = ?,
+        sort_name = ?,
+        is_visible = ?,
+        updated_at = ?
+      WHERE slug = ?
+    `
+  ).run(
+    name,
+    limitString(payload.rank_title, 120).trim() || null,
+    limitString(payload.house, 80).trim() || null,
+    limitString(payload.faction, 80).trim() || null,
+    limitString(payload.court, 40).trim() || null,
+    limitString(payload.ring, 40).trim() || null,
+    limitString(payload.introduced_in, 120).trim() || null,
+    limitString(payload.met_summary, 240).trim() || null,
+    limitString(payload.short_blurb, 500).trim() || null,
+    limitString(payload.source_file_label, 255).trim() || null,
+    limitString(payload.sort_name, 120).trim() || null,
+    visibility,
+    now,
+    slug
+  );
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "npc_edit",
+    objectType: "npc",
+    objectId: existing.id,
+    message: `DM edited NPC fields in-app: ${slug}`,
+    createdAt: now,
+  });
+
+  const updated = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+      `
+    )
+    .get(slug);
+
+  res.json(updated);
+});
+
+app.post(
+  "/api/dm/npcs/:slug/portrait",
+  requireRole("dm"),
+  upload.single("portrait"),
+  (req, res) => {
+    const { slug } = req.params;
+    const existing = db
+      .prepare(
+        `
+          SELECT *
+          FROM npcs
+          WHERE slug = ?
+        `
+      )
+      .get(slug);
+
+    if (!existing) {
+      return res.status(404).json({ error: "NPC not found" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "portrait file is required" });
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (![".png", ".webp", ".jpg", ".jpeg"].includes(ext)) {
+      return res.status(400).json({ error: "Unsupported portrait file type" });
+    }
+    if (Number(req.file.size || 0) > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: "Portrait file exceeds 10MB" });
+    }
+
+    const now = new Date().toISOString();
+    const uploadsDir = path.join(__dirname, "../../uploads/npc-portraits");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const fileName = `${slug}-${now.replace(/[^0-9]/g, "")}${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, fileName), req.file.buffer);
+    const portraitPath = `/uploads/npc-portraits/${fileName}`;
+
+    if (existing.portrait_path && existing.portrait_path !== portraitPath) {
+      createArchiveRecord(db, {
+        objectType: "portrait_asset",
+        objectId: `${existing.id}:${now}`,
+        ownerUserId: req.session.user.id,
+        archivedByUserId: req.session.user.id,
+        archivedAt: now,
+        payload: {
+          npc_id: existing.id,
+          prior_portrait_path: existing.portrait_path,
+          source_action: "manual-replacement",
+        },
+        objectLabel: `Portrait replaced for ${slug}`,
+        sourceTable: "npcs",
+        archiveReason: "manual-replacement",
+      });
+    }
+
+    db.prepare(
+      `
+        UPDATE npcs
+        SET portrait_path = ?, updated_at = ?
+        WHERE id = ?
+      `
+    ).run(portraitPath, now, existing.id);
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "npc_portrait_replace",
+      objectType: "npc",
+      objectId: existing.id,
+      message: `DM replaced portrait in-app: ${slug}`,
+      createdAt: now,
+    });
+
+    const updated = db
+      .prepare(
+        `
+          SELECT *
+          FROM npcs
+          WHERE id = ?
+        `
+      )
+      .get(existing.id);
+
+    res.json(updated);
+  }
+);
+
 app.get("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
   const npc = db
     .prepare(
@@ -1120,6 +1306,64 @@ app.patch("/api/dm/npcs/:slug/hide", requireRole("dm"), (req, res) => {
   res.json(npc);
 });
 
+app.get("/api/dm/import/staging", requireRole("dm"), (req, res) => {
+  const summary = getStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post(
+  "/api/dm/import/staging/markdown",
+  requireRole("dm"),
+  upload.array("files"),
+  (req, res) => {
+    addStagedMarkdownFiles(req.session.user.id, req.files || []);
+    const summary = getStagingSummary(db, req.session.user.id);
+    res.json(summary);
+  }
+);
+
+app.post(
+  "/api/dm/import/staging/portraits",
+  requireRole("dm"),
+  upload.array("files"),
+  (req, res) => {
+    addStagedPortraitFiles(req.session.user.id, req.files || []);
+    const summary = getStagingSummary(db, req.session.user.id);
+    res.json(summary);
+  }
+);
+
+app.post("/api/dm/import/staging/fixtures", requireRole("dm"), (req, res) => {
+  stageFixtures(req.session.user.id);
+  const summary = getStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post("/api/dm/import/staging/clear", requireRole("dm"), (req, res) => {
+  clearStage(req.session.user.id);
+  const summary = getStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post("/api/dm/import/finalize", requireRole("dm"), (req, res) => {
+  const results = finalizeImport(db, req.session.user.id);
+  res.json(results);
+});
+
+app.get("/api/dm/import/logs", requireRole("dm"), (_req, res) => {
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM import_logs
+        ORDER BY created_at DESC, id DESC
+        LIMIT 100
+      `
+    )
+    .all();
+  res.json(rows);
+});
+
 app.get("/api/users", requireRole("dm"), (_req, res) => {
   const users = db
     .prepare(
@@ -1272,7 +1516,16 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
       .all();
 
     payload.player_board_links = playerBoardLinks;
-    payload.recent_imports = [];
+    payload.recent_imports = db
+      .prepare(
+        `
+          SELECT filename, result, created_at AS timestamp
+          FROM import_logs
+          ORDER BY created_at DESC, id DESC
+          LIMIT 8
+        `
+      )
+      .all();
     payload.archive_activity_summary = {
       archived_recently: Number(archiveSummary?.archived_recently || 0),
       restored_recently: Number(archiveSummary?.restored_recently || 0),

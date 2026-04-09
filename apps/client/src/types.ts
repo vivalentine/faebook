@@ -18,6 +18,10 @@ export type Npc = {
   canonical_aliases: string[];
   personal_aliases: string[];
   source_file?: string | null;
+  source_file_label?: string | null;
+  sort_name?: string | null;
+  raw_markdown_body?: string | null;
+  last_imported_at?: string | null;
   created_at: string;
   updated_at: string;
 };

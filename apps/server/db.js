@@ -230,6 +230,19 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type
   ON audit_logs(action_type, created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS import_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dm_user_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    result TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (dm_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_import_logs_created_at
+  ON import_logs(created_at DESC);
 `);
 
 function tableExists(tableName) {
@@ -389,6 +402,34 @@ if (tableExists("board_states")) {
 
     migrateTx();
   }
+}
+
+if (!columnExists("npcs", "raw_markdown_body")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN raw_markdown_body TEXT
+  `);
+}
+
+if (!columnExists("npcs", "source_file_label")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN source_file_label TEXT
+  `);
+}
+
+if (!columnExists("npcs", "sort_name")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN sort_name TEXT
+  `);
+}
+
+if (!columnExists("npcs", "last_imported_at")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN last_imported_at TEXT
+  `);
 }
 
 module.exports = db;

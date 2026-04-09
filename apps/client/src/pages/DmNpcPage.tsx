@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SubmitEventHandler } from "react";
+import type { ChangeEvent, SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch, apiUrl } from "../lib/api";
 import type { Npc, NpcAlias } from "../types";
@@ -11,14 +11,48 @@ type PersonalAliasGroup = {
   aliases: NpcAlias[];
 };
 
+type NpcEditForm = {
+  name: string;
+  rank_title: string;
+  house: string;
+  faction: string;
+  court: string;
+  ring: string;
+  introduced_in: string;
+  met_summary: string;
+  short_blurb: string;
+  source_file_label: string;
+  sort_name: string;
+  visibility: "hidden" | "visible";
+};
+
+function toForm(npc: Npc): NpcEditForm {
+  return {
+    name: npc.name || "",
+    rank_title: npc.rank_title || "",
+    house: npc.house || "",
+    faction: npc.faction || "",
+    court: npc.court || "",
+    ring: npc.ring || "",
+    introduced_in: npc.introduced_in || "",
+    met_summary: npc.met_summary || "",
+    short_blurb: npc.short_blurb || "",
+    source_file_label: npc.source_file_label || "",
+    sort_name: npc.sort_name || "",
+    visibility: npc.is_visible ? "visible" : "hidden",
+  };
+}
+
 export default function DmNpcPage() {
   const { slug = "" } = useParams();
 
   const [npc, setNpc] = useState<Npc | null>(null);
   const [canonicalAliases, setCanonicalAliases] = useState<NpcAlias[]>([]);
   const [personalAliasGroups, setPersonalAliasGroups] = useState<PersonalAliasGroup[]>([]);
+  const [form, setForm] = useState<NpcEditForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [aliasInput, setAliasInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [editingAliasId, setEditingAliasId] = useState<number | null>(null);
@@ -27,36 +61,41 @@ export default function DmNpcPage() {
   const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
 
   useEffect(() => {
-    async function loadNpcPage() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const npcResponse = await apiFetch(`/api/dm/npcs/${slug}`);
-        if (!npcResponse.ok) {
-          throw new Error(`Failed to load NPC: ${npcResponse.status}`);
-        }
-
-        const aliasesResponse = await apiFetch(`/api/dm/npcs/${slug}/aliases`);
-        if (!aliasesResponse.ok) {
-          throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
-        }
-
-        const npcData = await npcResponse.json();
-        const aliasesData = await aliasesResponse.json();
-
-        setNpc(npcData);
-        setCanonicalAliases(aliasesData.canonical || []);
-        setPersonalAliasGroups(aliasesData.personal_by_user || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadNpcPage();
+    void loadNpcPage();
   }, [slug]);
+
+  async function loadNpcPage() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const npcResponse = await apiFetch(`/api/dm/npcs/${slug}`);
+      if (!npcResponse.ok) {
+        throw new Error(`Failed to load NPC: ${npcResponse.status}`);
+      }
+
+      const aliasesResponse = await apiFetch(`/api/dm/npcs/${slug}/aliases`);
+      if (!aliasesResponse.ok) {
+        throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
+      }
+
+      const npcData = await npcResponse.json();
+      const aliasesData = await aliasesResponse.json();
+
+      setNpc(npcData);
+      setForm(toForm(npcData));
+      setCanonicalAliases(aliasesData.canonical || []);
+      setPersonalAliasGroups(aliasesData.personal_by_user || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function setFormValue<K extends keyof NpcEditForm>(key: K, value: NpcEditForm[K]) {
+    setForm((current) => (current ? { ...current, [key]: value } : current));
+  }
 
   const handleCreateCanonicalAlias: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
@@ -81,7 +120,7 @@ export default function DmNpcPage() {
       }
 
       setCanonicalAliases((current) =>
-        [...current, data].sort((a, b) => a.alias.localeCompare(b.alias))
+        [...current, data].sort((a, b) => a.alias.localeCompare(b.alias)),
       );
       setAliasInput("");
     } catch (err) {
@@ -90,6 +129,67 @@ export default function DmNpcPage() {
       setSaving(false);
     }
   };
+
+  async function handleSaveNpcEdits() {
+    if (!form) return;
+
+    try {
+      setSaving(true);
+      setInfo("");
+      setError("");
+
+      const response = await apiFetch(`/api/dm/npcs/${slug}`, {
+        method: "PATCH",
+        body: JSON.stringify(form),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to save NPC: ${response.status}`);
+      }
+
+      setNpc(data);
+      setForm(toForm(data));
+      setInfo("NPC fields updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePortraitUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setSaving(true);
+      setError("");
+      setInfo("");
+
+      const formData = new FormData();
+      formData.append("portrait", file);
+
+      const response = await apiFetch(`/api/dm/npcs/${slug}/portrait`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to upload portrait: ${response.status}`);
+      }
+
+      setNpc(data);
+      setForm((current) => (current ? { ...current } : current));
+      setInfo("Portrait replaced. Previous portrait archived.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSaving(false);
+      event.target.value = "";
+    }
+  }
 
   async function handleSaveCanonicalAlias(aliasId: number) {
     if (!editingAliasValue.trim()) {
@@ -114,7 +214,7 @@ export default function DmNpcPage() {
       setCanonicalAliases((current) =>
         current
           .map((alias) => (alias.id === aliasId ? data : alias))
-          .sort((a, b) => a.alias.localeCompare(b.alias))
+          .sort((a, b) => a.alias.localeCompare(b.alias)),
       );
       setEditingAliasId(null);
       setEditingAliasValue("");
@@ -164,7 +264,7 @@ export default function DmNpcPage() {
     );
   }
 
-  if (error || !npc) {
+  if (error || !npc || !form) {
     return (
       <div className="app-shell">
         <div className="state-card error-card">
@@ -190,48 +290,35 @@ export default function DmNpcPage() {
             ) : (
               <div className="detail-image placeholder">No image</div>
             )}
+            <label className="toolbar-field">
+              <span>Replace portrait</span>
+              <input
+                className="text-input"
+                type="file"
+                accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg"
+                onChange={(event) => void handlePortraitUpload(event)}
+                disabled={saving}
+              />
+            </label>
           </div>
 
           <div className="detail-meta">
             <p className="eyebrow">DM Entry</p>
             <h1>{npc.name}</h1>
-            <p className="rank-line large">
-              {npc.rank_title || npc.role || "Unranked"}
-            </p>
+            <p className="rank-line large">{npc.rank_title || npc.role || "Unranked"}</p>
 
-            <div className="meta-row">
-              {npc.house ? <span>House: {npc.house}</span> : null}
-              {npc.court ? <span>Court: {npc.court}</span> : null}
-              {npc.ring ? <span>Ring: {npc.ring}</span> : null}
-            </div>
-
-            {npc.short_blurb ? <p className="blurb">{npc.short_blurb}</p> : null}
-
-            {npc.met_summary ? (
-              <div className="summary-box">
-                <p className="summary-label">Met when</p>
-                <p>{npc.met_summary}</p>
+            {info ? (
+              <div className="state-card small-card">
+                <p>{info}</p>
               </div>
             ) : null}
-
-            <div className="detail-info-list">
-              <p>
-                <strong>Introduced in:</strong> {npc.introduced_in || "—"}
-              </p>
-              <p>
-                <strong>Visibility:</strong> {npc.is_visible ? "Visible" : "Hidden"}
-              </p>
-              <p>
-                <strong>Source file:</strong> {npc.source_file || "—"}
-              </p>
-            </div>
           </div>
         </div>
 
         <section className="notes-section">
           <div className="notes-header">
-            <h2>Canonical Aliases</h2>
-            <p>DM-managed known names shown to players when this NPC is visible.</p>
+            <h2>NPC Admin Fields</h2>
+            <p>Direct DM editing for canonical scalar metadata.</p>
           </div>
 
           {error ? (
@@ -239,6 +326,40 @@ export default function DmNpcPage() {
               <p>{error}</p>
             </div>
           ) : null}
+
+          <div className="toolbar-grid">
+            <label className="toolbar-field"><span>Name</span><input className="text-input" value={form.name} onChange={(e) => setFormValue("name", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Rank title</span><input className="text-input" value={form.rank_title} onChange={(e) => setFormValue("rank_title", e.target.value)} /></label>
+            <label className="toolbar-field"><span>House</span><input className="text-input" value={form.house} onChange={(e) => setFormValue("house", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Faction</span><input className="text-input" value={form.faction} onChange={(e) => setFormValue("faction", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Court</span><input className="text-input" value={form.court} onChange={(e) => setFormValue("court", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Ring</span><input className="text-input" value={form.ring} onChange={(e) => setFormValue("ring", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Introduced in</span><input className="text-input" value={form.introduced_in} onChange={(e) => setFormValue("introduced_in", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Met summary</span><input className="text-input" value={form.met_summary} onChange={(e) => setFormValue("met_summary", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Short blurb</span><input className="text-input" value={form.short_blurb} onChange={(e) => setFormValue("short_blurb", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Source label</span><input className="text-input" value={form.source_file_label} onChange={(e) => setFormValue("source_file_label", e.target.value)} /></label>
+            <label className="toolbar-field"><span>Sort name</span><input className="text-input" value={form.sort_name} onChange={(e) => setFormValue("sort_name", e.target.value)} /></label>
+            <label className="toolbar-field">
+              <span>Visibility</span>
+              <select className="text-input" value={form.visibility} onChange={(e) => setFormValue("visibility", e.target.value as "hidden" | "visible") }>
+                <option value="hidden">hidden</option>
+                <option value="visible">visible</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="note-actions">
+            <button className="action-button" type="button" onClick={() => void handleSaveNpcEdits()} disabled={saving}>
+              {saving ? "Saving..." : "Save NPC fields"}
+            </button>
+          </div>
+        </section>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>Canonical Aliases</h2>
+            <p>DM-managed known names shown to players when this NPC is visible.</p>
+          </div>
 
           <form className="note-form" onSubmit={handleCreateCanonicalAlias}>
             <input
@@ -288,7 +409,7 @@ export default function DmNpcPage() {
                           <button
                             className="action-button"
                             type="button"
-                            onClick={() => handleSaveCanonicalAlias(alias.id)}
+                            onClick={() => void handleSaveCanonicalAlias(alias.id)}
                             disabled={updatingAliasId === alias.id}
                           >
                             {updatingAliasId === alias.id ? "Saving..." : "Save"}
@@ -322,7 +443,7 @@ export default function DmNpcPage() {
                         <button
                           className="action-button secondary-link"
                           type="button"
-                          onClick={() => handleDeleteCanonicalAlias(alias.id)}
+                          onClick={() => void handleDeleteCanonicalAlias(alias.id)}
                           disabled={deletingAliasId === alias.id}
                         >
                           {deletingAliasId === alias.id ? "Archiving..." : "Archive"}
