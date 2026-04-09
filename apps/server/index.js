@@ -17,7 +17,7 @@ const {
   finalizeImport,
   stageFixtures,
 } = require("./dm-npc-import");
-const { runGlobalSearch } = require("./search");
+const { runGlobalSearch, runGlobalSearchSuggestions } = require("./search");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -1629,6 +1629,17 @@ app.get("/api/search", requireRole("player", "dm"), (req, res) => {
     rawQuery: req.query.q,
     rawLimit: req.query.limit,
     rawOffset: req.query.offset,
+  });
+
+  return res.json(payload);
+});
+
+app.get("/api/search/suggestions", requireRole("player", "dm"), (req, res) => {
+  const payload = runGlobalSearchSuggestions({
+    db,
+    sessionUser: req.session.user,
+    rawQuery: req.query.q,
+    rawLimit: req.query.limit,
   });
 
   return res.json(payload);
