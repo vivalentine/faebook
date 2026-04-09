@@ -4,6 +4,7 @@ import type { ArchiveRecord, BoardUserSummary } from "../types";
 
 const CONTENT_TYPE_OPTIONS = [
   { value: "", label: "All content types" },
+  { value: "board", label: "Boards" },
   { value: "dashboard_suspect", label: "Dashboard suspects" },
   { value: "dashboard_note", label: "Dashboard notes" },
   { value: "npc_alias", label: "NPC aliases" },

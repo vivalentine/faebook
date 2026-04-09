@@ -183,42 +183,180 @@ function getBoardOwnerForRequest(req) {
   return getUserById(sessionUser.id);
 }
 
-function getOrCreateBoardState(ownerUserId) {
-  const row = db
+function getDefaultBoardRow(ownerUserId) {
+  return db
     .prepare(
       `
-        SELECT json_data, updated_at
-        FROM board_states
+        SELECT *
+        FROM boards
         WHERE owner_user_id = ?
+          AND archived_at IS NULL
+          AND is_default = 1
+        LIMIT 1
       `
     )
     .get(ownerUserId);
+}
 
-  if (!row) {
-    const defaultBoard = getDefaultBoard();
-    const now = new Date().toISOString();
+function getBoardByIdForOwner(boardId, ownerUserId) {
+  return db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE id = ?
+          AND owner_user_id = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(boardId, ownerUserId);
+}
 
+function clearActiveBoardDefaults(ownerUserId, now, exceptBoardId = null) {
+  if (exceptBoardId && Number.isInteger(exceptBoardId)) {
     db.prepare(
       `
-        INSERT INTO board_states (
-          owner_user_id,
-          json_data,
-          created_at,
-          updated_at
-        )
-        VALUES (?, ?, ?, ?)
+        UPDATE boards
+        SET is_default = 0,
+            updated_at = ?
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+          AND is_default = 1
+          AND id != ?
       `
-    ).run(ownerUserId, JSON.stringify(defaultBoard), now, now);
-
-    return {
-      board: defaultBoard,
-      updated_at: now,
-    };
+    ).run(now, ownerUserId, exceptBoardId);
+    return;
   }
 
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 0,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND archived_at IS NULL
+        AND is_default = 1
+    `
+  ).run(now, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwnerInTransaction(ownerUserId, boardId, now) {
+  clearActiveBoardDefaults(ownerUserId, now, boardId);
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 1,
+          updated_at = ?
+      WHERE id = ?
+        AND owner_user_id = ?
+        AND archived_at IS NULL
+    `
+  ).run(now, boardId, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwner(ownerUserId, boardId, now) {
+  const tx = db.transaction(() => {
+    setSingleDefaultBoardForOwnerInTransaction(ownerUserId, boardId, now);
+  });
+
+  tx();
+}
+
+function getLatestActiveBoardRow(ownerUserId) {
+  return db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+      `
+    )
+    .get(ownerUserId);
+}
+
+function ensureBoardForOwner(ownerUserId) {
+  const existingDefault = getDefaultBoardRow(ownerUserId);
+  if (existingDefault) {
+    return existingDefault;
+  }
+
+  const existingAny = getLatestActiveBoardRow(ownerUserId);
+
+  const now = new Date().toISOString();
+
+  if (existingAny) {
+    setSingleDefaultBoardForOwner(ownerUserId, existingAny.id, now);
+    return getBoardByIdForOwner(existingAny.id, ownerUserId);
+  }
+
+  const defaultBoard = getDefaultBoard();
+  const tx = db.transaction(() => {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO boards (
+            owner_user_id,
+            name,
+            is_default,
+            json_data,
+            created_at,
+            updated_at,
+            archived_at,
+            archived_by_user_id
+          )
+          VALUES (?, ?, 0, ?, ?, ?, NULL, NULL)
+        `
+      )
+      .run(ownerUserId, "Investigation Board", JSON.stringify(defaultBoard), now, now);
+
+    const newId = Number(result.lastInsertRowid);
+    setSingleDefaultBoardForOwnerInTransaction(ownerUserId, newId, now);
+    return newId;
+  });
+
+  const newBoardId = tx();
+
+  return db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE id = ?
+      `
+    )
+    .get(newBoardId);
+}
+
+function getBoardForRequest(req) {
+  const ownerUser = getBoardOwnerForRequest(req);
+  if (!ownerUser) {
+    return { ownerUser: null, boardRow: null };
+  }
+
+  const boardId = Number(req.query.boardId);
+  if (Number.isInteger(boardId) && boardId > 0) {
+    const byId = getBoardByIdForOwner(boardId, ownerUser.id);
+    if (byId) {
+      return { ownerUser, boardRow: byId };
+    }
+    return { ownerUser, boardRow: null };
+  }
+
+  const boardRow = ensureBoardForOwner(ownerUser.id);
+  return { ownerUser, boardRow };
+}
+
+function mapBoardSummary(row) {
   return {
-    board: safeParseBoard(row.json_data),
+    id: row.id,
+    owner_user_id: row.owner_user_id,
+    name: row.name,
+    is_default: Number(row.is_default) === 1,
     updated_at: row.updated_at,
+    created_at: row.created_at,
   };
 }
 
@@ -418,6 +556,12 @@ function sanitizeBoardNode(node, index) {
 
   const id = limitString(node.id || `node-${index}`, 120);
   const kind = node.data?.kind === "npc" ? "npc" : "note";
+  const noteColors = new Set(["yellow", "pink", "mint", "blue"]);
+  const noteColor = noteColors.has(node.data?.noteColor) ? node.data.noteColor : "yellow";
+  const noteRotation = isFiniteNumber(node.data?.noteRotation)
+    ? Math.min(Math.max(node.data.noteRotation, -7), 7)
+    : 0;
+  const npcId = Number(node.data?.npcId);
 
   return {
     id,
@@ -430,7 +574,10 @@ function sanitizeBoardNode(node, index) {
       kind,
       title: limitString(node.data?.title || "", 160),
       body: limitString(node.data?.body || "", 4000),
+      npcId: kind === "npc" && Number.isInteger(npcId) && npcId > 0 ? npcId : undefined,
       imageUrl: kind === "npc" ? limitString(node.data?.imageUrl || "", 500) : undefined,
+      noteColor: kind === "note" ? noteColor : undefined,
+      noteRotation: kind === "note" ? noteRotation : undefined,
     },
   };
 }
@@ -894,10 +1041,12 @@ app.get("/api/dm/board-users", requireRole("dm"), (_req, res) => {
           users.username,
           users.display_name,
           users.role,
-          board_states.updated_at AS board_updated_at
+          MAX(boards.updated_at) AS board_updated_at
         FROM users
-        LEFT JOIN board_states
-          ON board_states.owner_user_id = users.id
+        LEFT JOIN boards
+          ON boards.owner_user_id = users.id
+          AND boards.archived_at IS NULL
+        GROUP BY users.id, users.username, users.display_name, users.role
         ORDER BY
           CASE WHEN users.role = 'dm' THEN 0 ELSE 1 END,
           users.display_name ASC
@@ -942,8 +1091,11 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
     .prepare(
       `
         SELECT updated_at
-        FROM board_states
+        FROM boards
         WHERE owner_user_id = ?
+          AND archived_at IS NULL
+        ORDER BY is_default DESC, updated_at DESC, id DESC
+        LIMIT 1
       `
     )
     .get(sessionUser.id);
@@ -998,12 +1150,14 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
             users.id,
             users.display_name,
             users.username,
-            board_states.updated_at AS board_updated_at
+            MAX(boards.updated_at) AS board_updated_at
           FROM users
-          LEFT JOIN board_states
-            ON board_states.owner_user_id = users.id
+          LEFT JOIN boards
+            ON boards.owner_user_id = users.id
+            AND boards.archived_at IS NULL
           WHERE users.role = 'player'
-          ORDER BY board_states.updated_at DESC, users.display_name ASC
+          GROUP BY users.id, users.display_name, users.username
+          ORDER BY board_updated_at DESC, users.display_name ASC
         `
       )
       .all();
@@ -1788,27 +1942,282 @@ app.delete("/api/archive/:id", requireRole("dm"), (req, res) => {
   res.json({ ok: true, id: archiveId, hard_deleted_object_id: objectId });
 });
 
-app.get("/api/board", requireRole("player", "dm"), (req, res) => {
+app.get("/api/boards", requireRole("player", "dm"), (req, res) => {
   const ownerUser = getBoardOwnerForRequest(req);
 
   if (!ownerUser) {
     return res.status(404).json({ error: "Board owner not found" });
   }
 
-  const data = getOrCreateBoardState(ownerUser.id);
+  ensureBoardForOwner(ownerUser.id);
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+        ORDER BY is_default DESC, updated_at DESC, id DESC
+      `
+    )
+    .all(ownerUser.id);
 
   res.json({
-    board: data.board,
-    updated_at: data.updated_at,
+    owner: getSessionUser(ownerUser),
+    boards: rows.map(mapBoardSummary),
+  });
+});
+
+app.post("/api/boards", requireRole("player", "dm"), (req, res) => {
+  const ownerUser = getBoardOwnerForRequest(req);
+
+  if (!ownerUser) {
+    return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  const name = limitString(req.body.name || "Untitled Board", 120).trim() || "Untitled Board";
+  const now = new Date().toISOString();
+  const board = sanitizeBoardPayload(req.body.board || getDefaultBoard());
+
+  const result = db
+    .prepare(
+      `
+        INSERT INTO boards (
+          owner_user_id,
+          name,
+          is_default,
+          json_data,
+          created_at,
+          updated_at,
+          archived_at,
+          archived_by_user_id
+        )
+        VALUES (?, ?, 0, ?, ?, ?, NULL, NULL)
+      `
+    )
+    .run(ownerUser.id, name, JSON.stringify(board), now, now);
+
+  const created = db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE id = ?
+      `
+    )
+    .get(Number(result.lastInsertRowid));
+
+  res.status(201).json({
+    board: mapBoardSummary(created),
+    owner: getSessionUser(ownerUser),
+  });
+});
+
+app.patch("/api/boards/:id", requireRole("player", "dm"), (req, res) => {
+  const ownerUser = getBoardOwnerForRequest(req);
+  const boardId = Number(req.params.id);
+
+  if (!ownerUser) {
+    return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  if (!Number.isInteger(boardId) || boardId <= 0) {
+    return res.status(400).json({ error: "Invalid board id" });
+  }
+
+  const existing = getBoardByIdForOwner(boardId, ownerUser.id);
+  if (!existing) {
+    return res.status(404).json({ error: "Board not found" });
+  }
+
+  const maybeName = req.body.name;
+  const setDefault = req.body.set_default === true;
+  const now = new Date().toISOString();
+  const nextName =
+    maybeName === undefined ? existing.name : limitString(maybeName, 120).trim() || existing.name;
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE boards
+        SET name = ?,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(nextName, now, boardId);
+
+    if (setDefault) {
+      setSingleDefaultBoardForOwnerInTransaction(ownerUser.id, boardId, now);
+    }
+  });
+
+  tx();
+
+  res.json({
+    board: mapBoardSummary(getBoardByIdForOwner(boardId, ownerUser.id)),
+    owner: getSessionUser(ownerUser),
+  });
+});
+
+app.post("/api/boards/:id/duplicate", requireRole("player", "dm"), (req, res) => {
+  const ownerUser = getBoardOwnerForRequest(req);
+  const boardId = Number(req.params.id);
+
+  if (!ownerUser) {
+    return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  if (!Number.isInteger(boardId) || boardId <= 0) {
+    return res.status(400).json({ error: "Invalid board id" });
+  }
+
+  const sourceBoard = getBoardByIdForOwner(boardId, ownerUser.id);
+  if (!sourceBoard) {
+    return res.status(404).json({ error: "Board not found" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO boards (
+          owner_user_id,
+          name,
+          is_default,
+          json_data,
+          created_at,
+          updated_at,
+          archived_at,
+          archived_by_user_id
+        )
+        VALUES (?, ?, 0, ?, ?, ?, NULL, NULL)
+      `
+    )
+    .run(ownerUser.id, `${sourceBoard.name} (Copy)`, sourceBoard.json_data, now, now);
+
+  const created = db
+    .prepare(
+      `
+        SELECT *
+        FROM boards
+        WHERE id = ?
+      `
+    )
+    .get(Number(result.lastInsertRowid));
+
+  res.status(201).json({
+    board: mapBoardSummary(created),
+    owner: getSessionUser(ownerUser),
+  });
+});
+
+app.post("/api/boards/:id/archive", requireRole("player", "dm"), (req, res) => {
+  const ownerUser = getBoardOwnerForRequest(req);
+  const boardId = Number(req.params.id);
+
+  if (!ownerUser) {
+    return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  if (!Number.isInteger(boardId) || boardId <= 0) {
+    return res.status(400).json({ error: "Invalid board id" });
+  }
+
+  const sourceBoard = getBoardByIdForOwner(boardId, ownerUser.id);
+  if (!sourceBoard) {
+    return res.status(404).json({ error: "Board not found" });
+  }
+
+  const activeCountRow = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM boards
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(ownerUser.id);
+
+  if (Number(activeCountRow?.count || 0) < 2) {
+    return res.status(400).json({ error: "At least one active board must remain" });
+  }
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE boards
+        SET archived_at = ?,
+            archived_by_user_id = ?,
+            is_default = 0,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(now, req.session.user.id, now, boardId);
+
+    if (Number(sourceBoard.is_default) === 1) {
+      const fallback = getLatestActiveBoardRow(ownerUser.id);
+      if (fallback) {
+        setSingleDefaultBoardForOwnerInTransaction(ownerUser.id, fallback.id, now);
+      }
+    } else {
+      clearActiveBoardDefaults(ownerUser.id, now, boardId);
+    }
+  });
+
+  tx();
+
+  archiveRecordAndLog({
+    objectType: "board",
+    objectId: boardId,
+    ownerUserId: sourceBoard.owner_user_id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: sourceBoard },
+    objectLabel: `Board: ${sourceBoard.name}`,
+    sourceTable: "boards",
+    archiveReason: "player-remove",
+    auditMessage: `Archived board ${boardId}`,
+  });
+  const fallbackBoard = ensureBoardForOwner(ownerUser.id);
+  res.json({
+    ok: true,
+    archived_id: boardId,
+    next_board_id: fallbackBoard.id,
+    owner: getSessionUser(ownerUser),
+  });
+});
+
+app.get("/api/board", requireRole("player", "dm"), (req, res) => {
+  const { ownerUser, boardRow } = getBoardForRequest(req);
+
+  if (!ownerUser) {
+    return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  if (!boardRow) {
+    return res.status(404).json({ error: "Board not found" });
+  }
+
+  res.json({
+    board_id: boardRow.id,
+    board_name: boardRow.name,
+    is_default: Number(boardRow.is_default) === 1,
+    board: safeParseBoard(boardRow.json_data),
+    updated_at: boardRow.updated_at,
     owner: getSessionUser(ownerUser),
   });
 });
 
 app.put("/api/board", requireRole("player", "dm"), (req, res) => {
-  const ownerUser = getBoardOwnerForRequest(req);
+  const { ownerUser, boardRow } = getBoardForRequest(req);
 
   if (!ownerUser) {
     return res.status(404).json({ error: "Board owner not found" });
+  }
+
+  if (!boardRow) {
+    return res.status(404).json({ error: "Board not found" });
   }
 
   const board = sanitizeBoardPayload(req.body);
@@ -1816,21 +2225,16 @@ app.put("/api/board", requireRole("player", "dm"), (req, res) => {
 
   db.prepare(
     `
-      INSERT INTO board_states (
-        owner_user_id,
-        json_data,
-        created_at,
-        updated_at
-      )
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(owner_user_id) DO UPDATE SET
-        json_data = excluded.json_data,
-        updated_at = excluded.updated_at
+      UPDATE boards
+      SET json_data = ?,
+          updated_at = ?
+      WHERE id = ?
     `
-  ).run(ownerUser.id, JSON.stringify(board), now, now);
+  ).run(JSON.stringify(board), now, boardRow.id);
 
   res.json({
     ok: true,
+    board_id: boardRow.id,
     updated_at: now,
     owner: getSessionUser(ownerUser),
   });

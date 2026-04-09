@@ -113,7 +113,9 @@ export default function AppShellLayout() {
           </div>
         ) : null}
 
-        <Outlet />
+        <div className="app-page-content">
+          <Outlet />
+        </div>
       </div>
     </div>
   );

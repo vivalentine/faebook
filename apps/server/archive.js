@@ -16,6 +16,48 @@ function parsePayload(value) {
   }
 }
 
+function clearActiveBoardDefaults(db, ownerUserId, now, exceptBoardId = null) {
+  if (exceptBoardId && Number.isInteger(exceptBoardId)) {
+    db.prepare(
+      `
+        UPDATE boards
+        SET is_default = 0,
+            updated_at = ?
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+          AND is_default = 1
+          AND id != ?
+      `
+    ).run(now, ownerUserId, exceptBoardId);
+    return;
+  }
+
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 0,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND archived_at IS NULL
+        AND is_default = 1
+    `
+  ).run(now, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwner(db, ownerUserId, boardId, now) {
+  clearActiveBoardDefaults(db, ownerUserId, now, boardId);
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 1,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND id = ?
+        AND archived_at IS NULL
+    `
+  ).run(now, ownerUserId, boardId);
+}
+
 function createAuditLog(db, { actorUserId, actionType, objectType, objectId, message, createdAt }) {
   const now = createdAt || new Date().toISOString();
   db.prepare(
@@ -80,6 +122,76 @@ function createArchiveRecord(db, {
 }
 
 const RESTORE_STRATEGIES = {
+  board: {
+    tableName: "boards",
+    objectType: "board",
+    restoreRow(db, archiveRecord, now) {
+      const objectId = Number(archiveRecord.object_id);
+      const existing = db
+        .prepare(
+          `
+            SELECT *
+            FROM boards
+            WHERE id = ?
+          `
+        )
+        .get(objectId);
+
+      if (existing) {
+        db.prepare(
+          `
+            UPDATE boards
+            SET archived_at = NULL,
+                archived_by_user_id = NULL,
+                updated_at = ?
+            WHERE id = ?
+          `
+        ).run(now, objectId);
+      } else {
+        const payload = parsePayload(archiveRecord.payload_json);
+        const row = payload.row || {};
+
+        db.prepare(
+          `
+            INSERT INTO boards (
+              id,
+              owner_user_id,
+              name,
+              is_default,
+              json_data,
+              created_at,
+              updated_at,
+              archived_at,
+              archived_by_user_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+          `
+        ).run(
+          objectId,
+          row.owner_user_id,
+          row.name || "Restored Board",
+          row.is_default ? 1 : 0,
+          row.json_data || "{\"nodes\":[],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}",
+          row.created_at || now,
+          now
+        );
+      }
+
+      const rowAfter = db
+        .prepare(
+          `
+            SELECT id, owner_user_id
+            FROM boards
+            WHERE id = ?
+          `
+        )
+        .get(objectId);
+
+      setSingleDefaultBoardForOwner(db, rowAfter.owner_user_id, objectId, now);
+
+      return objectId;
+    },
+  },
   dashboard_suspect: {
     tableName: "dashboard_suspects",
     objectType: "dashboard_suspect",
