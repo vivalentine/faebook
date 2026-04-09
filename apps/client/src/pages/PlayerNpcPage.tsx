@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch, apiUrl } from "../lib/api";
-import type { Npc, NpcAlias } from "../types";
+import type { Npc, NpcAlias, NpcNote } from "../types";
 
 export default function PlayerNpcPage() {
   const { slug = "" } = useParams();
@@ -18,6 +18,9 @@ export default function PlayerNpcPage() {
   const [editingAliasValue, setEditingAliasValue] = useState("");
   const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
   const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
+  const [myNote, setMyNote] = useState<NpcNote | null>(null);
+  const [noteInput, setNoteInput] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
     async function loadPage() {
@@ -35,12 +38,20 @@ export default function PlayerNpcPage() {
           throw new Error(`Failed to load aliases: ${aliasesResponse.status}`);
         }
 
+        const noteResponse = await apiFetch(`/api/npcs/${slug}/note`);
+        if (!noteResponse.ok) {
+          throw new Error(`Failed to load note: ${noteResponse.status}`);
+        }
+
         const npcData = await npcResponse.json();
         const aliasesData = await aliasesResponse.json();
+        const noteData = await noteResponse.json();
 
         setNpc(npcData);
         setCanonicalAliases(aliasesData.canonical || []);
         setPersonalAliases(aliasesData.personal || []);
+        setMyNote(noteData.note || null);
+        setNoteInput(noteData.note?.content || "");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -117,6 +128,30 @@ export default function PlayerNpcPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setUpdatingAliasId(null);
+    }
+  }
+
+  async function handleSaveNote() {
+    try {
+      setSavingNote(true);
+      setError("");
+
+      const response = await apiFetch(`/api/npcs/${slug}/note`, {
+        method: "PUT",
+        body: JSON.stringify({ content: noteInput }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to save note: ${response.status}`);
+      }
+
+      setMyNote(data.note || null);
+      setNoteInput(data.note?.content || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSavingNote(false);
     }
   }
 
@@ -340,6 +375,45 @@ export default function PlayerNpcPage() {
                 );
               })
             )}
+          </div>
+        </section>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>My Notes</h2>
+            <p>Private notes only visible to you and the DM.</p>
+          </div>
+
+          {!myNote && !noteInput.trim() ? (
+            <div className="state-card small-card">
+              <p>No private note yet. Start one below.</p>
+            </div>
+          ) : null}
+
+          <div className="note-form">
+            <textarea
+              className="text-area"
+              placeholder="Track your private clues, theories, and suspicions here..."
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              rows={6}
+              maxLength={20000}
+            />
+            <div className="note-actions">
+              <button
+                className="action-button"
+                type="button"
+                onClick={() => void handleSaveNote()}
+                disabled={savingNote}
+              >
+                {savingNote ? "Saving..." : myNote ? "Save note" : "Create note"}
+              </button>
+              {myNote ? (
+                <span>
+                  Last updated {new Date(myNote.updated_at).toLocaleString()}
+                </span>
+              ) : null}
+            </div>
           </div>
         </section>
       </section>

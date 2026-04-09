@@ -283,6 +283,52 @@ if (!columnExists("npc_notes", "author_user_id")) {
   `);
 }
 
+const npcNoteDuplicateGroups = db
+  .prepare(
+    `
+      SELECT npc_id, author_user_id
+      FROM npc_notes
+      WHERE author_user_id IS NOT NULL
+      GROUP BY npc_id, author_user_id
+      HAVING COUNT(*) > 1
+    `
+  )
+  .all();
+
+if (npcNoteDuplicateGroups.length > 0) {
+  const selectDuplicates = db.prepare(
+    `
+      SELECT id
+      FROM npc_notes
+      WHERE npc_id = ?
+        AND author_user_id = ?
+      ORDER BY updated_at DESC, created_at DESC, id DESC
+    `
+  );
+
+  const markLegacyDuplicate = db.prepare(
+    `
+      UPDATE npc_notes
+      SET author_user_id = NULL,
+          author_name = TRIM(author_name || ' (legacy duplicate)')
+      WHERE id = ?
+    `
+  );
+
+  for (const group of npcNoteDuplicateGroups) {
+    const duplicates = selectDuplicates.all(group.npc_id, group.author_user_id);
+    for (const duplicate of duplicates.slice(1)) {
+      markLegacyDuplicate.run(duplicate.id);
+    }
+  }
+}
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_notes_npc_author_unique
+  ON npc_notes(npc_id, author_user_id)
+  WHERE author_user_id IS NOT NULL
+`);
+
 if (!columnExists("session_recaps", "updated_at")) {
   db.exec(`
     ALTER TABLE session_recaps
