@@ -35,7 +35,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="app-shell login-page-shell">
+    <div className="login-page-shell">
       <div className="login-shell">
         <div className="login-card">
           <p className="eyebrow">FaeBook</p>
