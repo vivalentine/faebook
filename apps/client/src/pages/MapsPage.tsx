@@ -44,6 +44,7 @@ export default function MapsPage() {
   const [isPanning, setIsPanning] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const mapStageRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef({
     active: false,
     pointerId: -1,
@@ -177,25 +178,20 @@ export default function MapsPage() {
 
   const computeNormalizedFromClientPoint = useCallback(
     (clientX: number, clientY: number) => {
-      if (!viewportRef.current || !activeLayer) {
+      if (!mapStageRef.current) {
         return { x: 0.5, y: 0.5 };
       }
 
-      const rect = viewportRef.current.getBoundingClientRect();
-      const localX = clientX - rect.left;
-      const localY = clientY - rect.top;
-
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const mapX = (localX - offset.x - centerX) / zoom + activeLayer.width / 2;
-      const mapY = (localY - offset.y - centerY) / zoom + activeLayer.height / 2;
+      const mapRect = mapStageRef.current.getBoundingClientRect();
+      const localX = clientX - mapRect.left;
+      const localY = clientY - mapRect.top;
 
       return {
-        x: clamp(mapX / activeLayer.width, 0, 1),
-        y: clamp(mapY / activeLayer.height, 0, 1),
+        x: clamp(localX / mapRect.width, 0, 1),
+        y: clamp(localY / mapRect.height, 0, 1),
       };
     },
-    [activeLayer, offset.x, offset.y, zoom],
+    [],
   );
 
   async function savePin(payload: {
@@ -495,6 +491,7 @@ export default function MapsPage() {
       >
         <div
           className="maps-canvas"
+          ref={mapStageRef}
           style={{
             width: `${activeLayer.width}px`,
             height: `${activeLayer.height}px`,
