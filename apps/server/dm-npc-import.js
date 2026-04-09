@@ -7,6 +7,53 @@ const STAGED_IMPORTS = new Map();
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VISIBILITY_VALUES = new Set(["hidden", "visible"]);
 const IMAGE_EXTENSIONS = new Set([".png", ".webp", ".jpg", ".jpeg"]);
+const OBSIDIAN_FRONTMATTER_KEYS = new Set([
+  "type",
+  "tier",
+  "name",
+  "aliases",
+  "pronouns",
+  "species",
+  "age",
+  "court",
+  "ring",
+  "faction",
+  "house",
+  "rank_title",
+  "role",
+  "status",
+  "introduced_in",
+  "location_home",
+  "location_work",
+  "tags",
+  "chibi",
+  "visibility",
+  "canonical_aliases",
+  "portrait_filename",
+  "source_file_label",
+  "sort_name",
+  "met_summary",
+  "short_blurb",
+  "slug",
+  "role_type",
+]);
+const OBSIDIAN_REQUIRED_SECTIONS = [
+  "Quick ID",
+  "Look",
+  "Social Presence",
+  "Personality Pins",
+  "Motivations",
+  "Relationships",
+  "Knowledge Scope",
+  "Secrets",
+  "Clues & Use at the Table",
+  "Schedule",
+  "Resources",
+  "Scene Starters",
+  "Quotes",
+  "Notes",
+];
+const OBSIDIAN_OPTIONAL_SECTIONS = ["Combat / Mechanics (optional)"];
 
 function getNow() {
   return new Date().toISOString();
@@ -30,6 +77,129 @@ function normalizeNameToSlug(name) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function parseArrayValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeString(entry))
+      .filter(Boolean);
+  }
+
+  const scalar = normalizeString(value);
+  if (!scalar) {
+    return [];
+  }
+
+  return [scalar];
+}
+
+function dedupeCaseInsensitive(values) {
+  const seen = new Set();
+  const result = [];
+
+  for (const value of values) {
+    const normalized = String(value).toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(value);
+  }
+
+  return result;
+}
+
+function normalizeWikilinkText(value) {
+  const raw = normalizeString(value);
+  if (!raw) return null;
+  const wikilinkMatch = raw.match(/^\[\[([^\]]+)\]\]$/);
+  if (!wikilinkMatch) return raw;
+  const inner = wikilinkMatch[1] || "";
+  const alias = inner.split("|")[1];
+  const target = inner.split("|")[0];
+  return normalizeString(alias || target) || raw;
+}
+
+function normalizeHeadingName(value) {
+  const raw = normalizeString(value);
+  if (!raw) return null;
+  const cleaned = raw.replace(/^#+\s*/, "").trim();
+  return normalizeWikilinkText(cleaned);
+}
+
+function extractH1HeadingName(body) {
+  const lines = String(body || "").split(/\r?\n/);
+  for (const line of lines) {
+    const match = line.match(/^#\s+(.+)$/);
+    if (match) {
+      return normalizeHeadingName(match[1]);
+    }
+  }
+  return null;
+}
+
+function parseObsidianSections(body) {
+  const lines = String(body || "").split(/\r?\n/);
+  const sections = [];
+  let current = null;
+
+  for (const line of lines) {
+    const heading = line.match(/^##\s+(.+)$/);
+    if (heading) {
+      if (current) {
+        current.raw = current.lines.join("\n").trim();
+        delete current.lines;
+        sections.push(current);
+      }
+
+      current = {
+        heading: normalizeString(heading[1]) || heading[1].trim(),
+        lines: [],
+        raw: "",
+      };
+      continue;
+    }
+
+    if (current) {
+      current.lines.push(line);
+    }
+  }
+
+  if (current) {
+    current.raw = current.lines.join("\n").trim();
+    delete current.lines;
+    sections.push(current);
+  }
+
+  const byHeading = new Map();
+  for (const section of sections) {
+    byHeading.set(section.heading, section);
+  }
+
+  const missingRequired = OBSIDIAN_REQUIRED_SECTIONS.filter((heading) => !byHeading.has(heading));
+  const extraSections = sections.filter(
+    (section) =>
+      !OBSIDIAN_REQUIRED_SECTIONS.includes(section.heading) &&
+      !OBSIDIAN_OPTIONAL_SECTIONS.includes(section.heading)
+  );
+
+  return {
+    sections,
+    byHeading,
+    missingRequired,
+    extraSections,
+  };
+}
+
+function normalizeForPreview(markdownText) {
+  return String(markdownText || "")
+    .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_full, imageName) => `[image: ${imageName}]`)
+    .replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, "$2")
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/^>\s*\[![^\]]+\]\s*/gim, "")
+    .replace(/`{3}[\s\S]*?`{3}/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, 280);
 }
 
 function ensureDir(dirPath) {
@@ -118,28 +288,8 @@ function addStagedPortraitFiles(dmUserId, files) {
   return stage;
 }
 
-function parseMarkdownFile(markdownFile) {
+function parseFixtureMarkdown(markdownFile, parsed) {
   const issues = [];
-  let parsed;
-
-  try {
-    parsed = matter(markdownFile.content);
-  } catch (_error) {
-    return {
-      filename: markdownFile.filename,
-      state: "invalid",
-      parsedName: null,
-      parsedSlug: null,
-      status: null,
-      matchedPortrait: null,
-      validationIssues: ["Invalid frontmatter format"],
-      warnings: [],
-      unmatchedPortraitState: "unmatched-portrait",
-      frontmatter: null,
-      body: "",
-    };
-  }
-
   const data = parsed.data || {};
   const name = normalizeString(data.name);
   const slug = normalizeString(data.slug);
@@ -163,20 +313,11 @@ function parseMarkdownFile(markdownFile) {
     issues.push("Invalid visibility value");
   }
 
-  const canonicalAliases = Array.isArray(data.canonical_aliases)
-    ? data.canonical_aliases
-        .map((alias) => normalizeString(alias))
-        .filter(Boolean)
-        .reduce((acc, alias) => {
-          if (!acc.some((existing) => existing.toLowerCase() === alias.toLowerCase())) {
-            acc.push(alias);
-          }
-          return acc;
-        }, [])
-    : [];
+  const canonicalAliases = dedupeCaseInsensitive(parseArrayValue(data.canonical_aliases));
 
   const preview = {
     filename: markdownFile.filename,
+    parserUsed: "fixture",
     state: issues.length ? "invalid" : "warning",
     parsedName: name,
     parsedSlug: slug,
@@ -202,8 +343,12 @@ function parseMarkdownFile(markdownFile) {
       source_file_label: normalizeString(data.source_file_label),
       sort_name: normalizeString(data.sort_name),
       canonical_aliases: canonicalAliases,
+      parser_frontmatter_extras: [],
+      obsidian_sections: null,
+      obsidian_structured_frontmatter: null,
     },
     body: parsed.content || "",
+    previewSnippet: normalizeForPreview(parsed.content || ""),
   };
 
   if (!preview.frontmatter.portrait_filename) {
@@ -217,6 +362,143 @@ function parseMarkdownFile(markdownFile) {
   }
 
   return preview;
+}
+
+function parseObsidianMarkdown(markdownFile, parsed) {
+  const issues = [];
+  const warnings = [];
+  const data = parsed.data || {};
+  const frontmatterExtras = Object.keys(data)
+    .filter((key) => !OBSIDIAN_FRONTMATTER_KEYS.has(key))
+    .sort();
+
+  if (frontmatterExtras.length) {
+    warnings.push(`Unknown frontmatter keys: ${frontmatterExtras.join(", ")}`);
+  }
+
+  const frontmatterName = normalizeString(data.name);
+  const h1Name = extractH1HeadingName(parsed.content || "");
+  const resolvedName = frontmatterName || h1Name;
+  const slug = normalizeString(data.slug) || normalizeNameToSlug(resolvedName);
+  const roleType = normalizeString(data.role_type) || "npc";
+  const visibility = normalizeString(data.visibility) || "hidden";
+
+  if (!resolvedName) {
+    issues.push("Missing NPC name (frontmatter name or H1 heading)");
+  }
+
+  if (!slug) {
+    issues.push("Missing slug (or unable to derive from name)");
+  } else if (!SLUG_PATTERN.test(slug)) {
+    issues.push("Invalid slug format");
+  }
+
+  if (!VISIBILITY_VALUES.has(visibility)) {
+    issues.push("Invalid visibility value");
+  }
+
+  if (roleType !== "npc") {
+    warnings.push("role_type is not 'npc'; proceeding with Obsidian parser");
+  }
+
+  const canonicalAliasesRaw =
+    parseArrayValue(data.canonical_aliases).length > 0
+      ? parseArrayValue(data.canonical_aliases)
+      : parseArrayValue(data.aliases);
+  const canonicalAliases = dedupeCaseInsensitive(canonicalAliasesRaw.map((alias) => normalizeWikilinkText(alias)).filter(Boolean));
+
+  const sections = parseObsidianSections(parsed.content || "");
+  if (sections.missingRequired.length) {
+    warnings.push(`Missing sections (non-fatal): ${sections.missingRequired.join(", ")}`);
+  }
+  if (sections.extraSections.length) {
+    warnings.push(
+      `Extra sections preserved: ${sections.extraSections.map((section) => section.heading).join(", ")}`
+    );
+  }
+
+  return {
+    filename: markdownFile.filename,
+    parserUsed: "obsidian-template",
+    state: issues.length ? "invalid" : "warning",
+    parsedName: resolvedName,
+    parsedSlug: slug,
+    status: null,
+    matchedPortrait: null,
+    validationIssues: issues,
+    warnings,
+    unmatchedPortraitState: "unmatched-portrait",
+    frontmatter: {
+      name: resolvedName,
+      slug,
+      role_type: roleType,
+      visibility,
+      rank_title: normalizeString(data.rank_title),
+      house: normalizeString(data.house),
+      faction: normalizeString(data.faction),
+      court: normalizeString(data.court),
+      ring: normalizeString(data.ring),
+      introduced_in: normalizeString(data.introduced_in),
+      met_summary: normalizeString(data.met_summary),
+      short_blurb: normalizeString(data.short_blurb),
+      portrait_filename: normalizeString(data.portrait_filename) || normalizeString(data.chibi),
+      source_file_label: normalizeString(data.source_file_label),
+      sort_name: normalizeString(data.sort_name),
+      canonical_aliases: canonicalAliases,
+      parser_frontmatter_extras: frontmatterExtras,
+      obsidian_sections: sections.sections,
+      obsidian_structured_frontmatter: {
+        type: normalizeString(data.type),
+        tier: normalizeString(data.tier),
+        pronouns: normalizeString(data.pronouns),
+        species: normalizeString(data.species),
+        age: normalizeString(data.age),
+        role: normalizeString(data.role),
+        status: normalizeString(data.status),
+        location_home: normalizeString(data.location_home),
+        location_work: normalizeString(data.location_work),
+        tags: dedupeCaseInsensitive(parseArrayValue(data.tags)),
+        chibi: normalizeString(data.chibi),
+      },
+    },
+    body: parsed.content || "",
+    previewSnippet: normalizeForPreview(parsed.content || ""),
+  };
+}
+
+function parseMarkdownFile(markdownFile) {
+  let parsed;
+
+  try {
+    parsed = matter(markdownFile.content);
+  } catch (_error) {
+    return {
+      filename: markdownFile.filename,
+      parserUsed: "fixture",
+      state: "invalid",
+      parsedName: null,
+      parsedSlug: null,
+      status: null,
+      matchedPortrait: null,
+      validationIssues: ["Invalid frontmatter format"],
+      warnings: [],
+      unmatchedPortraitState: "unmatched-portrait",
+      frontmatter: null,
+      body: "",
+      previewSnippet: "",
+    };
+  }
+
+  const fixtureParsed = parseFixtureMarkdown(markdownFile, parsed);
+  const fixtureFieldSet = fixtureParsed.frontmatter || {};
+  const looksFixtureLike =
+    fixtureFieldSet.role_type && fixtureFieldSet.visibility && fixtureFieldSet.slug && fixtureFieldSet.name;
+
+  if (looksFixtureLike && fixtureParsed.validationIssues.length === 0) {
+    return fixtureParsed;
+  }
+
+  return parseObsidianMarkdown(markdownFile, parsed);
 }
 
 function findPortraitMatch(previewItem, portraitsByFilename) {
@@ -329,12 +611,14 @@ function buildImportPreview(db, dmUserId) {
       filename: item.filename,
       parsed_name: item.parsedName,
       slug: item.parsedSlug,
+      parser_used: item.parserUsed,
       status: item.status,
       state: item.state,
       matched_portrait: item.matchedPortrait,
       unmatched_portrait_state: item.unmatchedPortraitState,
       validation_issues: item.validationIssues,
       warnings: item.warnings,
+      preview_snippet: item.previewSnippet,
     })),
     unmatched_files: unmatchedPortraitFiles,
     internal: {

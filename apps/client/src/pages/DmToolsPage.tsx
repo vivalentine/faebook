@@ -6,12 +6,14 @@ type ImportPreviewFile = {
   filename: string;
   parsed_name: string | null;
   slug: string | null;
+  parser_used?: "fixture" | "obsidian-template";
   status: "create" | "update" | null;
   state: string;
   matched_portrait: string | null;
   unmatched_portrait_state: string;
   validation_issues: string[];
   warnings: string[];
+  preview_snippet?: string;
 };
 
 type ImportPreview = {
@@ -322,9 +324,11 @@ export default function DmToolsPage() {
                     <strong>{item.filename}</strong>
                     <span>{item.status || item.state}</span>
                   </div>
+                  <p>Parser: {item.parser_used || "fixture"}</p>
                   <p>Name: {item.parsed_name || "—"}</p>
                   <p>Slug: {item.slug || "—"}</p>
                   <p>Matched portrait: {item.matched_portrait || "Unmatched"}</p>
+                  {item.preview_snippet ? <p>Preview: {item.preview_snippet}</p> : null}
                   {item.validation_issues.length ? (
                     <p>Validation issues: {item.validation_issues.join("; ")}</p>
                   ) : null}
