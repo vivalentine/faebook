@@ -23,7 +23,14 @@ export default function SearchPage() {
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [response, setResponse] = useState<SearchResponse>({ query: initialQuery, results: [] });
+  const [response, setResponse] = useState<SearchResponse>({
+    query: initialQuery,
+    limit: 40,
+    offset: 0,
+    total: 0,
+    has_more: false,
+    results: [],
+  });
 
   useEffect(() => {
     setQuery(initialQuery);
@@ -32,7 +39,7 @@ export default function SearchPage() {
   useEffect(() => {
     const nextQuery = initialQuery.trim();
     if (!nextQuery) {
-      setResponse({ query: "", results: [] });
+      setResponse({ query: "", limit: 40, offset: 0, total: 0, has_more: false, results: [] });
       setLoading(false);
       setError("");
       return;
@@ -52,7 +59,7 @@ export default function SearchPage() {
         setResponse(data as SearchResponse);
       } catch (searchError) {
         setError(searchError instanceof Error ? searchError.message : "Search failed");
-        setResponse({ query: nextQuery, results: [] });
+        setResponse({ query: nextQuery, limit: 40, offset: 0, total: 0, has_more: false, results: [] });
       } finally {
         setLoading(false);
       }
@@ -120,7 +127,7 @@ export default function SearchPage() {
       {!loading && !error && response.query ? (
         <div className="search-results-shell">
           <p className="topbar-meta">
-            Found {response.results.length} result{response.results.length === 1 ? "" : "s"} for “{response.query}”.
+            Found {response.total} result{response.total === 1 ? "" : "s"} for “{response.query}”.
           </p>
 
           {grouped.length === 0 ? (

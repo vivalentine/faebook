@@ -229,17 +229,31 @@ export type MapPin = {
   updated_at: string;
 };
 
+export type SearchSnippetPayload = {
+  source: string;
+  excerpt: string;
+  highlighted_excerpt: string;
+  truncated: boolean;
+  matched_terms: string[];
+};
+
 export type SearchResult = {
   type: string;
   label: string;
   id: number;
   title: string;
   snippet?: string;
+  snippet_payload?: SearchSnippetPayload;
   url?: string;
   metadata?: Record<string, string | number | null>;
 };
 
 export type SearchResponse = {
   query: string;
+  limit: number;
+  offset: number;
+  total: number;
+  has_more: boolean;
+  query_terms?: string[];
   results: SearchResult[];
 };
