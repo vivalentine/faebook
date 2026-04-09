@@ -312,7 +312,6 @@ export default function HomePage() {
     <div className="main-content dashboard-shell">
       <div className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>Home</h1>
           <p className="topbar-meta">Welcome back, {user?.display_name || user?.username}.</p>
         </div>
