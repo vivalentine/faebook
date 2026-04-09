@@ -2,6 +2,8 @@ const { buildSnippetPayload, getQueryTerms } = require("./search-snippets");
 
 const DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 100;
+const DEFAULT_SUGGESTION_LIMIT = 6;
+const MAX_SUGGESTION_LIMIT = 8;
 const MIN_QUERY_LENGTH = 2;
 const SOURCE_FETCH_MULTIPLIER = 4;
 const MAX_SOURCE_FETCH_LIMIT = 300;
@@ -740,8 +742,58 @@ function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset }) {
   };
 }
 
+function parseSuggestionLimit(rawLimit) {
+  const parsed = Number.parseInt(String(rawLimit || DEFAULT_SUGGESTION_LIMIT), 10);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_SUGGESTION_LIMIT;
+  }
+  return Math.min(Math.max(parsed, 1), MAX_SUGGESTION_LIMIT);
+}
+
+function toSuggestionItem(result) {
+  return {
+    type: result.type,
+    id: result.id,
+    title: result.title,
+    label: result.label,
+    url: result.url,
+    metadata: result.metadata || {},
+  };
+}
+
+function runGlobalSearchSuggestions({ db, sessionUser, rawQuery, rawLimit }) {
+  const query = String(rawQuery || "").trim();
+  const limit = parseSuggestionLimit(rawLimit);
+
+  if (query.length < MIN_QUERY_LENGTH) {
+    return {
+      query,
+      limit,
+      suggestions: [],
+    };
+  }
+
+  const searchPattern = toSearchPattern(query);
+  const sourceLimit = getSourceFetchLimit(limit, 0);
+  const baseResults =
+    sessionUser.role === "dm"
+      ? searchForDm({ db, query, searchPattern, sourceLimit })
+      : searchForPlayer({ db, sessionUserId: sessionUser.id, query, searchPattern, sourceLimit });
+
+  const suggestions = rankResults(baseResults, query)
+    .slice(0, limit)
+    .map(toSuggestionItem);
+
+  return {
+    query,
+    limit,
+    suggestions,
+  };
+}
+
 module.exports = {
   runGlobalSearch,
+  runGlobalSearchSuggestions,
   parsePagination,
   MAX_LIMIT,
   DEFAULT_LIMIT,

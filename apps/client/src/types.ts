@@ -257,3 +257,18 @@ export type SearchResponse = {
   query_terms?: string[];
   results: SearchResult[];
 };
+
+export type SearchSuggestion = {
+  type: string;
+  id: number;
+  title: string;
+  label: string;
+  url?: string;
+  metadata?: Record<string, string | number | null>;
+};
+
+export type SearchSuggestionsResponse = {
+  query: string;
+  limit: number;
+  suggestions: SearchSuggestion[];
+};

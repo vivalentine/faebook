@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { apiFetch } from "../lib/api";
+import type { SearchSuggestion, SearchSuggestionsResponse } from "../types";
 
 type NavItem = {
   label: string;
@@ -26,10 +28,79 @@ export default function AppShellLayout() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const [shellSearch, setShellSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
+  const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setIsDrawerOpen(false);
+    setIsSuggestionOpen(false);
+    setActiveSuggestionIndex(-1);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const query = shellSearch.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setIsSuggestionsLoading(false);
+      setActiveSuggestionIndex(-1);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        setIsSuggestionsLoading(true);
+        const response = await apiFetch(
+          `/api/search/suggestions?q=${encodeURIComponent(query)}&limit=6`,
+          { signal: controller.signal },
+        );
+        const data = (await response.json()) as SearchSuggestionsResponse | { error?: string };
+        if (!response.ok) {
+          throw new Error((data as { error?: string }).error || "Suggestion lookup failed");
+        }
+        const nextSuggestions = (data as SearchSuggestionsResponse).suggestions || [];
+        setSuggestions(nextSuggestions);
+        setIsSuggestionOpen(nextSuggestions.length > 0);
+        setActiveSuggestionIndex(-1);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setSuggestions([]);
+        setIsSuggestionOpen(false);
+        setActiveSuggestionIndex(-1);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSuggestionsLoading(false);
+        }
+      }
+    }, 200);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [shellSearch]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!searchContainerRef.current) {
+        return;
+      }
+
+      const target = event.target;
+      if (target instanceof Node && !searchContainerRef.current.contains(target)) {
+        setIsSuggestionOpen(false);
+        setActiveSuggestionIndex(-1);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
 
   const navItems = useMemo(
     () => NAV_ITEMS.filter((item) => !item.dmOnly || user?.role === "dm"),
@@ -46,6 +117,58 @@ export default function AppShellLayout() {
       setLogoutError(error instanceof Error ? error.message : "Sign out failed");
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  function closeSuggestionDropdown() {
+    setIsSuggestionOpen(false);
+    setActiveSuggestionIndex(-1);
+  }
+
+  function navigateFromSearch(query: string) {
+    const nextQuery = query.trim();
+    closeSuggestionDropdown();
+    if (!nextQuery) {
+      navigate("/search");
+      return;
+    }
+    navigate(`/search?q=${encodeURIComponent(nextQuery)}`);
+  }
+
+  function handleSuggestionSelect(suggestion: SearchSuggestion) {
+    setShellSearch(suggestion.title);
+    closeSuggestionDropdown();
+    if (suggestion.url) {
+      navigate(suggestion.url);
+      return;
+    }
+    navigateFromSearch(suggestion.title);
+  }
+
+  function getSuggestionEntityLabel(suggestion: SearchSuggestion) {
+    switch (suggestion.type) {
+      case "npc":
+        return "NPC";
+      case "canonical_alias":
+        return "Canonical Alias";
+      case "personal_alias":
+        return "Personal Alias";
+      case "npc_note":
+        return "NPC Note";
+      case "dashboard_suspect":
+        return "Suspect";
+      case "dashboard_note":
+        return "Note";
+      case "map_pin":
+        return "Map Pin";
+      case "session_recap":
+        return "Recap";
+      case "archive_record":
+        return "Archive";
+      case "import_log":
+        return "Import Log";
+      default:
+        return suggestion.label || "Result";
     }
   }
 
@@ -112,21 +235,85 @@ export default function AppShellLayout() {
               className="shell-search-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                const query = shellSearch.trim();
-                if (!query) {
-                  navigate("/search");
+                const selectedSuggestion =
+                  activeSuggestionIndex >= 0 ? suggestions[activeSuggestionIndex] : null;
+                if (selectedSuggestion) {
+                  handleSuggestionSelect(selectedSuggestion);
                   return;
                 }
-                navigate(`/search?q=${encodeURIComponent(query)}`);
+                navigateFromSearch(shellSearch);
               }}
             >
-              <input
-                className="text-input shell-search-input"
-                type="search"
-                placeholder="Search NPCs, notes, suspects, pins..."
-                value={shellSearch}
-                onChange={(event) => setShellSearch(event.target.value)}
-              />
+              <div className="shell-search-input-wrap" ref={searchContainerRef}>
+                <input
+                  className="text-input shell-search-input"
+                  type="search"
+                  placeholder="Search NPCs, notes, suspects, pins..."
+                  value={shellSearch}
+                  onFocus={() => {
+                    if (suggestions.length > 0) {
+                      setIsSuggestionOpen(true);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (!isSuggestionOpen || suggestions.length === 0) {
+                      if (event.key === "Escape") {
+                        closeSuggestionDropdown();
+                      }
+                      return;
+                    }
+
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      setActiveSuggestionIndex((current) =>
+                        current + 1 >= suggestions.length ? 0 : current + 1,
+                      );
+                      return;
+                    }
+
+                    if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      setActiveSuggestionIndex((current) =>
+                        current <= 0 ? suggestions.length - 1 : current - 1,
+                      );
+                      return;
+                    }
+
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      closeSuggestionDropdown();
+                    }
+                  }}
+                  onChange={(event) => {
+                    setShellSearch(event.target.value);
+                    setIsSuggestionOpen(true);
+                  }}
+                />
+                {isSuggestionOpen ? (
+                  <div className="shell-search-suggestions" role="listbox" aria-label="Search suggestions">
+                    {isSuggestionsLoading && suggestions.length === 0 ? (
+                      <p className="shell-search-suggestions-empty">Searching…</p>
+                    ) : null}
+                    {!isSuggestionsLoading && suggestions.length === 0 ? (
+                      <p className="shell-search-suggestions-empty">No quick suggestions.</p>
+                    ) : null}
+                    {suggestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion.type}-${suggestion.id}`}
+                        type="button"
+                        className={`shell-search-suggestion-item ${index === activeSuggestionIndex ? "active" : ""}`.trim()}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => handleSuggestionSelect(suggestion)}
+                      >
+                        <span className="shell-search-suggestion-title">{suggestion.title}</span>
+                        <span className="shell-search-suggestion-type">
+                          {getSuggestionEntityLabel(suggestion)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
               <button className="drawer-signout shell-search-button" type="submit">
                 Search
               </button>
