@@ -74,8 +74,6 @@ function BoardCanvas() {
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const [showNpcPicker, setShowNpcPicker] = useState(false);
   const [npcSearch, setNpcSearch] = useState("");
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [hasStableCanvasFrame, setHasStableCanvasFrame] = useState(false);
 
   const viewportRef = useRef(DEFAULT_VIEWPORT);
   const hasHydratedRef = useRef(false);
@@ -84,10 +82,6 @@ function BoardCanvas() {
   const autosaveTimeoutRef = useRef<number | null>(null);
   const dirtyRef = useRef(false);
   const boardSurfaceRef = useRef<HTMLDivElement | null>(null);
-  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
-  const wasCanvasReadyRef = useRef(false);
-  const lastFullscreenRef = useRef(false);
-  const stableCanvasRafRef = useRef<number | null>(null);
 
   const selectedBoardUserId = useMemo(() => {
     if (!user) return null;
@@ -109,12 +103,6 @@ function BoardCanvas() {
   }, [searchParams]);
 
   const canMutateDefault = Boolean(user && selectedBoardUserId === user.id);
-  const hasCanvasMeasurement = canvasSize.width > 0 && canvasSize.height > 0;
-  const isCanvasReady = hasCanvasMeasurement && hasStableCanvasFrame;
-  const reactFlowMountKey = useMemo(
-    () => `flow-${selectedBoardUserId || "self"}-${selectedBoardId || "default"}-${isFullscreen ? "fs" : "inline"}`,
-    [isFullscreen, selectedBoardId, selectedBoardUserId],
-  );
 
   const markDirty = useCallback(() => {
     if (!hasHydratedRef.current) return;
@@ -496,73 +484,12 @@ function BoardCanvas() {
   }, []);
 
   useEffect(() => {
-    const element = canvasWrapperRef.current;
-    if (!element) return;
+    if (!rfInstance) return;
 
-    const measure = () => {
-      const rect = element.getBoundingClientRect();
-      const width = Math.max(0, Math.floor(rect.width));
-      const height = Math.max(0, Math.floor(rect.height));
-      setCanvasSize((current) =>
-        current.width === width && current.height === height ? current : { width, height },
-      );
-    };
-
-    measure();
-    const observer = new ResizeObserver(() => {
-      measure();
+    requestAnimationFrame(() => {
+      rfInstance.setViewport(viewportRef.current);
     });
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (stableCanvasRafRef.current) {
-      cancelAnimationFrame(stableCanvasRafRef.current);
-      stableCanvasRafRef.current = null;
-    }
-
-    if (!hasCanvasMeasurement) {
-      setHasStableCanvasFrame(false);
-      return;
-    }
-
-    setHasStableCanvasFrame(false);
-    stableCanvasRafRef.current = requestAnimationFrame(() => {
-      stableCanvasRafRef.current = null;
-      setHasStableCanvasFrame(true);
-    });
-
-    return () => {
-      if (stableCanvasRafRef.current) {
-        cancelAnimationFrame(stableCanvasRafRef.current);
-        stableCanvasRafRef.current = null;
-      }
-    };
-  }, [hasCanvasMeasurement, reactFlowMountKey, isFullscreen]);
-
-  useEffect(() => {
-    if (!rfInstance || !isCanvasReady) {
-      wasCanvasReadyRef.current = isCanvasReady;
-      lastFullscreenRef.current = isFullscreen;
-      return;
-    }
-
-    const becameReady = !wasCanvasReadyRef.current && isCanvasReady;
-    const fullscreenChanged = lastFullscreenRef.current !== isFullscreen;
-
-    if (becameReady || fullscreenChanged) {
-      requestAnimationFrame(() => {
-        rfInstance.setViewport(viewportRef.current);
-      });
-    }
-
-    wasCanvasReadyRef.current = isCanvasReady;
-    lastFullscreenRef.current = isFullscreen;
-  }, [isCanvasReady, isFullscreen, rfInstance, canvasSize.height, canvasSize.width]);
+  }, [isFullscreen, rfInstance, selectedBoardId, selectedBoardUserId]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -920,37 +847,30 @@ function BoardCanvas() {
           ) : null}
         </div>
 
-        <div className="board-canvas-wrap board-v2-canvas" ref={canvasWrapperRef}>
-          {isCanvasReady ? (
-            <ReactFlow<BoardNode, BoardEdge>
-              key={reactFlowMountKey}
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              onInit={setRfInstance}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onMoveEnd={(_, viewport) => {
-                viewportRef.current = viewport;
-                setViewportVersion((value) => value + 1);
-              }}
-              deleteKeyCode={["Delete", "Backspace"]}
-              defaultEdgeOptions={{
-                type: "boardEdge",
-                style: { stroke: "#c63b44", strokeWidth: 3 },
-              }}
-              fitViewOptions={{ maxZoom: 1.3 }}
-              nodeDragThreshold={8}
-            >
-              <Background />
-            </ReactFlow>
-          ) : (
-            <div className="board-canvas-skeleton" role="status" aria-live="polite">
-              Preparing board canvas…
-            </div>
-          )}
+        <div className="board-canvas-wrap board-v2-canvas">
+          <ReactFlow<BoardNode, BoardEdge>
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onInit={setRfInstance}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onMoveEnd={(_, viewport) => {
+              viewportRef.current = viewport;
+              setViewportVersion((value) => value + 1);
+            }}
+            deleteKeyCode={["Delete", "Backspace"]}
+            defaultEdgeOptions={{
+              type: "boardEdge",
+              style: { stroke: "#c63b44", strokeWidth: 3 },
+            }}
+            fitViewOptions={{ maxZoom: 1.3 }}
+            nodeDragThreshold={8}
+          >
+            <Background />
+          </ReactFlow>
         </div>
 
         <footer className="board-footer-status">
