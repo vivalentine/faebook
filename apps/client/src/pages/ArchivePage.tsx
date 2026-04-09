@@ -8,6 +8,7 @@ const CONTENT_TYPE_OPTIONS = [
   { value: "dashboard_suspect", label: "Dashboard suspects" },
   { value: "dashboard_note", label: "Dashboard notes" },
   { value: "npc_alias", label: "NPC aliases" },
+  { value: "map_pin", label: "Map pins" },
 ];
 
 function formatDateTime(value: string) {

@@ -360,6 +360,70 @@ const RESTORE_STRATEGIES = {
       return objectId;
     },
   },
+  map_pin: {
+    tableName: "map_pins",
+    objectType: "map_pin",
+    restoreRow(db, archiveRecord, now) {
+      const objectId = Number(archiveRecord.object_id);
+      const existing = db
+        .prepare(
+          `
+            SELECT *
+            FROM map_pins
+            WHERE id = ?
+          `
+        )
+        .get(objectId);
+
+      if (existing) {
+        db.prepare(
+          `
+            UPDATE map_pins
+            SET archived_at = NULL,
+                archived_by_user_id = NULL,
+                updated_at = ?
+            WHERE id = ?
+          `
+        ).run(now, objectId);
+        return objectId;
+      }
+
+      const payload = parsePayload(archiveRecord.payload_json);
+      const row = payload.row || {};
+      db.prepare(
+        `
+          INSERT INTO map_pins (
+            id,
+            user_id,
+            map_layer,
+            x,
+            y,
+            title,
+            note,
+            category,
+            created_at,
+            updated_at,
+            archived_at,
+            archived_by_user_id
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+        `
+      ).run(
+        objectId,
+        row.user_id,
+        row.map_layer,
+        row.x,
+        row.y,
+        row.title || "Restored Pin",
+        row.note || "",
+        row.category || "clue",
+        row.created_at || now,
+        now
+      );
+
+      return objectId;
+    },
+  },
 };
 
 function getRestoreStrategy(objectType) {

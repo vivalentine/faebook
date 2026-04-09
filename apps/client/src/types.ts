@@ -184,3 +184,31 @@ export type ArchiveRecord = {
   archived_by_username?: string | null;
   archived_by_display_name?: string | null;
 };
+
+export type MapLayerConfig = {
+  map_id: "overworld" | "inner-ring" | "outer-ring";
+  label: string;
+  image_filename: string;
+  image_path: string;
+  width: number;
+  height: number;
+  default_zoom: number;
+  min_zoom: number;
+  max_zoom: number;
+  pin_scale: number;
+};
+
+export type MapPinCategory = "clue" | "lead" | "suspect" | "danger" | "meeting" | "theory";
+
+export type MapPin = {
+  id: number;
+  user_id: number;
+  map_layer: MapLayerConfig["map_id"];
+  x: number;
+  y: number;
+  title: string;
+  note: string;
+  category: MapPinCategory;
+  created_at: string;
+  updated_at: string;
+};
