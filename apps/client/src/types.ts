@@ -228,3 +228,18 @@ export type MapPin = {
   created_at: string;
   updated_at: string;
 };
+
+export type SearchResult = {
+  type: string;
+  label: string;
+  id: number;
+  title: string;
+  snippet?: string;
+  url?: string;
+  metadata?: Record<string, string | number | null>;
+};
+
+export type SearchResponse = {
+  query: string;
+  results: SearchResult[];
+};

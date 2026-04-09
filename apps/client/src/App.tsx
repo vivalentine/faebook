@@ -13,6 +13,7 @@ import MapsPage from "./pages/MapsPage";
 import SettingsPage from "./pages/SettingsPage";
 import DmToolsPage from "./pages/DmToolsPage";
 import ArchivePage from "./pages/ArchivePage";
+import SearchPage from "./pages/SearchPage";
 import "./App.css";
 
 function DirectoryRoute() {
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="directory/:slug" element={<DirectoryNpcRoute />} />
             <Route path="board" element={<BoardPage />} />
             <Route path="maps" element={<MapsPage />} />
+            <Route path="search" element={<SearchPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
               path="dm-tools"
