@@ -112,8 +112,8 @@ function BoardCanvas() {
   const hasCanvasMeasurement = canvasSize.width > 0 && canvasSize.height > 0;
   const isCanvasReady = hasCanvasMeasurement && hasStableCanvasFrame;
   const reactFlowMountKey = useMemo(
-    () => `flow-${selectedBoardUserId || "self"}-${selectedBoardId || "default"}`,
-    [selectedBoardId, selectedBoardUserId],
+    () => `flow-${selectedBoardUserId || "self"}-${selectedBoardId || "default"}-${isFullscreen ? "fs" : "inline"}`,
+    [isFullscreen, selectedBoardId, selectedBoardUserId],
   );
 
   const markDirty = useCallback(() => {
