@@ -643,7 +643,7 @@ export default function MapsPage() {
           <label className="toolbar-field">
             <span>Map Layer</span>
             <select
-              className="text-input"
+              className="text-input maps-layer-select"
               value={activeLayerId}
               onChange={(event) => onLayerChange(event.target.value)}
             >

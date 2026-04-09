@@ -797,6 +797,31 @@
   font-size: 13px;
 }
 
+.maps-layer-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  background-image:
+    linear-gradient(180deg, #171e31, #131a2a),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d7ccff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat, no-repeat;
+  background-size: auto, 16px;
+  background-position: 0 0, right 13px center;
+  border-color: #4a4f71;
+  color: #f4efff;
+  color-scheme: dark;
+}
+
+.maps-layer-select:hover {
+  border-color: #6961a0;
+}
+
+.maps-layer-select option,
+.maps-layer-select optgroup {
+  background: #131a2a;
+  color: #f4efff;
+}
+
 .maps-viewport-shell {
   position: relative;
   border-radius: 18px;
