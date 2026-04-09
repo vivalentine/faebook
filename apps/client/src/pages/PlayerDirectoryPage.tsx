@@ -80,7 +80,6 @@ export default function PlayerDirectoryPage() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>NPC Directory</h1>
         </div>
 

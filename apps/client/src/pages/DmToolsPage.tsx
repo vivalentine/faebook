@@ -218,7 +218,6 @@ export default function DmToolsPage() {
     <div className="app-shell dm-tools-page">
       <header className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>DM Tools</h1>
         </div>
         <div className="topbar-meta topbar-meta-stack">

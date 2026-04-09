@@ -74,7 +74,6 @@ export default function SearchPage() {
     <div className="main-content search-shell">
       <div className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>Global Search</h1>
           <p className="topbar-meta">Permission-aware search across your allowed campaign data.</p>
         </div>
