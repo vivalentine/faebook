@@ -226,7 +226,6 @@ export default function PlayerNpcPage() {
           </div>
 
           <div className="detail-meta">
-            <p className="eyebrow">FaeBook Entry</p>
             <h1>{npc.name}</h1>
             <p className="rank-line large">
               {npc.rank_title || npc.role || "Unranked"}

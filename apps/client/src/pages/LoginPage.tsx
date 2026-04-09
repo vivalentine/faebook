@@ -41,7 +41,7 @@ export default function LoginPage() {
           <p className="eyebrow">FaeBook</p>
           <h1>Sign in</h1>
           <p className="login-copy">
-            Usernames for this build are dm, terry, hilton, and usaq.
+            Enter your campaign credentials to continue.
           </p>
 
           {error ? (

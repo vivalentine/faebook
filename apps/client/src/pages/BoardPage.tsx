@@ -938,7 +938,6 @@ function BoardCanvas() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>Investigation Board</h1>
         </div>
 

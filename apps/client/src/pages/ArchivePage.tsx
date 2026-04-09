@@ -155,7 +155,6 @@ export default function ArchivePage() {
     <div className="main-content">
       <div className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>Archive</h1>
           <p className="topbar-meta">DM-only archive browser and recovery actions.</p>
         </div>

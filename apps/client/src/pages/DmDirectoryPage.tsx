@@ -117,7 +117,6 @@ export default function DmDirectoryPage() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">FaeBook</p>
           <h1>DM Control Panel</h1>
         </div>
 
