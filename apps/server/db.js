@@ -170,6 +170,29 @@ db.exec(`
   ON npc_aliases(npc_id, user_id, alias_type, alias_normalized)
   WHERE alias_type = 'personal' AND archived_at IS NULL;
 
+  CREATE TABLE IF NOT EXISTS map_pins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    map_layer TEXT NOT NULL CHECK (map_layer IN ('overworld', 'inner-ring', 'outer-ring')),
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    title TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT 'clue' CHECK (category IN ('clue', 'lead', 'suspect', 'danger', 'meeting', 'theory')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_map_pins_user_map_active
+  ON map_pins(user_id, map_layer, archived_at, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_map_pins_archived
+  ON map_pins(archived_at DESC, id DESC);
+
   CREATE TABLE IF NOT EXISTS archive_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     object_type TEXT NOT NULL,

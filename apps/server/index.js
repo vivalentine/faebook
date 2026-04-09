@@ -14,6 +14,9 @@ const PORT = Number(process.env.PORT || 3001);
 const SESSION_COOKIE_NAME = "faebook.sid";
 const CLIENT_DIST_DIR = path.join(__dirname, "../client/dist");
 const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
+const MAPS_CONFIG_DIR = path.join(__dirname, "../../config/maps");
+const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
+const MAP_PIN_CATEGORIES = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
 
 const allowedOrigins = new Set(
   String(process.env.CLIENT_URLS || "")
@@ -368,6 +371,84 @@ function limitString(value, maxLength) {
   return String(value || "").slice(0, maxLength);
 }
 
+function parseSimpleYamlMap(rawText) {
+  const result = {};
+  const lines = String(rawText || "").split(/\r?\n/);
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = line.indexOf(":");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = line.slice(0, separatorIndex).trim();
+    const valueRaw = line.slice(separatorIndex + 1).trim();
+    const unquoted =
+      (valueRaw.startsWith('"') && valueRaw.endsWith('"')) ||
+      (valueRaw.startsWith("'") && valueRaw.endsWith("'"))
+        ? valueRaw.slice(1, -1)
+        : valueRaw;
+    const asNumber = Number(unquoted);
+
+    result[key] = Number.isFinite(asNumber) && unquoted !== "" ? asNumber : unquoted;
+  }
+
+  return result;
+}
+
+function loadMapsConfig() {
+  const configs = [];
+  const files = fs
+    .readdirSync(MAPS_CONFIG_DIR)
+    .filter((filename) => filename.toLowerCase().endsWith(".yml"))
+    .sort();
+
+  for (const filename of files) {
+    const filePath = path.join(MAPS_CONFIG_DIR, filename);
+    const parsed = parseSimpleYamlMap(fs.readFileSync(filePath, "utf8"));
+
+    if (!MAP_LAYER_IDS.includes(parsed.map_id)) {
+      continue;
+    }
+
+    const width = Number(parsed.width);
+    const height = Number(parsed.height);
+    const minZoom = Number(parsed.min_zoom);
+    const maxZoom = Number(parsed.max_zoom);
+    const defaultZoomRaw = Number(parsed.default_zoom);
+    const defaultZoom = Number.isFinite(defaultZoomRaw)
+      ? Math.min(Math.max(defaultZoomRaw, minZoom), maxZoom)
+      : 1;
+
+    if (!parsed.image_filename || !Number.isFinite(width) || !Number.isFinite(height)) {
+      continue;
+    }
+
+    configs.push({
+      map_id: parsed.map_id,
+      label: String(parsed.label || parsed.map_id),
+      image_filename: String(parsed.image_filename),
+      image_path: `/maps/${String(parsed.image_filename)}`,
+      width,
+      height,
+      default_zoom: defaultZoom,
+      min_zoom: Number.isFinite(minZoom) ? minZoom : 0.5,
+      max_zoom: Number.isFinite(maxZoom) ? maxZoom : 4,
+      pin_scale: Number.isFinite(Number(parsed.pin_scale)) ? Number(parsed.pin_scale) : 1,
+    });
+  }
+
+  configs.sort((a, b) => MAP_LAYER_IDS.indexOf(a.map_id) - MAP_LAYER_IDS.indexOf(b.map_id));
+  return configs;
+}
+
+const MAP_CONFIGS = loadMapsConfig();
+
 function sanitizeSuspectStatus(value) {
   return ["active", "cleared", "unknown"].includes(value) ? value : "unknown";
 }
@@ -428,6 +509,34 @@ function mapDashboardNoteForClient(row) {
   return {
     id: row.id,
     content: row.content,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function clampNormalizedCoordinate(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+function sanitizeMapLayer(value) {
+  return MAP_LAYER_IDS.includes(value) ? value : MAP_LAYER_IDS[0];
+}
+
+function sanitizeMapPinCategory(value) {
+  return MAP_PIN_CATEGORIES.includes(value) ? value : "clue";
+}
+
+function mapMapPinForClient(row) {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    map_layer: row.map_layer,
+    x: Number(row.x),
+    y: Number(row.y),
+    title: row.title,
+    note: row.note || "",
+    category: row.category,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -1782,6 +1891,209 @@ app.delete("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {
   });
 
   res.json({ ok: true, id: aliasId });
+});
+
+app.get("/api/maps/config", requireRole("player", "dm"), (_req, res) => {
+  res.json({
+    layers: MAP_CONFIGS,
+  });
+});
+
+app.get("/api/maps/pins", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const requestedUserId = Number(req.query.userId);
+  const isDm = sessionUser.role === "dm";
+  const ownerUserId =
+    isDm && Number.isInteger(requestedUserId) && requestedUserId > 0
+      ? requestedUserId
+      : sessionUser.id;
+  const requestedLayer = String(req.query.map_layer || "").trim();
+
+  const values = [ownerUserId];
+  const filters = ["user_id = ?", "archived_at IS NULL"];
+
+  if (requestedLayer) {
+    const mapLayer = sanitizeMapLayer(requestedLayer);
+    filters.push("map_layer = ?");
+    values.push(mapLayer);
+  }
+
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_pins
+        WHERE ${filters.join(" AND ")}
+        ORDER BY updated_at DESC, id DESC
+      `
+    )
+    .all(...values);
+
+  res.json({
+    pins: rows.map(mapMapPinForClient),
+    owner_user_id: ownerUserId,
+  });
+});
+
+app.post("/api/maps/pins", requireRole("player", "dm"), (req, res) => {
+  const mapLayer = sanitizeMapLayer(String(req.body.map_layer || ""));
+  const x = clampNormalizedCoordinate(Number(req.body.x));
+  const y = clampNormalizedCoordinate(Number(req.body.y));
+  const title = limitString(req.body.title, 120).trim();
+  const note = limitString(req.body.note, 2000).trim();
+  const category = sanitizeMapPinCategory(String(req.body.category || "clue"));
+
+  if (!title) {
+    return res.status(400).json({ error: "title is required" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO map_pins (
+          user_id,
+          map_layer,
+          x,
+          y,
+          title,
+          note,
+          category,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(req.session.user.id, mapLayer, x, y, title, note, category, now, now);
+
+  const created = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_pins
+        WHERE id = ?
+      `
+    )
+    .get(result.lastInsertRowid);
+
+  res.status(201).json(mapMapPinForClient(created));
+});
+
+app.patch("/api/maps/pins/:id", requireRole("player", "dm"), (req, res) => {
+  const pinId = Number(req.params.id);
+  const existing = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_pins
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(pinId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Pin not found" });
+  }
+
+  if (existing.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const hasMapLayer = Object.prototype.hasOwnProperty.call(req.body, "map_layer");
+  const hasX = Object.prototype.hasOwnProperty.call(req.body, "x");
+  const hasY = Object.prototype.hasOwnProperty.call(req.body, "y");
+  const hasTitle = Object.prototype.hasOwnProperty.call(req.body, "title");
+  const hasNote = Object.prototype.hasOwnProperty.call(req.body, "note");
+  const hasCategory = Object.prototype.hasOwnProperty.call(req.body, "category");
+
+  const mapLayer = hasMapLayer
+    ? sanitizeMapLayer(String(req.body.map_layer || ""))
+    : existing.map_layer;
+  const x = hasX ? clampNormalizedCoordinate(Number(req.body.x)) : Number(existing.x);
+  const y = hasY ? clampNormalizedCoordinate(Number(req.body.y)) : Number(existing.y);
+  const title = hasTitle ? limitString(req.body.title, 120).trim() : existing.title;
+  const note = hasNote ? limitString(req.body.note, 2000).trim() : existing.note;
+  const category = hasCategory
+    ? sanitizeMapPinCategory(String(req.body.category || "clue"))
+    : existing.category;
+
+  if (!title) {
+    return res.status(400).json({ error: "title is required" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE map_pins
+      SET map_layer = ?,
+          x = ?,
+          y = ?,
+          title = ?,
+          note = ?,
+          category = ?,
+          updated_at = ?
+      WHERE id = ?
+    `
+  ).run(mapLayer, x, y, title, note, category, now, pinId);
+
+  const updated = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_pins
+        WHERE id = ?
+      `
+    )
+    .get(pinId);
+
+  res.json(mapMapPinForClient(updated));
+});
+
+app.post("/api/maps/pins/:id/archive", requireRole("player", "dm"), (req, res) => {
+  const pinId = Number(req.params.id);
+  const existing = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_pins
+        WHERE id = ? AND archived_at IS NULL
+      `
+    )
+    .get(pinId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Pin not found" });
+  }
+
+  if (existing.user_id !== req.session.user.id) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE map_pins
+      SET archived_at = ?,
+          archived_by_user_id = ?,
+          updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, req.session.user.id, now, pinId);
+
+  archiveRecordAndLog({
+    objectType: "map_pin",
+    objectId: pinId,
+    ownerUserId: existing.user_id,
+    archivedByUserId: req.session.user.id,
+    payload: { row: existing },
+    objectLabel: existing.title,
+    sourceTable: "map_pins",
+    archiveReason: req.session.user.role === "dm" ? "dm-remove" : "player-remove",
+    auditMessage: `Archived map pin ${pinId}`,
+  });
+
+  res.json({ ok: true, archived_id: pinId });
 });
 
 app.get("/api/archive", requireRole("dm"), (req, res) => {
