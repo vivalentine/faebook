@@ -10,6 +10,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", to: "/" },
+  { label: "Search", to: "/search" },
   { label: "NPC Directory", to: "/directory" },
   { label: "Investigation Board", to: "/board" },
   { label: "Maps", to: "/maps" },
@@ -24,6 +25,7 @@ export default function AppShellLayout() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [shellSearch, setShellSearch] = useState("");
 
   useEffect(() => {
     setIsDrawerOpen(false);
@@ -97,14 +99,39 @@ export default function AppShellLayout() {
 
       <div className="app-content-area">
         <header className="shell-header">
-          <button
-            className="hamburger"
-            type="button"
-            aria-label="Open navigation"
-            onClick={() => setIsDrawerOpen((open) => !open)}
-          >
-            ☰
-          </button>
+          <div className="shell-header-row">
+            <button
+              className="hamburger"
+              type="button"
+              aria-label="Open navigation"
+              onClick={() => setIsDrawerOpen((open) => !open)}
+            >
+              ☰
+            </button>
+            <form
+              className="shell-search-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const query = shellSearch.trim();
+                if (!query) {
+                  navigate("/search");
+                  return;
+                }
+                navigate(`/search?q=${encodeURIComponent(query)}`);
+              }}
+            >
+              <input
+                className="text-input shell-search-input"
+                type="search"
+                placeholder="Search NPCs, notes, suspects, pins..."
+                value={shellSearch}
+                onChange={(event) => setShellSearch(event.target.value)}
+              />
+              <button className="drawer-signout shell-search-button" type="submit">
+                Search
+              </button>
+            </form>
+          </div>
         </header>
 
         {logoutError ? (
