@@ -41,6 +41,7 @@ export default function MapsPage() {
   const [error, setError] = useState("");
   const [addMode, setAddMode] = useState(false);
   const [editorState, setEditorState] = useState<EditorState | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragStateRef = useRef({
@@ -128,6 +129,51 @@ export default function MapsPage() {
   useEffect(() => {
     void loadMaps();
   }, [loadMaps]);
+
+  useEffect(() => {
+    const viewportEl = viewportRef.current;
+    if (!viewportEl || !activeLayer) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+
+      const rect = viewportEl.getBoundingClientRect();
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+
+      const zoomFactor = event.deltaY < 0 ? 1.12 : 0.9;
+      const nextZoom = clamp(zoomRef.current * zoomFactor, activeLayer.min_zoom, activeLayer.max_zoom);
+
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const worldX = (pointerX - offsetRef.current.x - centerX) / zoomRef.current;
+      const worldY = (pointerY - offsetRef.current.y - centerY) / zoomRef.current;
+
+      const nextOffsetX = pointerX - centerX - worldX * nextZoom;
+      const nextOffsetY = pointerY - centerY - worldY * nextZoom;
+
+      setZoom(nextZoom);
+      setOffset({ x: nextOffsetX, y: nextOffsetY });
+    };
+
+    viewportEl.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      viewportEl.removeEventListener("wheel", onWheel);
+    };
+  }, [activeLayer]);
+
+  const zoomRef = useRef(zoom);
+  const offsetRef = useRef(offset);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    offsetRef.current = offset;
+  }, [offset]);
 
   const computeNormalizedFromClientPoint = useCallback(
     (clientX: number, clientY: number) => {
@@ -231,29 +277,6 @@ export default function MapsPage() {
     setEditorState(null);
   }
 
-  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (!activeLayer || !viewportRef.current) return;
-
-    event.preventDefault();
-    const rect = viewportRef.current.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left;
-    const pointerY = event.clientY - rect.top;
-
-    const zoomFactor = event.deltaY < 0 ? 1.12 : 0.9;
-    const nextZoom = clamp(zoom * zoomFactor, activeLayer.min_zoom, activeLayer.max_zoom);
-
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const worldX = (pointerX - offset.x - centerX) / zoom;
-    const worldY = (pointerY - offset.y - centerY) / zoom;
-
-    const nextOffsetX = pointerX - centerX - worldX * nextZoom;
-    const nextOffsetY = pointerY - centerY - worldY * nextZoom;
-
-    setZoom(nextZoom);
-    setOffset({ x: nextOffsetX, y: nextOffsetY });
-  }
-
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!viewportRef.current) return;
 
@@ -322,6 +345,7 @@ export default function MapsPage() {
     const dy = event.clientY - drag.startY;
     if (Math.abs(dx) > PAN_DRAG_THRESHOLD || Math.abs(dy) > PAN_DRAG_THRESHOLD) {
       drag.moved = true;
+      setIsPanning(true);
     }
 
     setOffset({ x: drag.baseX + dx, y: drag.baseY + dy });
@@ -348,6 +372,7 @@ export default function MapsPage() {
         baseY: 0,
         moved: drag.moved,
       };
+      setIsPanning(false);
     }
   }
 
@@ -460,12 +485,13 @@ export default function MapsPage() {
       <section
         className={`maps-viewport-shell ${addMode ? "add-mode" : ""}`.trim()}
         ref={viewportRef}
-        onWheel={handleWheel}
+        onDragStart={(event) => event.preventDefault()}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onClick={onMapClick}
+        data-panning={isPanning ? "true" : "false"}
       >
         <div
           className="maps-canvas"
@@ -475,7 +501,13 @@ export default function MapsPage() {
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
           }}
         >
-          <img src={activeLayer.image_path} alt={activeLayer.label} className="maps-image" draggable={false} />
+          <img
+            src={activeLayer.image_path}
+            alt={activeLayer.label}
+            className="maps-image"
+            draggable={false}
+            onDragStart={(event) => event.preventDefault()}
+          />
 
           {visiblePins.map((pin) => (
             <button
