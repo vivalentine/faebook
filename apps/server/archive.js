@@ -16,6 +16,48 @@ function parsePayload(value) {
   }
 }
 
+function clearActiveBoardDefaults(db, ownerUserId, now, exceptBoardId = null) {
+  if (exceptBoardId && Number.isInteger(exceptBoardId)) {
+    db.prepare(
+      `
+        UPDATE boards
+        SET is_default = 0,
+            updated_at = ?
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+          AND is_default = 1
+          AND id != ?
+      `
+    ).run(now, ownerUserId, exceptBoardId);
+    return;
+  }
+
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 0,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND archived_at IS NULL
+        AND is_default = 1
+    `
+  ).run(now, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwner(db, ownerUserId, boardId, now) {
+  clearActiveBoardDefaults(db, ownerUserId, now, boardId);
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 1,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND id = ?
+        AND archived_at IS NULL
+    `
+  ).run(now, ownerUserId, boardId);
+}
+
 function createAuditLog(db, { actorUserId, actionType, objectType, objectId, message, createdAt }) {
   const now = createdAt || new Date().toISOString();
   db.prepare(
@@ -145,16 +187,7 @@ const RESTORE_STRATEGIES = {
         )
         .get(objectId);
 
-      db.prepare(
-        `
-          UPDATE boards
-          SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END,
-              updated_at = ?
-          WHERE owner_user_id = ?
-            AND archived_at IS NULL
-            AND (is_default = 1 OR id = ?)
-        `
-      ).run(objectId, now, rowAfter.owner_user_id, objectId);
+      setSingleDefaultBoardForOwner(db, rowAfter.owner_user_id, objectId, now);
 
       return objectId;
     },

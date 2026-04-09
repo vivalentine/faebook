@@ -212,13 +212,58 @@ function getBoardByIdForOwner(boardId, ownerUserId) {
     .get(boardId, ownerUserId);
 }
 
-function ensureBoardForOwner(ownerUserId) {
-  const existingDefault = getDefaultBoardRow(ownerUserId);
-  if (existingDefault) {
-    return existingDefault;
+function clearActiveBoardDefaults(ownerUserId, now, exceptBoardId = null) {
+  if (exceptBoardId && Number.isInteger(exceptBoardId)) {
+    db.prepare(
+      `
+        UPDATE boards
+        SET is_default = 0,
+            updated_at = ?
+        WHERE owner_user_id = ?
+          AND archived_at IS NULL
+          AND is_default = 1
+          AND id != ?
+      `
+    ).run(now, ownerUserId, exceptBoardId);
+    return;
   }
 
-  const existingAny = db
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 0,
+          updated_at = ?
+      WHERE owner_user_id = ?
+        AND archived_at IS NULL
+        AND is_default = 1
+    `
+  ).run(now, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwnerInTransaction(ownerUserId, boardId, now) {
+  clearActiveBoardDefaults(ownerUserId, now, boardId);
+  db.prepare(
+    `
+      UPDATE boards
+      SET is_default = 1,
+          updated_at = ?
+      WHERE id = ?
+        AND owner_user_id = ?
+        AND archived_at IS NULL
+    `
+  ).run(now, boardId, ownerUserId);
+}
+
+function setSingleDefaultBoardForOwner(ownerUserId, boardId, now) {
+  const tx = db.transaction(() => {
+    setSingleDefaultBoardForOwnerInTransaction(ownerUserId, boardId, now);
+  });
+
+  tx();
+}
+
+function getLatestActiveBoardRow(ownerUserId) {
+  return db
     .prepare(
       `
         SELECT *
@@ -230,40 +275,49 @@ function ensureBoardForOwner(ownerUserId) {
       `
     )
     .get(ownerUserId);
+}
+
+function ensureBoardForOwner(ownerUserId) {
+  const existingDefault = getDefaultBoardRow(ownerUserId);
+  if (existingDefault) {
+    return existingDefault;
+  }
+
+  const existingAny = getLatestActiveBoardRow(ownerUserId);
 
   const now = new Date().toISOString();
 
   if (existingAny) {
-    db.prepare(
-      `
-        UPDATE boards
-        SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END,
-            updated_at = ?
-        WHERE owner_user_id = ?
-          AND archived_at IS NULL
-      `
-    ).run(existingAny.id, now, ownerUserId);
+    setSingleDefaultBoardForOwner(ownerUserId, existingAny.id, now);
     return getBoardByIdForOwner(existingAny.id, ownerUserId);
   }
 
   const defaultBoard = getDefaultBoard();
-  const result = db
-    .prepare(
-      `
-        INSERT INTO boards (
-          owner_user_id,
-          name,
-          is_default,
-          json_data,
-          created_at,
-          updated_at,
-          archived_at,
-          archived_by_user_id
-        )
-        VALUES (?, ?, 1, ?, ?, ?, NULL, NULL)
-      `
-    )
-    .run(ownerUserId, "Investigation Board", JSON.stringify(defaultBoard), now, now);
+  const tx = db.transaction(() => {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO boards (
+            owner_user_id,
+            name,
+            is_default,
+            json_data,
+            created_at,
+            updated_at,
+            archived_at,
+            archived_by_user_id
+          )
+          VALUES (?, ?, 0, ?, ?, ?, NULL, NULL)
+        `
+      )
+      .run(ownerUserId, "Investigation Board", JSON.stringify(defaultBoard), now, now);
+
+    const newId = Number(result.lastInsertRowid);
+    setSingleDefaultBoardForOwnerInTransaction(ownerUserId, newId, now);
+    return newId;
+  });
+
+  const newBoardId = tx();
 
   return db
     .prepare(
@@ -273,7 +327,7 @@ function ensureBoardForOwner(ownerUserId) {
         WHERE id = ?
       `
     )
-    .get(Number(result.lastInsertRowid));
+    .get(newBoardId);
 }
 
 function getBoardForRequest(req) {
@@ -1993,15 +2047,7 @@ app.patch("/api/boards/:id", requireRole("player", "dm"), (req, res) => {
     ).run(nextName, now, boardId);
 
     if (setDefault) {
-      db.prepare(
-        `
-          UPDATE boards
-          SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END,
-              updated_at = ?
-          WHERE owner_user_id = ?
-            AND archived_at IS NULL
-        `
-      ).run(boardId, now, ownerUser.id);
+      setSingleDefaultBoardForOwnerInTransaction(ownerUser.id, boardId, now);
     }
   });
 
@@ -2098,16 +2144,29 @@ app.post("/api/boards/:id/archive", requireRole("player", "dm"), (req, res) => {
   }
 
   const now = new Date().toISOString();
-  db.prepare(
-    `
-      UPDATE boards
-      SET archived_at = ?,
-          archived_by_user_id = ?,
-          is_default = 0,
-          updated_at = ?
-      WHERE id = ?
-    `
-  ).run(now, req.session.user.id, now, boardId);
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE boards
+        SET archived_at = ?,
+            archived_by_user_id = ?,
+            is_default = 0,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(now, req.session.user.id, now, boardId);
+
+    if (Number(sourceBoard.is_default) === 1) {
+      const fallback = getLatestActiveBoardRow(ownerUser.id);
+      if (fallback) {
+        setSingleDefaultBoardForOwnerInTransaction(ownerUser.id, fallback.id, now);
+      }
+    } else {
+      clearActiveBoardDefaults(ownerUser.id, now, boardId);
+    }
+  });
+
+  tx();
 
   archiveRecordAndLog({
     objectType: "board",

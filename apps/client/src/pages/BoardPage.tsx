@@ -75,6 +75,7 @@ function BoardCanvas() {
   const [showNpcPicker, setShowNpcPicker] = useState(false);
   const [npcSearch, setNpcSearch] = useState("");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [hasStableCanvasFrame, setHasStableCanvasFrame] = useState(false);
 
   const viewportRef = useRef(DEFAULT_VIEWPORT);
   const hasHydratedRef = useRef(false);
@@ -86,6 +87,7 @@ function BoardCanvas() {
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const wasCanvasReadyRef = useRef(false);
   const lastFullscreenRef = useRef(false);
+  const stableCanvasRafRef = useRef<number | null>(null);
 
   const selectedBoardUserId = useMemo(() => {
     if (!user) return null;
@@ -107,7 +109,12 @@ function BoardCanvas() {
   }, [searchParams]);
 
   const canMutateDefault = Boolean(user && selectedBoardUserId === user.id);
-  const isCanvasReady = canvasSize.width > 0 && canvasSize.height > 0;
+  const hasCanvasMeasurement = canvasSize.width > 0 && canvasSize.height > 0;
+  const isCanvasReady = hasCanvasMeasurement && hasStableCanvasFrame;
+  const reactFlowMountKey = useMemo(
+    () => `flow-${selectedBoardUserId || "self"}-${selectedBoardId || "default"}`,
+    [selectedBoardId, selectedBoardUserId],
+  );
 
   const markDirty = useCallback(() => {
     if (!hasHydratedRef.current) return;
@@ -513,6 +520,31 @@ function BoardCanvas() {
   }, []);
 
   useEffect(() => {
+    if (stableCanvasRafRef.current) {
+      cancelAnimationFrame(stableCanvasRafRef.current);
+      stableCanvasRafRef.current = null;
+    }
+
+    if (!hasCanvasMeasurement) {
+      setHasStableCanvasFrame(false);
+      return;
+    }
+
+    setHasStableCanvasFrame(false);
+    stableCanvasRafRef.current = requestAnimationFrame(() => {
+      stableCanvasRafRef.current = null;
+      setHasStableCanvasFrame(true);
+    });
+
+    return () => {
+      if (stableCanvasRafRef.current) {
+        cancelAnimationFrame(stableCanvasRafRef.current);
+        stableCanvasRafRef.current = null;
+      }
+    };
+  }, [hasCanvasMeasurement, reactFlowMountKey, isFullscreen]);
+
+  useEffect(() => {
     if (!rfInstance || !isCanvasReady) {
       wasCanvasReadyRef.current = isCanvasReady;
       lastFullscreenRef.current = isFullscreen;
@@ -891,6 +923,7 @@ function BoardCanvas() {
         <div className="board-canvas-wrap board-v2-canvas" ref={canvasWrapperRef}>
           {isCanvasReady ? (
             <ReactFlow<BoardNode, BoardEdge>
+              key={reactFlowMountKey}
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
