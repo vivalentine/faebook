@@ -27,8 +27,92 @@ type EditorState = {
   draft: PinDraft;
 };
 
+type ViewportSize = {
+  width: number;
+  height: number;
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function clampViewportOffsetAxis({
+  offset,
+  mapLength,
+  viewportLength,
+  zoom,
+}: {
+  offset: number;
+  mapLength: number;
+  viewportLength: number;
+  zoom: number;
+}) {
+  if (viewportLength <= 0 || mapLength <= 0 || zoom <= 0) {
+    return offset;
+  }
+
+  const scaledLength = mapLength * zoom;
+  if (scaledLength <= viewportLength) {
+    return -mapLength / 2;
+  }
+
+  const halfScaledLength = scaledLength / 2;
+  const minCenter = viewportLength - halfScaledLength;
+  const maxCenter = halfScaledLength;
+  const currentCenter = viewportLength / 2 + offset + mapLength / 2;
+  const nextCenter = clamp(currentCenter, minCenter, maxCenter);
+  return nextCenter - viewportLength / 2 - mapLength / 2;
+}
+
+function clampViewportOffset({
+  offset,
+  layer,
+  zoom,
+  viewport,
+}: {
+  offset: { x: number; y: number };
+  layer: Pick<MapLayerConfig, "width" | "height">;
+  zoom: number;
+  viewport: ViewportSize;
+}) {
+  return {
+    x: clampViewportOffsetAxis({
+      offset: offset.x,
+      mapLength: layer.width,
+      viewportLength: viewport.width,
+      zoom,
+    }),
+    y: clampViewportOffsetAxis({
+      offset: offset.y,
+      mapLength: layer.height,
+      viewportLength: viewport.height,
+      zoom,
+    }),
+  };
+}
+
+function computeInitialViewport({
+  layer,
+  viewport,
+}: {
+  layer: Pick<MapLayerConfig, "width" | "height" | "default_zoom">;
+  viewport: ViewportSize;
+}) {
+  const zoom = layer.default_zoom;
+  const centeredOffset = {
+    x: -layer.width / 2,
+    y: -layer.height / 2,
+  };
+
+  return {
+    zoom,
+    offset: clampViewportOffset({
+      offset: centeredOffset,
+      layer,
+      zoom,
+      viewport,
+    }),
+  };
 }
 
 function formatTimestampForFilename(date = new Date()) {
@@ -57,6 +141,7 @@ export default function MapsPage() {
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -97,13 +182,16 @@ export default function MapsPage() {
     [pins, activeLayerId],
   );
 
-  const resetView = useCallback(
-    (layer: MapLayerConfig) => {
-      setZoom(layer.default_zoom);
-      setOffset({ x: 0, y: 0 });
-    },
-    [setZoom, setOffset],
-  );
+  const resetView = useCallback((layer: MapLayerConfig) => {
+    const viewportEl = viewportRef.current;
+    const viewport = {
+      width: viewportEl?.clientWidth ?? viewportSize.width,
+      height: viewportEl?.clientHeight ?? viewportSize.height,
+    };
+    const initialViewport = computeInitialViewport({ layer, viewport });
+    setZoom(initialViewport.zoom);
+    setOffset(initialViewport.offset);
+  }, [viewportSize.height, viewportSize.width]);
 
   const loadMaps = useCallback(async () => {
     setLoading(true);
@@ -137,7 +225,15 @@ export default function MapsPage() {
         setActiveLayerId((current) => {
           const selected = current || nextLayers[0].map_id;
           const layer = nextLayers.find((entry) => entry.map_id === selected) || nextLayers[0];
-          setZoom(layer.default_zoom);
+          const initialViewport = computeInitialViewport({
+            layer,
+            viewport: {
+              width: viewportRef.current?.clientWidth ?? 0,
+              height: viewportRef.current?.clientHeight ?? 0,
+            },
+          });
+          setZoom(initialViewport.zoom);
+          setOffset(initialViewport.offset);
           return layer.map_id;
         });
       }
@@ -146,6 +242,30 @@ export default function MapsPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const viewportEl = viewportRef.current;
+    if (!viewportEl) {
+      return;
+    }
+
+    const syncViewportSize = () => {
+      setViewportSize({
+        width: viewportEl.clientWidth,
+        height: viewportEl.clientHeight,
+      });
+    };
+
+    syncViewportSize();
+    const resizeObserver = new ResizeObserver(() => {
+      syncViewportSize();
+    });
+    resizeObserver.observe(viewportEl);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -175,9 +295,15 @@ export default function MapsPage() {
 
       const nextOffsetX = pointerX - centerX - worldX * nextZoom;
       const nextOffsetY = pointerY - centerY - worldY * nextZoom;
+      const clampedOffset = clampViewportOffset({
+        offset: { x: nextOffsetX, y: nextOffsetY },
+        layer: activeLayer,
+        zoom: nextZoom,
+        viewport: { width: rect.width, height: rect.height },
+      });
 
       setZoom(nextZoom);
-      setOffset({ x: nextOffsetX, y: nextOffsetY });
+      setOffset(clampedOffset);
     };
 
     viewportEl.addEventListener("wheel", onWheel, { passive: false });
@@ -196,6 +322,26 @@ export default function MapsPage() {
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
+
+  useEffect(() => {
+    if (!activeLayer || viewportSize.width <= 0 || viewportSize.height <= 0) {
+      return;
+    }
+
+    setOffset((current) => {
+      const next = clampViewportOffset({
+        offset: current,
+        layer: activeLayer,
+        zoom,
+        viewport: viewportSize,
+      });
+
+      if (Math.abs(next.x - current.x) < 0.001 && Math.abs(next.y - current.y) < 0.001) {
+        return current;
+      }
+      return next;
+    });
+  }, [activeLayer, viewportSize, zoom]);
 
   const computeNormalizedFromClientPoint = useCallback(
     (clientX: number, clientY: number) => {
@@ -365,7 +511,18 @@ export default function MapsPage() {
       setIsPanning(true);
     }
 
-    setOffset({ x: drag.baseX + dx, y: drag.baseY + dy });
+    const viewportEl = viewportRef.current;
+    const nextOffset = { x: drag.baseX + dx, y: drag.baseY + dy };
+    const clampedOffset = clampViewportOffset({
+      offset: nextOffset,
+      layer: activeLayer,
+      zoom,
+      viewport: {
+        width: viewportEl?.clientWidth ?? viewportSize.width,
+        height: viewportEl?.clientHeight ?? viewportSize.height,
+      },
+    });
+    setOffset(clampedOffset);
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
