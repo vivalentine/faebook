@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addEdge,
   Background,
-  Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -20,15 +18,16 @@ import "@xyflow/react/dist/style.css";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, apiUrl } from "../lib/api";
 import type {
+  AuthUser,
   BoardCardData,
   BoardEdge,
   BoardEdgeData,
-  BoardResponse,
+  BoardListItem,
   BoardNode,
+  BoardResponse,
   BoardSnapshot,
   BoardUserSummary,
   Npc,
-  AuthUser,
 } from "../types";
 import BoardCardNode from "../components/BoardCardNode";
 import BoardDeleteEdge from "../components/BoardDeleteEdge";
@@ -43,6 +42,7 @@ const edgeTypes: EdgeTypes = {
 
 const AUTOSAVE_DELAY_MS = 1200;
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
+const NOTE_COLORS: Array<"yellow" | "pink" | "mint" | "blue"> = ["yellow", "pink", "mint", "blue"];
 
 function BoardCanvas() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -66,6 +66,15 @@ function BoardCanvas() {
   >("idle");
   const [boardUsers, setBoardUsers] = useState<BoardUserSummary[]>([]);
   const [boardOwner, setBoardOwner] = useState<AuthUser | null>(null);
+  const [boards, setBoards] = useState<BoardListItem[]>([]);
+  const [currentBoardId, setCurrentBoardId] = useState<number | null>(null);
+  const [currentBoardName, setCurrentBoardName] = useState("Investigation Board");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showNpcPicker, setShowNpcPicker] = useState(false);
+  const [npcSearch, setNpcSearch] = useState("");
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   const viewportRef = useRef(DEFAULT_VIEWPORT);
   const hasHydratedRef = useRef(false);
@@ -73,6 +82,10 @@ function BoardCanvas() {
   const nextYRef = useRef(40);
   const autosaveTimeoutRef = useRef<number | null>(null);
   const dirtyRef = useRef(false);
+  const boardSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const wasCanvasReadyRef = useRef(false);
+  const lastFullscreenRef = useRef(false);
 
   const selectedBoardUserId = useMemo(() => {
     if (!user) return null;
@@ -86,6 +99,15 @@ function BoardCanvas() {
 
     return Number.isInteger(parsed) && parsed > 0 ? parsed : user.id;
   }, [isDm, searchParams, user]);
+
+  const selectedBoardId = useMemo(() => {
+    const raw = searchParams.get("boardId");
+    const parsed = raw ? Number(raw) : Number.NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }, [searchParams]);
+
+  const canMutateDefault = Boolean(user && selectedBoardUserId === user.id);
+  const isCanvasReady = canvasSize.width > 0 && canvasSize.height > 0;
 
   const markDirty = useCallback(() => {
     if (!hasHydratedRef.current) return;
@@ -211,9 +233,12 @@ function BoardCanvas() {
   const stripTransientNodeData = useCallback(
     (data: BoardCardData): BoardCardData => ({
       kind: data.kind,
+      npcId: data.npcId,
       title: data.title,
       body: data.body,
       imageUrl: data.imageUrl,
+      noteColor: data.noteColor,
+      noteRotation: data.noteRotation,
     }),
     [],
   );
@@ -224,6 +249,19 @@ function BoardCanvas() {
     }),
     [],
   );
+
+  const loadBoards = useCallback(async () => {
+    if (!selectedBoardUserId) return;
+    const query = isDm ? `?userId=${selectedBoardUserId}` : "";
+    const response = await apiFetch(`/api/boards${query}`);
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || `Failed to load boards: ${response.status}`);
+    }
+
+    setBoards(payload.boards || []);
+  }, [isDm, selectedBoardUserId]);
 
   const persistBoard = useCallback(async () => {
     if (!selectedBoardUserId) return true;
@@ -245,7 +283,11 @@ function BoardCanvas() {
         viewport: viewportRef.current,
       };
 
-      const query = isDm ? `?userId=${selectedBoardUserId}` : "";
+      const params = new URLSearchParams();
+      if (isDm) params.set("userId", String(selectedBoardUserId));
+      if (currentBoardId) params.set("boardId", String(currentBoardId));
+      const query = params.toString() ? `?${params.toString()}` : "";
+
       const response = await apiFetch(`/api/board${query}`, {
         method: "PUT",
         body: JSON.stringify(snapshot),
@@ -281,6 +323,7 @@ function BoardCanvas() {
       setSaving(false);
     }
   }, [
+    currentBoardId,
     edges,
     isDm,
     nodes,
@@ -364,7 +407,13 @@ function BoardCanvas() {
         setError("");
         setAutosaveStatus("idle");
 
-        const query = isDm ? `?userId=${selectedBoardUserId}` : "";
+        await loadBoards();
+
+        const params = new URLSearchParams();
+        if (isDm) params.set("userId", String(selectedBoardUserId));
+        if (selectedBoardId) params.set("boardId", String(selectedBoardId));
+        const query = params.toString() ? `?${params.toString()}` : "";
+
         const boardResponse = await apiFetch(`/api/board${query}`);
         const boardData: BoardResponse = await boardResponse.json();
 
@@ -392,6 +441,8 @@ function BoardCanvas() {
         setVisibleNpcs(npcData);
         setLastSavedAt(boardData.updated_at);
         setBoardOwner(boardData.owner);
+        setCurrentBoardId(boardData.board_id);
+        setCurrentBoardName(boardData.board_name);
         viewportRef.current = restoredViewport;
         nextXRef.current = 40 + restoredNodes.length * 20;
         nextYRef.current = 40 + restoredNodes.length * 20;
@@ -416,7 +467,70 @@ function BoardCanvas() {
     return () => {
       isActive = false;
     };
-  }, [decorateEdges, decorateNodes, isDm, rfInstance, selectedBoardUserId, setEdges, setNodes]);
+  }, [
+    decorateEdges,
+    decorateNodes,
+    isDm,
+    loadBoards,
+    rfInstance,
+    selectedBoardId,
+    selectedBoardUserId,
+    setEdges,
+    setNodes,
+  ]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const element = canvasWrapperRef.current;
+    if (!element) return;
+
+    const measure = () => {
+      const rect = element.getBoundingClientRect();
+      const width = Math.max(0, Math.floor(rect.width));
+      const height = Math.max(0, Math.floor(rect.height));
+      setCanvasSize((current) =>
+        current.width === width && current.height === height ? current : { width, height },
+      );
+    };
+
+    measure();
+    const observer = new ResizeObserver(() => {
+      measure();
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!rfInstance || !isCanvasReady) {
+      wasCanvasReadyRef.current = isCanvasReady;
+      lastFullscreenRef.current = isFullscreen;
+      return;
+    }
+
+    const becameReady = !wasCanvasReadyRef.current && isCanvasReady;
+    const fullscreenChanged = lastFullscreenRef.current !== isFullscreen;
+
+    if (becameReady || fullscreenChanged) {
+      requestAnimationFrame(() => {
+        rfInstance.setViewport(viewportRef.current);
+      });
+    }
+
+    wasCanvasReadyRef.current = isCanvasReady;
+    lastFullscreenRef.current = isFullscreen;
+  }, [isCanvasReady, isFullscreen, rfInstance, canvasSize.height, canvasSize.width]);
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -446,7 +560,8 @@ function BoardCanvas() {
     }
 
     await persistBoard();
-  }, [persistBoard]);
+    await loadBoards();
+  }, [loadBoards, persistBoard]);
 
   const addNpcNode = useCallback(
     (npc: Npc) => {
@@ -458,6 +573,7 @@ function BoardCanvas() {
         position: { x: nextXRef.current, y: nextYRef.current },
         data: {
           kind: "npc",
+          npcId: npc.id,
           title: npc.name,
           body: npc.house || npc.rank_title || "",
           imageUrl,
@@ -467,11 +583,16 @@ function BoardCanvas() {
       setNodes((current) => [...current, newNode]);
       nextXRef.current += 40;
       nextYRef.current += 40;
+      setShowNpcPicker(false);
+      setShowAddMenu(false);
     },
     [decorateNode, setNodes],
   );
 
   const addNoteNode = useCallback(() => {
+    const noteColor = NOTE_COLORS[Math.floor(Math.random() * NOTE_COLORS.length)];
+    const noteRotation = Math.floor(Math.random() * 9) - 4;
+
     const newNode: BoardNode = decorateNode({
       id: `note-${Date.now()}`,
       type: "boardCard",
@@ -480,19 +601,32 @@ function BoardCanvas() {
         kind: "note",
         title: "New note",
         body: "",
+        noteColor,
+        noteRotation,
       },
     });
 
     setNodes((current) => [...current, newNode]);
     nextXRef.current += 40;
     nextYRef.current += 40;
+    setShowAddMenu(false);
   }, [decorateNode, setNodes]);
 
   const clearBoard = useCallback(() => {
     if (!window.confirm("Clear the entire board?")) return;
     setNodes([]);
     setEdges([]);
+    setShowOverflowMenu(false);
   }, [setEdges, setNodes]);
+
+  const updateSearchParams = useCallback(
+    (update: (params: URLSearchParams) => void) => {
+      const next = new URLSearchParams(searchParams);
+      update(next);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const handleBoardOwnerChange = useCallback(
     async (nextUserId: number) => {
@@ -503,14 +637,162 @@ function BoardCanvas() {
         if (!saved) return;
       }
 
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.set("userId", String(nextUserId));
-      setSearchParams(nextParams, { replace: true });
+      updateSearchParams((params) => {
+        params.set("userId", String(nextUserId));
+        params.delete("boardId");
+      });
     },
-    [isDm, persistBoard, searchParams, selectedBoardUserId, setSearchParams, user],
+    [isDm, persistBoard, selectedBoardUserId, updateSearchParams, user],
   );
 
-  const sidebarNpcs = useMemo(() => visibleNpcs, [visibleNpcs]);
+  const handleBoardSwitch = useCallback(
+    async (nextBoardId: number) => {
+      if (!currentBoardId || nextBoardId === currentBoardId) return;
+
+      if (dirtyRef.current) {
+        const saved = await persistBoard();
+        if (!saved) return;
+      }
+
+      if (canMutateDefault) {
+        const params = new URLSearchParams();
+        if (isDm) params.set("userId", String(selectedBoardUserId));
+        await apiFetch(`/api/boards/${nextBoardId}${params.toString() ? `?${params.toString()}` : ""}`, {
+          method: "PATCH",
+          body: JSON.stringify({ set_default: true }),
+        });
+      }
+
+      updateSearchParams((params) => {
+        params.set("boardId", String(nextBoardId));
+      });
+    },
+    [canMutateDefault, currentBoardId, isDm, persistBoard, selectedBoardUserId, updateSearchParams],
+  );
+
+  const createBoard = useCallback(async () => {
+    try {
+      const nextName = window.prompt("New board name", "Investigation Board");
+      if (!nextName) return;
+
+      const params = new URLSearchParams();
+      if (isDm) params.set("userId", String(selectedBoardUserId));
+
+      const response = await apiFetch(`/api/boards${params.toString() ? `?${params.toString()}` : ""}`, {
+        method: "POST",
+        body: JSON.stringify({ name: nextName, board: { nodes: [], edges: [], viewport: DEFAULT_VIEWPORT } }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to create board");
+      }
+
+      await loadBoards();
+      updateSearchParams((next) => next.set("boardId", String(payload.board.id)));
+      setShowOverflowMenu(false);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to create board");
+    }
+  }, [isDm, loadBoards, selectedBoardUserId, updateSearchParams]);
+
+  const renameBoard = useCallback(async () => {
+    try {
+      if (!currentBoardId) return;
+      const nextName = window.prompt("Rename board", currentBoardName);
+      if (!nextName) return;
+
+      const params = new URLSearchParams();
+      if (isDm) params.set("userId", String(selectedBoardUserId));
+
+      const response = await apiFetch(
+        `/api/boards/${currentBoardId}${params.toString() ? `?${params.toString()}` : ""}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ name: nextName }),
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to rename board");
+      }
+
+      setCurrentBoardName(payload.board.name);
+      await loadBoards();
+      setShowOverflowMenu(false);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to rename board");
+    }
+  }, [currentBoardId, currentBoardName, isDm, loadBoards, selectedBoardUserId]);
+
+  const duplicateBoard = useCallback(async () => {
+    try {
+      if (!currentBoardId) return;
+
+      const params = new URLSearchParams();
+      if (isDm) params.set("userId", String(selectedBoardUserId));
+
+      const response = await apiFetch(
+        `/api/boards/${currentBoardId}/duplicate${params.toString() ? `?${params.toString()}` : ""}`,
+        { method: "POST" },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to duplicate board");
+      }
+
+      await loadBoards();
+      updateSearchParams((next) => next.set("boardId", String(payload.board.id)));
+      setShowOverflowMenu(false);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to duplicate board");
+    }
+  }, [currentBoardId, isDm, loadBoards, selectedBoardUserId, updateSearchParams]);
+
+  const archiveBoard = useCallback(async () => {
+    try {
+      if (!currentBoardId) return;
+      if (!window.confirm("Archive this board? You can restore it from DM Archive.")) return;
+
+      const params = new URLSearchParams();
+      if (isDm) params.set("userId", String(selectedBoardUserId));
+
+      const response = await apiFetch(
+        `/api/boards/${currentBoardId}/archive${params.toString() ? `?${params.toString()}` : ""}`,
+        { method: "POST" },
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to archive board");
+      }
+
+      await loadBoards();
+      updateSearchParams((next) => next.set("boardId", String(payload.next_board_id)));
+      setShowOverflowMenu(false);
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Failed to archive board");
+    }
+  }, [currentBoardId, isDm, loadBoards, selectedBoardUserId, updateSearchParams]);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!boardSurfaceRef.current) return;
+
+    if (!document.fullscreenElement) {
+      await boardSurfaceRef.current.requestFullscreen();
+      return;
+    }
+
+    await document.exitFullscreen();
+  }, []);
+
+  const filteredNpcs = useMemo(() => {
+    const query = npcSearch.trim().toLowerCase();
+    if (!query) return visibleNpcs;
+    return visibleNpcs.filter((npc) => {
+      const aliases = [...npc.canonical_aliases, ...npc.personal_aliases].join(" ").toLowerCase();
+      return npc.name.toLowerCase().includes(query) || aliases.includes(query);
+    });
+  }, [npcSearch, visibleNpcs]);
+
   const boardOwnerLabel =
     boardOwner?.display_name || boardOwner?.username || user?.display_name || "User";
 
@@ -540,110 +822,145 @@ function BoardCanvas() {
         </div>
       ) : null}
 
-      <section className="board-layout">
-        <aside className="board-sidebar">
-          <div className="board-sidebar-card">
-            <h2>Board Tools</h2>
-
-            {isDm ? (
-              <label className="toolbar-field">
-                <span>Open board</span>
-                <select
-                  className="text-input"
-                  value={selectedBoardUserId ?? ""}
-                  onChange={(event) => {
-                    void handleBoardOwnerChange(Number(event.target.value));
-                  }}
-                >
-                  {boardUsers.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.display_name} ({entry.role})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-
-            <div className="board-tools-actions">
-              <button className="action-button" onClick={addNoteNode}>
-                Add note
-              </button>
-              <button
-                className="action-button secondary-link"
-                onClick={() => {
-                  void saveBoard();
+      <section className="board-v2-shell" ref={boardSurfaceRef}>
+        <div className="board-floating-controls">
+          {isDm ? (
+            <label className="toolbar-field board-inline-field">
+              <span>User</span>
+              <select
+                className="text-input"
+                value={selectedBoardUserId ?? ""}
+                onChange={(event) => {
+                  void handleBoardOwnerChange(Number(event.target.value));
                 }}
-                disabled={saving}
               >
-                {saving ? "Saving..." : "Save now"}
-              </button>
-              <button className="action-button secondary-link" onClick={clearBoard}>
-                Clear board
-              </button>
-            </div>
-            <p className="board-meta-line">
-              Autosave:{" "}
-              {autosaveStatus === "dirty"
-                ? "Waiting..."
-                : autosaveStatus === "saving"
-                  ? "Saving..."
-                  : autosaveStatus === "saved"
-                    ? "Saved"
-                    : "Idle"}
-            </p>
-            <p className="board-meta-line">
-              Last saved:{" "}
-              {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "Never"}
-            </p>
-            <p className="board-meta-line">
-              Tip: click a node or edge, then press Delete or Backspace.
-            </p>
+                {boardUsers.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.display_name} ({entry.role})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label className="toolbar-field board-inline-field">
+            <span>Board</span>
+            <select
+              className="text-input"
+              value={currentBoardId ?? ""}
+              onChange={(event) => {
+                void handleBoardSwitch(Number(event.target.value));
+              }}
+            >
+              {boards.map((board) => (
+                <option key={board.id} value={board.id}>
+                  {board.name}{board.is_default ? " • default" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="board-icon-group">
+            <button className="action-button board-icon-button" onClick={() => setShowAddMenu((v) => !v)} type="button">+</button>
+            <button className="action-button board-icon-button" onClick={() => void saveBoard()} type="button" disabled={saving}>{saving ? "…" : "💾"}</button>
+            <button className="action-button board-icon-button" onClick={() => void toggleFullscreen()} type="button">{isFullscreen ? "⤢" : "⤢"}</button>
+            <button className="action-button board-icon-button" onClick={() => setShowOverflowMenu((v) => !v)} type="button">⋯</button>
           </div>
 
-          <div className="board-sidebar-card">
-            <h2>{boardOwner?.role === "dm" ? "All NPCs" : "Unlocked NPCs"}</h2>
-            <div className="board-npc-list">
-              {sidebarNpcs.map((npc) => (
-                <button
-                  key={npc.id}
-                  className="board-npc-button"
-                  onClick={() => {
-                    addNpcNode(npc);
-                  }}
-                >
+          {showAddMenu ? (
+            <div className="board-popover">
+              <button type="button" className="secondary-link" onClick={addNoteNode}>Add Note</button>
+              <button type="button" className="secondary-link" onClick={() => {
+                setShowNpcPicker(true);
+                setShowAddMenu(false);
+              }}>Add NPC</button>
+            </div>
+          ) : null}
+
+          {showOverflowMenu ? (
+            <div className="board-popover">
+              <button type="button" className="secondary-link" onClick={() => void createBoard()}>Create Board</button>
+              <button type="button" className="secondary-link" onClick={() => void renameBoard()}>Rename Board</button>
+              <button type="button" className="secondary-link" onClick={() => void duplicateBoard()}>Duplicate Board</button>
+              <button type="button" className="secondary-link" onClick={clearBoard}>Clear Board</button>
+              <button type="button" className="board-node-delete-button" onClick={() => void archiveBoard()}>Archive Board</button>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="board-canvas-wrap board-v2-canvas" ref={canvasWrapperRef}>
+          {isCanvasReady ? (
+            <ReactFlow<BoardNode, BoardEdge>
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              onInit={setRfInstance}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onMoveEnd={(_, viewport) => {
+                viewportRef.current = viewport;
+                setViewportVersion((value) => value + 1);
+              }}
+              deleteKeyCode={["Delete", "Backspace"]}
+              defaultEdgeOptions={{
+                type: "boardEdge",
+                style: { stroke: "#c63b44", strokeWidth: 3 },
+              }}
+              fitViewOptions={{ maxZoom: 1.3 }}
+              nodeDragThreshold={8}
+            >
+              <Background />
+            </ReactFlow>
+          ) : (
+            <div className="board-canvas-skeleton" role="status" aria-live="polite">
+              Preparing board canvas…
+            </div>
+          )}
+        </div>
+
+        <footer className="board-footer-status">
+          <span>{currentBoardName}</span>
+          <span>
+            Autosave: {" "}
+            {autosaveStatus === "dirty"
+              ? "Waiting..."
+              : autosaveStatus === "saving"
+                ? "Saving..."
+                : autosaveStatus === "saved"
+                  ? "Saved"
+                  : "Idle"}
+          </span>
+          <span>Last saved: {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "Never"}</span>
+        </footer>
+      </section>
+
+      {showNpcPicker ? (
+        <div className="board-modal-overlay" role="presentation" onClick={() => setShowNpcPicker(false)}>
+          <div className="board-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <h2>Add NPC</h2>
+            <input
+              className="text-input"
+              type="search"
+              placeholder="Search by name or alias..."
+              value={npcSearch}
+              onChange={(event) => setNpcSearch(event.target.value)}
+            />
+            <div className="board-modal-list">
+              {filteredNpcs.map((npc) => (
+                <button key={npc.id} type="button" className="board-npc-button" onClick={() => addNpcNode(npc)}>
                   {npc.name}
                 </button>
               ))}
+              {!filteredNpcs.length ? <p className="topbar-meta">No NPC matches.</p> : null}
+            </div>
+            <div className="board-modal-actions">
+              <button type="button" className="secondary-link" onClick={() => setShowNpcPicker(false)}>Close</button>
             </div>
           </div>
-        </aside>
-
-        <div className="board-canvas-wrap">
-          <ReactFlow<BoardNode, BoardEdge>
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onInit={setRfInstance}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onMoveEnd={(_, viewport) => {
-              viewportRef.current = viewport;
-              setViewportVersion((value) => value + 1);
-            }}
-            deleteKeyCode={["Delete", "Backspace"]}
-            defaultEdgeOptions={{
-              type: "boardEdge",
-              style: { stroke: "#c63b44", strokeWidth: 3 },
-            }}
-          >
-            <Background />
-            <MiniMap />
-            <Controls />
-          </ReactFlow>
         </div>
-      </section>
+      ) : null}
     </div>
   );
 }
