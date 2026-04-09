@@ -111,6 +111,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_dashboard_suspects_user_sort
   ON dashboard_suspects(user_id, archived_at, sort_order, id);
 
+  CREATE INDEX IF NOT EXISTS idx_dashboard_suspects_user_active_updated
+  ON dashboard_suspects(user_id, archived_at, updated_at DESC, id DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_dashboard_suspects_active_updated
+  ON dashboard_suspects(archived_at, updated_at DESC, id DESC);
+
   CREATE TABLE IF NOT EXISTS dashboard_notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -125,6 +131,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_dashboard_notes_user_active
   ON dashboard_notes(user_id, archived_at, updated_at);
+
+  CREATE INDEX IF NOT EXISTS idx_dashboard_notes_user_active_updated
+  ON dashboard_notes(user_id, archived_at, updated_at DESC, id DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_dashboard_notes_active_updated
+  ON dashboard_notes(archived_at, updated_at DESC, id DESC);
 
   CREATE TABLE IF NOT EXISTS session_recaps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,6 +174,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_npc_aliases_user_active
   ON npc_aliases(user_id, archived_at, alias_type);
 
+  CREATE INDEX IF NOT EXISTS idx_npc_aliases_type_active_updated
+  ON npc_aliases(alias_type, archived_at, updated_at DESC, id DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_npc_aliases_user_type_active_updated
+  ON npc_aliases(user_id, alias_type, archived_at, updated_at DESC, id DESC);
+
   CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_aliases_canonical_unique
   ON npc_aliases(npc_id, alias_type, alias_normalized)
   WHERE alias_type = 'canonical' AND archived_at IS NULL;
@@ -189,6 +207,12 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_map_pins_user_map_active
   ON map_pins(user_id, map_layer, archived_at, updated_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_map_pins_user_active_updated
+  ON map_pins(user_id, archived_at, updated_at DESC, id DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_map_pins_active_updated
+  ON map_pins(archived_at, updated_at DESC, id DESC);
 
   CREATE INDEX IF NOT EXISTS idx_map_pins_archived
   ON map_pins(archived_at DESC, id DESC);
@@ -327,6 +351,15 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_notes_npc_author_unique
   ON npc_notes(npc_id, author_user_id)
   WHERE author_user_id IS NOT NULL
+`);
+
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_npc_notes_author_updated
+  ON npc_notes(author_user_id, updated_at DESC, id DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_npc_notes_updated
+  ON npc_notes(updated_at DESC, id DESC);
 `);
 
 if (!columnExists("session_recaps", "updated_at")) {
