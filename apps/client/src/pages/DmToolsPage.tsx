@@ -33,6 +33,12 @@ type ImportLog = {
   created_at: string;
 };
 
+type BackupResult = {
+  name: string;
+  created_at: string;
+  path: string;
+};
+
 export default function DmToolsPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
@@ -40,6 +46,7 @@ export default function DmToolsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [finalizeResult, setFinalizeResult] = useState("");
+  const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
 
   useEffect(() => {
     void refresh();
@@ -79,6 +86,7 @@ export default function DmToolsPage() {
       setBusy(true);
       setError("");
       setFinalizeResult("");
+      setBackupResult(null);
 
       const formData = new FormData();
       Array.from(fileList).forEach((file) => formData.append("files", file));
@@ -158,6 +166,28 @@ export default function DmToolsPage() {
       setFinalizeResult(`Finalize complete. Created: ${created}, Updated: ${updated}, Invalid: ${invalid}.`);
 
       await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createBackup() {
+    if (!window.confirm("Create a local DM backup now?")) return;
+
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+      const response = await apiFetch("/api/dm/backups", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Backup failed: ${response.status}`);
+      }
+
+      setBackupResult(data.backup || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -258,6 +288,24 @@ export default function DmToolsPage() {
             <p>{finalizeResult}</p>
           </div>
         ) : null}
+
+        <section className="state-card">
+          <h2>Local Backup</h2>
+          <p>
+            Creates a DM-only local backup bundle with database files, uploaded portraits, and map config.
+          </p>
+          <div className="note-actions">
+            <button className="action-button" type="button" onClick={() => void createBackup()} disabled={busy}>
+              Create Local Backup
+            </button>
+          </div>
+          {backupResult ? (
+            <p>
+              Created: <strong>{backupResult.name}</strong> ({new Date(backupResult.created_at).toLocaleString()}) at{" "}
+              <code>{backupResult.path}</code>
+            </p>
+          ) : null}
+        </section>
 
         <section className="state-card">
           <h2>Staging Preview</h2>

@@ -44,6 +44,87 @@ const AUTOSAVE_DELAY_MS = 1200;
 const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };
 const NOTE_COLORS: Array<"yellow" | "pink" | "mint" | "blue"> = ["yellow", "pink", "mint", "blue"];
 
+function formatTimestampForFilename(date = new Date()) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}-${hour}${minute}`;
+}
+
+function sanitizeFilenamePart(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_\s]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "board";
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function renderElementToPngBlob(element: HTMLElement, pixelRatio = 2) {
+  const rect = element.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width));
+  const height = Math.max(1, Math.floor(rect.height));
+  const cloned = element.cloneNode(true) as HTMLElement;
+  cloned.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+
+  const svgMarkup = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+      <foreignObject width="100%" height="100%">
+        ${new XMLSerializer().serializeToString(cloned)}
+      </foreignObject>
+    </svg>
+  `;
+
+  const svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+  const svgUrl = URL.createObjectURL(svgBlob);
+
+  const image = new Image();
+  image.decoding = "sync";
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Failed to render board image"));
+    image.src = svgUrl;
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    URL.revokeObjectURL(svgUrl);
+    throw new Error("Canvas context not available");
+  }
+
+  context.scale(pixelRatio, pixelRatio);
+  context.fillStyle = "#071014";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+  URL.revokeObjectURL(svgUrl);
+
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Failed to generate board PNG"));
+        return;
+      }
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
 function BoardCanvas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
@@ -754,6 +835,104 @@ function BoardCanvas() {
 
   const boardOwnerLabel =
     boardOwner?.display_name || boardOwner?.username || user?.display_name || "User";
+  const currentBoardDetails =
+    boards.find((entry) => entry.id === currentBoardId) || null;
+
+  const exportBoardJson = useCallback(async () => {
+    if (!user || !currentBoardId || !boardOwner) return;
+
+    const timestamp = formatTimestampForFilename();
+    const boardSlug = sanitizeFilenamePart(currentBoardName);
+    const payload = {
+      metadata: {
+        export_type: "board_json",
+        schema_version: "1.0",
+        exported_at: new Date().toISOString(),
+        exported_by_user_id: user.id,
+        exported_by_username: user.username,
+        app_name: "FaeBook",
+      },
+      board: {
+        id: currentBoardId,
+        name: currentBoardName,
+        owner_user_id: boardOwner.id,
+        is_default: currentBoardDetails?.is_default ?? false,
+        nodes: nodes.map((node) => ({
+          ...node,
+          data: stripTransientNodeData(node.data),
+        })),
+        edges: edges.map((edge) => ({
+          ...edge,
+          data: stripTransientEdgeData(edge.data),
+        })),
+        viewport: viewportRef.current,
+        created_at: currentBoardDetails?.created_at || null,
+        updated_at: lastSavedAt || currentBoardDetails?.updated_at || null,
+      },
+    };
+
+    downloadBlob(
+      new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+      `board-${boardSlug}-${timestamp}.json`,
+    );
+
+    try {
+      await apiFetch("/api/exports/audit", {
+        method: "POST",
+        body: JSON.stringify({
+          export_type: "board_json",
+          object_type: "board",
+          object_id: String(currentBoardId),
+          message: `Exported board JSON for board ${currentBoardId}`,
+        }),
+      });
+    } catch (_error) {
+      // non-blocking
+    }
+  }, [
+    boardOwner,
+    boards,
+    currentBoardId,
+    currentBoardName,
+    edges,
+    lastSavedAt,
+    nodes,
+    stripTransientEdgeData,
+    stripTransientNodeData,
+    user,
+  ]);
+
+  const exportBoardPng = useCallback(async () => {
+    if (!currentBoardId || !boardSurfaceRef.current) return;
+
+    const viewportElement = boardSurfaceRef.current.querySelector(
+      ".react-flow__viewport",
+    ) as HTMLElement | null;
+
+    if (!viewportElement) {
+      setError("Unable to export board image.");
+      return;
+    }
+
+    try {
+      const blob = await renderElementToPngBlob(viewportElement, 2);
+      const timestamp = formatTimestampForFilename();
+      const boardSlug = sanitizeFilenamePart(currentBoardName);
+      downloadBlob(blob, `board-${boardSlug}-${timestamp}.png`);
+
+      await apiFetch("/api/exports/audit", {
+        method: "POST",
+        body: JSON.stringify({
+          export_type: "board_png",
+          object_type: "board",
+          object_id: String(currentBoardId),
+          message: `Exported board PNG for board ${currentBoardId}`,
+        }),
+      });
+    } catch (_error) {
+      setError("Failed to export board image.");
+    }
+  }, [currentBoardId, currentBoardName]);
 
   return (
     <div className="app-shell">
@@ -841,6 +1020,8 @@ function BoardCanvas() {
               <button type="button" className="secondary-link" onClick={() => void createBoard()}>Create Board</button>
               <button type="button" className="secondary-link" onClick={() => void renameBoard()}>Rename Board</button>
               <button type="button" className="secondary-link" onClick={() => void duplicateBoard()}>Duplicate Board</button>
+              <button type="button" className="secondary-link" onClick={() => void exportBoardJson()}>Export Board JSON</button>
+              <button type="button" className="secondary-link" onClick={() => void exportBoardPng()}>Export Board PNG</button>
               <button type="button" className="secondary-link" onClick={clearBoard}>Clear Board</button>
               <button type="button" className="board-node-delete-button" onClick={() => void archiveBoard()}>Archive Board</button>
             </div>

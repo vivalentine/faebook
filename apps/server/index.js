@@ -398,6 +398,21 @@ function limitString(value, maxLength) {
   return String(value || "").slice(0, maxLength);
 }
 
+function formatTimestampForFilename(date = new Date()) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}-${hour}${minute}`;
+}
+
+function safeMkdir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
 function parseSimpleYamlMap(rawText) {
   const result = {};
   const lines = String(rawText || "").split(/\r?\n/);
@@ -2555,6 +2570,127 @@ app.post("/api/maps/pins/:id/archive", requireRole("player", "dm"), (req, res) =
   });
 
   res.json({ ok: true, archived_id: pinId });
+});
+
+app.post("/api/exports/audit", requireRole("player", "dm"), (req, res) => {
+  const exportType = limitString(req.body.export_type, 64).trim();
+  const objectType = limitString(req.body.object_type || "export", 64).trim() || "export";
+  const objectId = req.body.object_id ? limitString(req.body.object_id, 64).trim() : null;
+  const message =
+    limitString(req.body.message, 300).trim() ||
+    `User exported ${exportType || "data"} (${objectType})`;
+  const allowedExportTypes = new Set(["board_png", "board_json", "map_pins_json"]);
+
+  if (!allowedExportTypes.has(exportType)) {
+    return res.status(400).json({ error: "Unsupported export type" });
+  }
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "export",
+    objectType,
+    objectId: objectId || exportType,
+    message,
+    createdAt: new Date().toISOString(),
+  });
+
+  res.status(201).json({ ok: true });
+});
+
+app.post("/api/dm/backups", requireRole("dm"), (req, res) => {
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const timestamp = formatTimestampForFilename(now);
+  const backupName = `faebook-backup-${timestamp}`;
+  const backupsRootDir = path.join(__dirname, "../../backups");
+  const backupDir = path.join(backupsRootDir, backupName);
+  const backupDataDir = path.join(backupDir, "data");
+  const backupUploadsDir = path.join(backupDir, "uploads");
+  const backupMapsDir = path.join(backupDir, "config", "maps");
+  const sourceDbPath = path.join(__dirname, "../../data/faebook.db");
+  const sourceUploadsDir = path.join(__dirname, "../../uploads/npc-portraits");
+  const sourceMapsDir = path.join(__dirname, "../../config/maps");
+
+  try {
+    if (fs.existsSync(backupDir)) {
+      return res.status(409).json({ error: "A backup already exists for this timestamp" });
+    }
+
+    safeMkdir(backupDataDir);
+    safeMkdir(backupUploadsDir);
+    safeMkdir(backupMapsDir);
+
+    if (fs.existsSync(sourceDbPath)) {
+      fs.copyFileSync(sourceDbPath, path.join(backupDataDir, "faebook.db"));
+    }
+
+    for (const suffix of ["-wal", "-shm"]) {
+      const sourcePath = `${sourceDbPath}${suffix}`;
+      if (fs.existsSync(sourcePath)) {
+        fs.copyFileSync(sourcePath, path.join(backupDataDir, `faebook.db${suffix}`));
+      }
+    }
+
+    if (fs.existsSync(sourceUploadsDir)) {
+      fs.cpSync(sourceUploadsDir, backupUploadsDir, { recursive: true, force: true });
+    }
+
+    const mapConfigFiles = fs
+      .readdirSync(sourceMapsDir)
+      .filter((filename) => filename.toLowerCase().endsWith(".yml"))
+      .sort();
+
+    for (const filename of mapConfigFiles) {
+      fs.copyFileSync(
+        path.join(sourceMapsDir, filename),
+        path.join(backupMapsDir, filename)
+      );
+    }
+
+    const manifest = {
+      backup_name: backupName,
+      schema_version: "1.0",
+      created_at: nowIso,
+      created_by_user_id: req.session.user.id,
+      created_by_username: req.session.user.username,
+      app_name: "FaeBook",
+      includes: {
+        database: fs.existsSync(sourceDbPath),
+        database_wal: fs.existsSync(`${sourceDbPath}-wal`),
+        database_shm: fs.existsSync(`${sourceDbPath}-shm`),
+        uploaded_portraits: fs.existsSync(sourceUploadsDir),
+        map_config_files: mapConfigFiles,
+      },
+    };
+
+    fs.writeFileSync(
+      path.join(backupDir, "manifest.json"),
+      JSON.stringify(manifest, null, 2),
+      "utf8"
+    );
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "backup_create",
+      objectType: "system_backup",
+      objectId: backupName,
+      message: `DM created local backup ${backupName}`,
+      createdAt: nowIso,
+    });
+
+    res.status(201).json({
+      ok: true,
+      backup: {
+        name: backupName,
+        created_at: nowIso,
+        path: path.relative(path.join(__dirname, "../.."), backupDir),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : "Failed to create backup",
+    });
+  }
 });
 
 app.get("/api/archive", requireRole("dm"), (req, res) => {

@@ -119,6 +119,42 @@ npm --prefix apps/client run dev
 npm run build
 ```
 
+## v1 exports and backups
+
+### Board exports (player and DM)
+
+- Open **Investigation Board**.
+- Use the overflow menu (`⋯`) to export:
+  - **Export Board JSON**
+  - **Export Board PNG**
+
+Board export files are timestamped in UTC using `yyyy-mm-dd-hhmm`.
+
+### Map pin exports (player and DM)
+
+- Open **Maps**.
+- Use toolbar actions:
+  - **Export Current Pins**
+  - **Export All Pins**
+
+Map pin export files use `map-pins-{scope}-{yyyy-mm-dd-hhmm}.json`.
+
+### DM local backup workflow
+
+- Open **DM Tools**.
+- In **Local Backup**, click **Create Local Backup**.
+- The server creates a local backup directory at:
+  - `backups/faebook-backup-{yyyy-mm-dd-hhmm}/`
+
+Each backup includes:
+
+- `data/faebook.db` (plus `faebook.db-wal` and `faebook.db-shm` when present)
+- `uploads/` copy of portrait assets from `uploads/npc-portraits`
+- `config/maps/*.yml`
+- `manifest.json` with metadata and included assets
+
+Backup creation is DM-only and writes an audit log entry.
+
 ## Environment files
 
 Use these files locally:

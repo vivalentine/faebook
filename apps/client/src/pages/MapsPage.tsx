@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../auth/AuthContext";
 import type { MapLayerConfig, MapPin, MapPinCategory } from "../types";
 
 const PIN_CATEGORIES: MapPinCategory[] = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
@@ -30,7 +31,27 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function formatTimestampForFilename(date = new Date()) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}-${hour}${minute}`;
+}
+
+function downloadJson(filename: string, payload: unknown) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function MapsPage() {
+  const { user } = useAuth();
   const [layers, setLayers] = useState<MapLayerConfig[]>([]);
   const [pins, setPins] = useState<MapPin[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
@@ -391,6 +412,47 @@ export default function MapsPage() {
     });
   }
 
+  const exportPins = useCallback(
+    async (scope: "current" | "all") => {
+      if (!user) return;
+      const timestamp = formatTimestampForFilename();
+      const scopedPins =
+        scope === "current"
+          ? pins.filter((pin) => pin.map_layer === activeLayerId)
+          : [...pins];
+
+      const payload = {
+        metadata: {
+          export_type: "map_pins_json",
+          schema_version: "1.0",
+          exported_at: new Date().toISOString(),
+          exported_by_user_id: user.id,
+          exported_by_username: user.username,
+          app_name: "FaeBook",
+        },
+        pins: scopedPins,
+      };
+
+      const scopeLabel = scope === "current" ? activeLayerId : "all";
+      downloadJson(`map-pins-${scopeLabel}-${timestamp}.json`, payload);
+
+      try {
+        await apiFetch("/api/exports/audit", {
+          method: "POST",
+          body: JSON.stringify({
+            export_type: "map_pins_json",
+            object_type: "map_pin",
+            object_id: scopeLabel,
+            message: `Exported map pins JSON (${scopeLabel})`,
+          }),
+        });
+      } catch (_error) {
+        // non-blocking
+      }
+    },
+    [activeLayerId, pins, user],
+  );
+
   if (loading) {
     return (
       <main className="main-content">
@@ -467,6 +529,12 @@ export default function MapsPage() {
               }}
             >
               {addMode ? "Cancel Add" : "Add Pin"}
+            </button>
+            <button className="secondary-link maps-action" type="button" onClick={() => void exportPins("current")}>
+              Export Current Pins
+            </button>
+            <button className="secondary-link maps-action" type="button" onClick={() => void exportPins("all")}>
+              Export All Pins
             </button>
           </div>
         </div>

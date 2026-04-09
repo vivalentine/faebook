@@ -3,6 +3,7 @@ dist/
 apps/client/dist/
 data/
 uploads/
+backups/
 .env
 .env.local
 *.zip
