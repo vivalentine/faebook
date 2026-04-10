@@ -27,6 +27,8 @@ const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
 const MAPS_CONFIG_DIR = path.join(__dirname, "../../config/maps");
 const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
 const MAP_PIN_CATEGORIES = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
+const MAP_LANDMARK_MARKER_STYLES = ["district", "landmark", "estate", "civic", "market"];
+const MAP_LANDMARK_VISIBILITY_SCOPES = ["public", "dm_only"];
 const upload = multer({ storage: multer.memoryStorage() });
 
 const allowedOrigins = new Set(
@@ -569,6 +571,25 @@ function sanitizeMapPinCategory(value) {
   return MAP_PIN_CATEGORIES.includes(value) ? value : "clue";
 }
 
+function sanitizeMapLandmarkMarkerStyle(value) {
+  return MAP_LANDMARK_MARKER_STYLES.includes(value) ? value : "landmark";
+}
+
+function sanitizeMapLandmarkVisibilityScope(value) {
+  return MAP_LANDMARK_VISIBILITY_SCOPES.includes(value) ? value : "public";
+}
+
+function sanitizeOptionalSlug(value, fallback = "") {
+  const candidate = String(value || fallback || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return limitString(candidate, 120);
+}
+
 function mapMapPinForClient(row) {
   return {
     id: row.id,
@@ -579,6 +600,26 @@ function mapMapPinForClient(row) {
     title: row.title,
     note: row.note || "",
     category: row.category,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function mapMapLandmarkForClient(row) {
+  return {
+    id: row.id,
+    map_id: row.map_id,
+    slug: row.slug,
+    label: row.label,
+    x: Number(row.x),
+    y: Number(row.y),
+    marker_style: row.marker_style,
+    visibility_scope: row.visibility_scope,
+    description: row.description || "",
+    linked_page_slug: row.linked_page_slug || null,
+    linked_entity_slug: row.linked_entity_slug || null,
+    sort_order: Number(row.sort_order || 0),
+    unlock_chapter: row.unlock_chapter == null ? null : Number(row.unlock_chapter),
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -2537,6 +2578,256 @@ app.get("/api/maps/config", requireRole("player", "dm"), (_req, res) => {
   res.json({
     layers: MAP_CONFIGS,
   });
+});
+
+app.get("/api/maps/landmarks", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const requestedMapId = String(req.query.map_id || "").trim();
+  const values = [];
+  const filters = [];
+
+  if (requestedMapId) {
+    filters.push("map_id = ?");
+    values.push(sanitizeMapLayer(requestedMapId));
+  }
+
+  if (sessionUser.role !== "dm") {
+    filters.push("visibility_scope = 'public'");
+  }
+
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM map_landmarks
+        ${whereClause}
+        ORDER BY sort_order ASC, label COLLATE NOCASE ASC, id ASC
+      `
+    )
+    .all(...values);
+
+  res.json({
+    landmarks: rows.map(mapMapLandmarkForClient),
+  });
+});
+
+app.post("/api/maps/landmarks", requireRole("dm"), (req, res) => {
+  const mapId = sanitizeMapLayer(String(req.body.map_id || ""));
+  const label = limitString(req.body.label, 120).trim();
+  const x = clampNormalizedCoordinate(Number(req.body.x));
+  const y = clampNormalizedCoordinate(Number(req.body.y));
+  const markerStyle = sanitizeMapLandmarkMarkerStyle(String(req.body.marker_style || "landmark"));
+  const visibilityScope = sanitizeMapLandmarkVisibilityScope(String(req.body.visibility_scope || "public"));
+  const description = limitString(req.body.description, 1500).trim();
+  const linkedPageSlug = limitString(req.body.linked_page_slug, 160).trim() || null;
+  const linkedEntitySlug = limitString(req.body.linked_entity_slug, 160).trim() || null;
+  const sortOrder = Number.isFinite(Number(req.body.sort_order)) ? Math.round(Number(req.body.sort_order)) : 0;
+  const unlockChapter =
+    req.body.unlock_chapter == null || req.body.unlock_chapter === ""
+      ? null
+      : Math.max(0, Math.round(Number(req.body.unlock_chapter)));
+  const slug = sanitizeOptionalSlug(req.body.slug, label);
+
+  if (!label) {
+    return res.status(400).json({ error: "label is required" });
+  }
+
+  if (!slug) {
+    return res.status(400).json({ error: "slug is required" });
+  }
+
+  const duplicate = db
+    .prepare(
+      `
+        SELECT id
+        FROM map_landmarks
+        WHERE map_id = ? AND slug = ?
+      `
+    )
+    .get(mapId, slug);
+
+  if (duplicate) {
+    return res.status(409).json({ error: "slug already exists for this map" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO map_landmarks (
+          map_id,
+          slug,
+          label,
+          x,
+          y,
+          marker_style,
+          visibility_scope,
+          description,
+          linked_page_slug,
+          linked_entity_slug,
+          sort_order,
+          unlock_chapter,
+          created_at,
+          updated_at,
+          created_by_user_id,
+          updated_by_user_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(
+      mapId,
+      slug,
+      label,
+      x,
+      y,
+      markerStyle,
+      visibilityScope,
+      description,
+      linkedPageSlug,
+      linkedEntitySlug,
+      sortOrder,
+      unlockChapter,
+      now,
+      now,
+      req.session.user.id,
+      req.session.user.id
+    );
+
+  const created = db.prepare(`SELECT * FROM map_landmarks WHERE id = ?`).get(result.lastInsertRowid);
+  res.status(201).json(mapMapLandmarkForClient(created));
+});
+
+app.patch("/api/maps/landmarks/:id", requireRole("dm"), (req, res) => {
+  const landmarkId = Number(req.params.id);
+  const existing = db.prepare(`SELECT * FROM map_landmarks WHERE id = ?`).get(landmarkId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Landmark not found" });
+  }
+
+  const hasMapId = Object.prototype.hasOwnProperty.call(req.body, "map_id");
+  const hasSlug = Object.prototype.hasOwnProperty.call(req.body, "slug");
+  const hasLabel = Object.prototype.hasOwnProperty.call(req.body, "label");
+  const hasX = Object.prototype.hasOwnProperty.call(req.body, "x");
+  const hasY = Object.prototype.hasOwnProperty.call(req.body, "y");
+  const hasMarkerStyle = Object.prototype.hasOwnProperty.call(req.body, "marker_style");
+  const hasVisibilityScope = Object.prototype.hasOwnProperty.call(req.body, "visibility_scope");
+  const hasDescription = Object.prototype.hasOwnProperty.call(req.body, "description");
+  const hasLinkedPageSlug = Object.prototype.hasOwnProperty.call(req.body, "linked_page_slug");
+  const hasLinkedEntitySlug = Object.prototype.hasOwnProperty.call(req.body, "linked_entity_slug");
+  const hasSortOrder = Object.prototype.hasOwnProperty.call(req.body, "sort_order");
+  const hasUnlockChapter = Object.prototype.hasOwnProperty.call(req.body, "unlock_chapter");
+
+  const mapId = hasMapId ? sanitizeMapLayer(String(req.body.map_id || "")) : existing.map_id;
+  const label = hasLabel ? limitString(req.body.label, 120).trim() : existing.label;
+  const x = hasX ? clampNormalizedCoordinate(Number(req.body.x)) : Number(existing.x);
+  const y = hasY ? clampNormalizedCoordinate(Number(req.body.y)) : Number(existing.y);
+  const markerStyle = hasMarkerStyle
+    ? sanitizeMapLandmarkMarkerStyle(String(req.body.marker_style || "landmark"))
+    : existing.marker_style;
+  const visibilityScope = hasVisibilityScope
+    ? sanitizeMapLandmarkVisibilityScope(String(req.body.visibility_scope || "public"))
+    : existing.visibility_scope;
+  const description = hasDescription
+    ? limitString(req.body.description, 1500).trim()
+    : existing.description || "";
+  const linkedPageSlug = hasLinkedPageSlug
+    ? limitString(req.body.linked_page_slug, 160).trim() || null
+    : existing.linked_page_slug;
+  const linkedEntitySlug = hasLinkedEntitySlug
+    ? limitString(req.body.linked_entity_slug, 160).trim() || null
+    : existing.linked_entity_slug;
+  const sortOrder = hasSortOrder
+    ? Number.isFinite(Number(req.body.sort_order))
+      ? Math.round(Number(req.body.sort_order))
+      : 0
+    : Number(existing.sort_order || 0);
+  const unlockChapter = hasUnlockChapter
+    ? req.body.unlock_chapter == null || req.body.unlock_chapter === ""
+      ? null
+      : Math.max(0, Math.round(Number(req.body.unlock_chapter)))
+    : existing.unlock_chapter;
+  const slug = hasSlug
+    ? sanitizeOptionalSlug(req.body.slug, label)
+    : hasLabel
+      ? sanitizeOptionalSlug(existing.slug, label)
+      : existing.slug;
+
+  if (!label) {
+    return res.status(400).json({ error: "label is required" });
+  }
+
+  if (!slug) {
+    return res.status(400).json({ error: "slug is required" });
+  }
+
+  const duplicate = db
+    .prepare(
+      `
+        SELECT id
+        FROM map_landmarks
+        WHERE map_id = ? AND slug = ? AND id != ?
+      `
+    )
+    .get(mapId, slug, landmarkId);
+
+  if (duplicate) {
+    return res.status(409).json({ error: "slug already exists for this map" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE map_landmarks
+      SET map_id = ?,
+          slug = ?,
+          label = ?,
+          x = ?,
+          y = ?,
+          marker_style = ?,
+          visibility_scope = ?,
+          description = ?,
+          linked_page_slug = ?,
+          linked_entity_slug = ?,
+          sort_order = ?,
+          unlock_chapter = ?,
+          updated_at = ?,
+          updated_by_user_id = ?
+      WHERE id = ?
+    `
+  ).run(
+    mapId,
+    slug,
+    label,
+    x,
+    y,
+    markerStyle,
+    visibilityScope,
+    description,
+    linkedPageSlug,
+    linkedEntitySlug,
+    sortOrder,
+    unlockChapter,
+    now,
+    req.session.user.id,
+    landmarkId
+  );
+
+  const updated = db.prepare(`SELECT * FROM map_landmarks WHERE id = ?`).get(landmarkId);
+  res.json(mapMapLandmarkForClient(updated));
+});
+
+app.delete("/api/maps/landmarks/:id", requireRole("dm"), (req, res) => {
+  const landmarkId = Number(req.params.id);
+  const result = db.prepare(`DELETE FROM map_landmarks WHERE id = ?`).run(landmarkId);
+
+  if (result.changes < 1) {
+    return res.status(404).json({ error: "Landmark not found" });
+  }
+
+  res.json({ ok: true, deleted_id: landmarkId });
 });
 
 app.get("/api/maps/pins", requireRole("player", "dm"), (req, res) => {

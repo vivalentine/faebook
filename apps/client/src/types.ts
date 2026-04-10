@@ -230,6 +230,28 @@ export type MapPin = {
   updated_at: string;
 };
 
+export type MapLandmarkVisibilityScope = "public" | "dm_only";
+
+export type MapLandmarkMarkerStyle = "district" | "landmark" | "estate" | "civic" | "market";
+
+export type MapLandmark = {
+  id: number;
+  map_id: MapLayerConfig["map_id"];
+  slug: string;
+  label: string;
+  x: number;
+  y: number;
+  marker_style: MapLandmarkMarkerStyle;
+  visibility_scope: MapLandmarkVisibilityScope;
+  description: string;
+  linked_page_slug: string | null;
+  linked_entity_slug: string | null;
+  sort_order: number;
+  unlock_chapter: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SearchSnippetPayload = {
   source: string;
   excerpt: string;

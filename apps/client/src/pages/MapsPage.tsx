@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
-import type { MapLayerConfig, MapPin, MapPinCategory } from "../types";
+import type {
+  MapLandmark,
+  MapLandmarkMarkerStyle,
+  MapLandmarkVisibilityScope,
+  MapLayerConfig,
+  MapPin,
+  MapPinCategory,
+} from "../types";
 
 const PIN_CATEGORIES: MapPinCategory[] = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
+const LANDMARK_MARKER_STYLES: MapLandmarkMarkerStyle[] = ["landmark", "district", "estate", "civic", "market"];
+const LANDMARK_VISIBILITY_SCOPES: MapLandmarkVisibilityScope[] = ["public", "dm_only"];
 const PAN_DRAG_THRESHOLD = 8;
 const PINCH_ZOOM_DAMPING_EXPONENT = 0.45;
 
@@ -31,6 +40,30 @@ type EditorState = {
 type ViewportSize = {
   width: number;
   height: number;
+};
+
+type LandmarkDraft = {
+  label: string;
+  slug: string;
+  marker_style: MapLandmarkMarkerStyle;
+  visibility_scope: MapLandmarkVisibilityScope;
+  description: string;
+  linked_page_slug: string;
+  linked_entity_slug: string;
+  sort_order: number;
+  unlock_chapter: string;
+};
+
+const EMPTY_LANDMARK_DRAFT: LandmarkDraft = {
+  label: "",
+  slug: "",
+  marker_style: "landmark",
+  visibility_scope: "public",
+  description: "",
+  linked_page_slug: "",
+  linked_entity_slug: "",
+  sort_order: 0,
+  unlock_chapter: "",
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -138,6 +171,7 @@ export default function MapsPage() {
   const { user } = useAuth();
   const [layers, setLayers] = useState<MapLayerConfig[]>([]);
   const [pins, setPins] = useState<MapPin[]>([]);
+  const [landmarks, setLandmarks] = useState<MapLandmark[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -146,7 +180,20 @@ export default function MapsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [addMode, setAddMode] = useState(false);
+  const [landmarkAddMode, setLandmarkAddMode] = useState(false);
   const [editorState, setEditorState] = useState<EditorState | null>(null);
+  const [landmarkEditor, setLandmarkEditor] = useState<
+    | {
+        mode: "create" | "edit";
+        landmarkId?: number;
+        map_id: MapLayerConfig["map_id"];
+        x: number;
+        y: number;
+        draft: LandmarkDraft;
+      }
+    | null
+  >(null);
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<number | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -184,6 +231,16 @@ export default function MapsPage() {
     [pins, activeLayerId],
   );
 
+  const visibleLandmarks = useMemo(
+    () => landmarks.filter((landmark) => landmark.map_id === activeLayerId),
+    [landmarks, activeLayerId],
+  );
+
+  const selectedLandmark = useMemo(
+    () => visibleLandmarks.find((landmark) => landmark.id === selectedLandmarkId) || null,
+    [visibleLandmarks, selectedLandmarkId],
+  );
+
   const resetView = useCallback((layer: MapLayerConfig) => {
     const viewportEl = viewportRef.current;
     const viewport = {
@@ -200,13 +257,15 @@ export default function MapsPage() {
     setError("");
 
     try {
-      const [configResponse, pinResponse] = await Promise.all([
+      const [configResponse, pinResponse, landmarkResponse] = await Promise.all([
         apiFetch("/api/maps/config"),
         apiFetch("/api/maps/pins"),
+        apiFetch("/api/maps/landmarks"),
       ]);
 
       const configData = await configResponse.json();
       const pinData = await pinResponse.json();
+      const landmarkData = await landmarkResponse.json();
 
       if (!configResponse.ok) {
         throw new Error(configData.error || `Failed to load maps config: ${configResponse.status}`);
@@ -215,6 +274,11 @@ export default function MapsPage() {
       if (!pinResponse.ok) {
         throw new Error(pinData.error || `Failed to load map pins: ${pinResponse.status}`);
       }
+      if (!landmarkResponse.ok) {
+        throw new Error(
+          landmarkData.error || `Failed to load map landmarks: ${landmarkResponse.status}`,
+        );
+      }
 
       const nextLayers: MapLayerConfig[] = Array.isArray(configData.layers)
         ? configData.layers
@@ -222,6 +286,7 @@ export default function MapsPage() {
 
       setLayers(nextLayers);
       setPins(Array.isArray(pinData.pins) ? pinData.pins : []);
+      setLandmarks(Array.isArray(landmarkData.landmarks) ? landmarkData.landmarks : []);
 
       if (nextLayers[0]) {
         setActiveLayerId((current) => {
@@ -432,6 +497,81 @@ export default function MapsPage() {
     }
   }
 
+  async function saveLandmark(payload: {
+    method: "POST" | "PATCH";
+    id?: number;
+    map_id: MapLayerConfig["map_id"];
+    x: number;
+    y: number;
+    draft: LandmarkDraft;
+  }) {
+    setSaving(true);
+    setError("");
+    try {
+      const endpoint =
+        payload.method === "PATCH" ? `/api/maps/landmarks/${payload.id}` : "/api/maps/landmarks";
+      const response = await apiFetch(endpoint, {
+        method: payload.method,
+        body: JSON.stringify({
+          map_id: payload.map_id,
+          x: payload.x,
+          y: payload.y,
+          label: payload.draft.label,
+          slug: payload.draft.slug,
+          marker_style: payload.draft.marker_style,
+          visibility_scope: payload.draft.visibility_scope,
+          description: payload.draft.description,
+          linked_page_slug: payload.draft.linked_page_slug || null,
+          linked_entity_slug: payload.draft.linked_entity_slug || null,
+          sort_order: payload.draft.sort_order,
+          unlock_chapter:
+            payload.draft.unlock_chapter.trim() === ""
+              ? null
+              : Number(payload.draft.unlock_chapter),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save landmark");
+      }
+
+      setLandmarks((current) => {
+        if (payload.method === "POST") {
+          return [...current, data];
+        }
+        return current.map((landmark) => (landmark.id === data.id ? data : landmark));
+      });
+      setLandmarkEditor(null);
+      setLandmarkAddMode(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save landmark");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteLandmark(landmarkId: number) {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/maps/landmarks/${landmarkId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete landmark");
+      }
+      setLandmarks((current) => current.filter((landmark) => landmark.id !== landmarkId));
+      setSelectedLandmarkId((current) => (current === landmarkId ? null : current));
+      setLandmarkEditor(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete landmark");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function onLayerChange(nextLayerId: string) {
     const nextLayer = layers.find((layer) => layer.map_id === nextLayerId);
     if (!nextLayer) return;
@@ -439,7 +579,10 @@ export default function MapsPage() {
     setActiveLayerId(nextLayer.map_id);
     resetView(nextLayer);
     setAddMode(false);
+    setLandmarkAddMode(false);
     setEditorState(null);
+    setLandmarkEditor(null);
+    setSelectedLandmarkId(null);
   }
 
   function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -608,7 +751,7 @@ export default function MapsPage() {
   }
 
   function onMapClick(event: React.MouseEvent<HTMLDivElement>) {
-    if (!activeLayer || !addMode) {
+    if (!activeLayer) {
       return;
     }
 
@@ -617,6 +760,21 @@ export default function MapsPage() {
     }
 
     const point = computeNormalizedFromClientPoint(event.clientX, event.clientY);
+    if (landmarkAddMode && user?.role === "dm") {
+      setLandmarkEditor({
+        mode: "create",
+        map_id: activeLayer.map_id,
+        x: point.x,
+        y: point.y,
+        draft: { ...EMPTY_LANDMARK_DRAFT },
+      });
+      return;
+    }
+
+    if (!addMode) {
+      return;
+    }
+
     setEditorState({
       mode: "create",
       mapLayer: activeLayer.map_id,
@@ -739,11 +897,27 @@ export default function MapsPage() {
               type="button"
               onClick={() => {
                 setAddMode((current) => !current);
+                setLandmarkAddMode(false);
                 setEditorState(null);
+                setLandmarkEditor(null);
               }}
             >
               {addMode ? "Cancel Add" : "Add Pin"}
             </button>
+            {user?.role === "dm" ? (
+              <button
+                className={`secondary-link maps-action ${landmarkAddMode ? "active" : ""}`.trim()}
+                type="button"
+                onClick={() => {
+                  setLandmarkAddMode((current) => !current);
+                  setAddMode(false);
+                  setEditorState(null);
+                  setLandmarkEditor(null);
+                }}
+              >
+                {landmarkAddMode ? "Cancel Landmark" : "Add Landmark"}
+              </button>
+            ) : null}
             <button className="secondary-link maps-action" type="button" onClick={() => void exportPins("current")}>
               Export Current Pins
             </button>
@@ -754,9 +928,11 @@ export default function MapsPage() {
         </div>
 
         <p className="maps-hint">
-          {addMode
+          {landmarkAddMode && user?.role === "dm"
+            ? "Landmark mode is active. Tap the map to place a canonical landmark."
+            : addMode
             ? "Add mode is active. Tap the map to place a pin."
-            : "Drag to pan, use mouse wheel or pinch to zoom, and tap any pin to edit."}
+            : "Drag to pan, use mouse wheel or pinch to zoom, and tap markers for details."}
         </p>
       </section>
 
@@ -788,6 +964,65 @@ export default function MapsPage() {
             onDragStart={(event) => event.preventDefault()}
           />
 
+          {visibleLandmarks.map((landmark) => (
+            <button
+              type="button"
+              key={`landmark-${landmark.id}`}
+              className={`map-landmark map-landmark-${landmark.marker_style} ${
+                landmark.visibility_scope === "dm_only" ? "is-dm-only" : ""
+              }`.trim()}
+              style={{ left: `${landmark.x * 100}%`, top: `${landmark.y * 100}%` }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedLandmarkId(landmark.id);
+                if (user?.role === "dm") {
+                  setLandmarkEditor({
+                    mode: "edit",
+                    landmarkId: landmark.id,
+                    map_id: landmark.map_id,
+                    x: landmark.x,
+                    y: landmark.y,
+                    draft: {
+                      label: landmark.label,
+                      slug: landmark.slug,
+                      marker_style: landmark.marker_style,
+                      visibility_scope: landmark.visibility_scope,
+                      description: landmark.description || "",
+                      linked_page_slug: landmark.linked_page_slug || "",
+                      linked_entity_slug: landmark.linked_entity_slug || "",
+                      sort_order: landmark.sort_order || 0,
+                      unlock_chapter:
+                        landmark.unlock_chapter == null ? "" : String(landmark.unlock_chapter),
+                    },
+                  });
+                  setAddMode(false);
+                }
+              }}
+              title={landmark.label}
+            >
+              <span>{landmark.label}</span>
+            </button>
+          ))}
+
+          {selectedLandmark ? (
+            <article
+              className="map-landmark-popover"
+              style={{ left: `${selectedLandmark.x * 100}%`, top: `${selectedLandmark.y * 100}%` }}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+              }}
+            >
+              <h3>{selectedLandmark.label}</h3>
+              {selectedLandmark.description ? <p>{selectedLandmark.description}</p> : null}
+              <p className="map-landmark-popover-meta">
+                {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
+              </p>
+            </article>
+          ) : null}
+
           {visiblePins.map((pin) => (
             <button
               type="button"
@@ -800,6 +1035,7 @@ export default function MapsPage() {
               onClick={(event) => {
                 event.stopPropagation();
                 setAddMode(false);
+                setLandmarkAddMode(false);
                 setEditorState({
                   mode: "edit",
                   pinId: pin.id,
@@ -938,6 +1174,187 @@ export default function MapsPage() {
               }}
             >
               {saving ? "Saving..." : editorState.mode === "create" ? "Save Pin" : "Save Changes"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {landmarkEditor ? (
+        <section className="maps-editor-card">
+          <div className="maps-editor-header">
+            <h2>{landmarkEditor.mode === "create" ? "Add Shared Landmark" : "Edit Shared Landmark"}</h2>
+            <p>
+              Layer: {layers.find((layer) => layer.map_id === landmarkEditor.map_id)?.label || landmarkEditor.map_id}
+              {" · "}Coordinates: {landmarkEditor.x.toFixed(3)}, {landmarkEditor.y.toFixed(3)}
+            </p>
+          </div>
+          <label className="toolbar-field">
+            <span>Label</span>
+            <input
+              className="text-input"
+              value={landmarkEditor.draft.label}
+              maxLength={120}
+              onChange={(event) =>
+                setLandmarkEditor((current) =>
+                  current
+                    ? { ...current, draft: { ...current.draft, label: event.target.value } }
+                    : null,
+                )
+              }
+            />
+          </label>
+          <label className="toolbar-field">
+            <span>Slug</span>
+            <input
+              className="text-input"
+              value={landmarkEditor.draft.slug}
+              maxLength={120}
+              onChange={(event) =>
+                setLandmarkEditor((current) =>
+                  current
+                    ? { ...current, draft: { ...current.draft, slug: event.target.value } }
+                    : null,
+                )
+              }
+              placeholder="optional-auto-from-label"
+            />
+          </label>
+          <div className="maps-toolbar-row">
+            <label className="toolbar-field">
+              <span>Marker style</span>
+              <select
+                className="text-input"
+                value={landmarkEditor.draft.marker_style}
+                onChange={(event) =>
+                  setLandmarkEditor((current) =>
+                    current
+                      ? {
+                          ...current,
+                          draft: {
+                            ...current.draft,
+                            marker_style: event.target.value as MapLandmarkMarkerStyle,
+                          },
+                        }
+                      : null,
+                  )
+                }
+              >
+                {LANDMARK_MARKER_STYLES.map((style) => (
+                  <option key={style} value={style}>
+                    {style}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="toolbar-field">
+              <span>Visibility</span>
+              <select
+                className="text-input"
+                value={landmarkEditor.draft.visibility_scope}
+                onChange={(event) =>
+                  setLandmarkEditor((current) =>
+                    current
+                      ? {
+                          ...current,
+                          draft: {
+                            ...current.draft,
+                            visibility_scope: event.target.value as MapLandmarkVisibilityScope,
+                          },
+                        }
+                      : null,
+                  )
+                }
+              >
+                {LANDMARK_VISIBILITY_SCOPES.map((scope) => (
+                  <option key={scope} value={scope}>
+                    {scope === "dm_only" ? "DM only" : "Public"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="toolbar-field">
+            <span>Description (optional)</span>
+            <textarea
+              className="text-area"
+              value={landmarkEditor.draft.description}
+              rows={3}
+              maxLength={1500}
+              onChange={(event) =>
+                setLandmarkEditor((current) =>
+                  current
+                    ? { ...current, draft: { ...current.draft, description: event.target.value } }
+                    : null,
+                )
+              }
+            />
+          </label>
+          <div className="maps-toolbar-row">
+            <label className="toolbar-field">
+              <span>Sort order</span>
+              <input
+                className="text-input"
+                type="number"
+                value={landmarkEditor.draft.sort_order}
+                onChange={(event) =>
+                  setLandmarkEditor((current) =>
+                    current
+                      ? {
+                          ...current,
+                          draft: { ...current.draft, sort_order: Number(event.target.value || 0) },
+                        }
+                      : null,
+                  )
+                }
+              />
+            </label>
+            <label className="toolbar-field">
+              <span>Unlock chapter (optional)</span>
+              <input
+                className="text-input"
+                type="number"
+                min={0}
+                value={landmarkEditor.draft.unlock_chapter}
+                onChange={(event) =>
+                  setLandmarkEditor((current) =>
+                    current
+                      ? { ...current, draft: { ...current.draft, unlock_chapter: event.target.value } }
+                      : null,
+                  )
+                }
+              />
+            </label>
+          </div>
+          <div className="maps-editor-actions">
+            <button className="secondary-link maps-action" type="button" onClick={() => setLandmarkEditor(null)}>
+              Cancel
+            </button>
+            {landmarkEditor.mode === "edit" && landmarkEditor.landmarkId ? (
+              <button
+                className="board-node-delete-button"
+                type="button"
+                disabled={saving}
+                onClick={() => void deleteLandmark(landmarkEditor.landmarkId!)}
+              >
+                Delete Landmark
+              </button>
+            ) : null}
+            <button
+              className="action-button maps-action"
+              type="button"
+              disabled={saving}
+              onClick={() =>
+                void saveLandmark({
+                  method: landmarkEditor.mode === "create" ? "POST" : "PATCH",
+                  id: landmarkEditor.landmarkId,
+                  map_id: landmarkEditor.map_id,
+                  x: landmarkEditor.x,
+                  y: landmarkEditor.y,
+                  draft: landmarkEditor.draft,
+                })
+              }
+            >
+              {saving ? "Saving..." : landmarkEditor.mode === "create" ? "Save Landmark" : "Save Changes"}
             </button>
           </div>
         </section>
