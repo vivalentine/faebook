@@ -716,6 +716,10 @@
   padding: 16px;
 }
 
+.board-modal-overlay-surface {
+  position: absolute;
+}
+
 .board-modal {
   width: min(560px, 100%);
   max-height: min(78vh, 720px);
@@ -843,9 +847,9 @@
 
 .maps-canvas {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform-origin: center center;
+  left: 0;
+  top: 0;
+  transform-origin: top left;
   will-change: transform;
 }
 

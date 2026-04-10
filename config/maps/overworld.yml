@@ -5,5 +5,5 @@ width: 4096
 height: 3072
 default_zoom: 0.25
 min_zoom: 0
-max_zoom: 3
+max_zoom: 2
 pin_scale: 1

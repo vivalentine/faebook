@@ -54,15 +54,12 @@ function clampViewportOffsetAxis({
 
   const scaledLength = mapLength * zoom;
   if (scaledLength <= viewportLength) {
-    return -mapLength / 2;
+    return (viewportLength - scaledLength) / 2;
   }
 
-  const halfScaledLength = scaledLength / 2;
-  const minCenter = viewportLength - halfScaledLength;
-  const maxCenter = halfScaledLength;
-  const currentCenter = viewportLength / 2 + offset + mapLength / 2;
-  const nextCenter = clamp(currentCenter, minCenter, maxCenter);
-  return nextCenter - viewportLength / 2 - mapLength / 2;
+  const minOffset = viewportLength - scaledLength;
+  const maxOffset = 0;
+  return clamp(offset, minOffset, maxOffset);
 }
 
 function clampViewportOffset({
@@ -100,9 +97,11 @@ function computeInitialViewport({
   viewport: ViewportSize;
 }) {
   const zoom = layer.default_zoom;
+  const scaledWidth = layer.width * zoom;
+  const scaledHeight = layer.height * zoom;
   const centeredOffset = {
-    x: -layer.width / 2,
-    y: -layer.height / 2,
+    x: (viewport.width - scaledWidth) / 2,
+    y: (viewport.height - scaledHeight) / 2,
   };
 
   return {
@@ -291,13 +290,11 @@ export default function MapsPage() {
       const zoomFactor = event.deltaY < 0 ? 1.12 : 0.9;
       const nextZoom = clamp(zoomRef.current * zoomFactor, activeLayer.min_zoom, activeLayer.max_zoom);
 
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const worldX = (pointerX - offsetRef.current.x - centerX) / zoomRef.current;
-      const worldY = (pointerY - offsetRef.current.y - centerY) / zoomRef.current;
+      const worldX = (pointerX - offsetRef.current.x) / zoomRef.current;
+      const worldY = (pointerY - offsetRef.current.y) / zoomRef.current;
 
-      const nextOffsetX = pointerX - centerX - worldX * nextZoom;
-      const nextOffsetY = pointerY - centerY - worldY * nextZoom;
+      const nextOffsetX = pointerX - worldX * nextZoom;
+      const nextOffsetY = pointerY - worldY * nextZoom;
       const clampedOffset = clampViewportOffset({
         offset: { x: nextOffsetX, y: nextOffsetY },
         layer: activeLayer,
@@ -305,6 +302,8 @@ export default function MapsPage() {
         viewport: { width: rect.width, height: rect.height },
       });
 
+      zoomRef.current = nextZoom;
+      offsetRef.current = clampedOffset;
       setZoom(nextZoom);
       setOffset(clampedOffset);
     };
@@ -458,8 +457,6 @@ export default function MapsPage() {
         const rect = viewportRef.current.getBoundingClientRect();
         const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
         const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
         const startZoom = zoomRef.current;
         const startOffset = offsetRef.current;
 
@@ -469,8 +466,8 @@ export default function MapsPage() {
           pointerB: points[1][0],
           startDistance: distance,
           startZoom,
-          startWorldX: (midpointX - startOffset.x - centerX) / startZoom,
-          startWorldY: (midpointY - startOffset.y - centerY) / startZoom,
+          startWorldX: (midpointX - startOffset.x) / startZoom,
+          startWorldY: (midpointY - startOffset.y) / startZoom,
         };
 
         dragStateRef.current = {
@@ -526,8 +523,6 @@ export default function MapsPage() {
         const rect = viewportEl.getBoundingClientRect();
         const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
         const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
         const currentDistance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
         const rawRatio = pinch.startDistance > 0 ? currentDistance / pinch.startDistance : 1;
         const dampedRatio = Math.pow(rawRatio, PINCH_ZOOM_DAMPING_EXPONENT);
@@ -538,8 +533,8 @@ export default function MapsPage() {
         );
 
         const nextOffset = {
-          x: midpointX - centerX - pinch.startWorldX * nextZoom,
-          y: midpointY - centerY - pinch.startWorldY * nextZoom,
+          x: midpointX - pinch.startWorldX * nextZoom,
+          y: midpointY - pinch.startWorldY * nextZoom,
         };
         const clampedOffset = clampViewportOffset({
           offset: nextOffset,
@@ -550,6 +545,8 @@ export default function MapsPage() {
 
         dragStateRef.current.moved = true;
         setIsPanning(true);
+        zoomRef.current = nextZoom;
+        offsetRef.current = clampedOffset;
         setZoom(nextZoom);
         setOffset(clampedOffset);
         return;

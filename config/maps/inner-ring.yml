@@ -2,7 +2,7 @@ map_id: inner-ring
 label: Inner Ring
 image_filename: inner-ring-map.png
 width: 2048
-height: 1372
+height: 2048
 default_zoom: 1
 min_zoom: 0.5
 max_zoom: 4
