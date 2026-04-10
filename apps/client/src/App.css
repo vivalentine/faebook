@@ -1605,6 +1605,127 @@
   margin: 0;
 }
 
+.chapters-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chapters-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.chapter-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chapter-list-item {
+  border: 1px solid #2f3147;
+  border-radius: 12px;
+  background: #161827;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chapter-list-item.active {
+  border-color: #7568a3;
+}
+
+.chapter-list-link {
+  text-decoration: none;
+  color: #ebe5ff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chapter-list-meta {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #b8abc8;
+}
+
+.chapter-status {
+  width: fit-content;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+}
+
+.chapter-status.published {
+  color: #9ae7cb;
+  background: #163a35;
+}
+
+.chapter-status.draft {
+  color: #e8d6a0;
+  background: #3a3218;
+}
+
+.chapter-list-admin-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chapter-reader-card,
+.chapters-index-card {
+  min-height: 280px;
+}
+
+.chapter-reader-header {
+  margin-bottom: 12px;
+}
+
+.chapter-reader-header h2 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 2.8vw, 34px);
+}
+
+.chapter-reader-markdown {
+  font-size: 16px;
+}
+
+.chapter-reader-nav {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #2f3147;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.chapter-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chapter-editor-grid {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.chapter-publish-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #d9d2e8;
+}
+
 @media (max-width: 980px) {
   .app-drawer {
     position: fixed;
@@ -1639,6 +1760,14 @@
 
   .dashboard-card {
     grid-column: span 12;
+  }
+
+  .chapters-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chapter-editor-grid {
+    grid-template-columns: 1fr;
   }
 
   .dashboard-inline-form {

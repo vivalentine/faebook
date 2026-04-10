@@ -657,11 +657,28 @@ function getLatestRecap() {
         FROM session_recaps
         LEFT JOIN users
           ON users.id = session_recaps.published_by_user_id
+        WHERE session_recaps.is_published = 1
         ORDER BY session_recaps.chapter_number DESC, session_recaps.published_at DESC, session_recaps.id DESC
         LIMIT 1
       `
     )
     .get();
+}
+
+function mapSessionRecapRow(row) {
+  return {
+    id: row.id,
+    chapter_number: row.chapter_number,
+    chapter_title: row.chapter_title,
+    title: row.title,
+    content: row.content,
+    is_published: Number(row.is_published) === 1,
+    published_at: row.published_at,
+    updated_at: row.updated_at,
+    published_by_user_id: row.published_by_user_id,
+    published_by_display_name: row.published_by_display_name ?? null,
+    published_by_username: row.published_by_username ?? null,
+  };
 }
 
 function getCanonicalAliasesByNpcIds(npcIds) {
@@ -1559,7 +1576,8 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
     .map(mapSuspectForClient);
 
   const note = getActiveDashboardNoteByUserId(sessionUser.id);
-  const latestRecap = getLatestRecap() || null;
+  const latestRecapRow = getLatestRecap();
+  const latestRecap = latestRecapRow ? mapSessionRecapRow(latestRecapRow) : null;
 
   const recentlyUnlockedNpcs = db
     .prepare(
@@ -1962,7 +1980,74 @@ app.get("/api/session-recaps/latest", requireRole("player", "dm"), (_req, res) =
     return res.json(null);
   }
 
-  res.json(recap);
+  res.json(mapSessionRecapRow(recap));
+});
+
+app.get("/api/session-recaps", requireRole("player", "dm"), (req, res) => {
+  const showAll = req.session.user.role === "dm";
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          session_recaps.id,
+          session_recaps.chapter_number,
+          session_recaps.chapter_title,
+          session_recaps.title,
+          session_recaps.content,
+          session_recaps.is_published,
+          session_recaps.published_at,
+          session_recaps.updated_at,
+          session_recaps.published_by_user_id,
+          users.display_name AS published_by_display_name,
+          users.username AS published_by_username
+        FROM session_recaps
+        LEFT JOIN users
+          ON users.id = session_recaps.published_by_user_id
+        WHERE (? = 1 OR session_recaps.is_published = 1)
+        ORDER BY session_recaps.chapter_number ASC, session_recaps.id ASC
+      `
+    )
+    .all(showAll ? 1 : 0);
+
+  return res.json(rows.map(mapSessionRecapRow));
+});
+
+app.get("/api/session-recaps/chapter/:chapterNumber", requireRole("player", "dm"), (req, res) => {
+  const chapterNumber = Number.parseInt(String(req.params.chapterNumber), 10);
+  if (!Number.isInteger(chapterNumber) || chapterNumber <= 0) {
+    return res.status(400).json({ error: "chapterNumber must be a positive integer" });
+  }
+
+  const row = db
+    .prepare(
+      `
+        SELECT
+          session_recaps.id,
+          session_recaps.chapter_number,
+          session_recaps.chapter_title,
+          session_recaps.title,
+          session_recaps.content,
+          session_recaps.is_published,
+          session_recaps.published_at,
+          session_recaps.updated_at,
+          session_recaps.published_by_user_id,
+          users.display_name AS published_by_display_name,
+          users.username AS published_by_username
+        FROM session_recaps
+        LEFT JOIN users
+          ON users.id = session_recaps.published_by_user_id
+        WHERE session_recaps.chapter_number = ?
+          AND (? = 1 OR session_recaps.is_published = 1)
+        LIMIT 1
+      `
+    )
+    .get(chapterNumber, req.session.user.role === "dm" ? 1 : 0);
+
+  if (!row) {
+    return res.status(404).json({ error: "Recap not found" });
+  }
+
+  return res.json(mapSessionRecapRow(row));
 });
 
 app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
@@ -1970,6 +2055,7 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
   const chapterTitle = limitString(req.body.chapter_title, 160).trim();
   const title = limitString(req.body.title || "Lumi’s Session Recap", 120).trim();
   const content = limitString(req.body.content, 20000).trim();
+  const isPublished = req.body.is_published === false ? 0 : 1;
 
   if (!Number.isInteger(chapterNumber) || chapterNumber <= 0) {
     return res.status(400).json({ error: "chapter_number must be a positive integer" });
@@ -2003,6 +2089,7 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
             chapter_title = ?,
             title = ?,
             content = ?,
+            is_published = ?,
             published_at = ?,
             published_by_user_id = ?,
             updated_at = ?
@@ -2014,6 +2101,7 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
       chapterTitle,
       title,
       content,
+      isPublished,
       now,
       req.session.user.id,
       now,
@@ -2028,26 +2116,50 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
           chapter_title,
           title,
           content,
+          is_published,
           published_at,
           published_by_user_id,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
-    ).run(chapterNumber, chapterNumber, chapterTitle, title, content, now, req.session.user.id, now);
+    ).run(chapterNumber, chapterNumber, chapterTitle, title, content, isPublished, now, req.session.user.id, now);
   }
 
   createAuditLog(db, {
     actorUserId: req.session.user.id,
-    actionType: "recap_publish",
+    actionType: isPublished ? "recap_publish" : "recap_save_draft",
     objectType: "session_recap",
     objectId: String(chapterNumber),
-    message: `Published recap chapter ${chapterNumber}`,
+    message: `${isPublished ? "Published" : "Saved draft for"} recap chapter ${chapterNumber}`,
     createdAt: now,
   });
 
-  const latest = getLatestRecap();
-  res.json(latest || null);
+  const created = db
+    .prepare(
+      `
+        SELECT
+          session_recaps.id,
+          session_recaps.chapter_number,
+          session_recaps.chapter_title,
+          session_recaps.title,
+          session_recaps.content,
+          session_recaps.is_published,
+          session_recaps.published_at,
+          session_recaps.updated_at,
+          session_recaps.published_by_user_id,
+          users.display_name AS published_by_display_name,
+          users.username AS published_by_username
+        FROM session_recaps
+        LEFT JOIN users
+          ON users.id = session_recaps.published_by_user_id
+        WHERE session_recaps.chapter_number = ?
+        LIMIT 1
+      `
+    )
+    .get(chapterNumber);
+
+  res.json(created ? mapSessionRecapRow(created) : null);
 });
 
 app.patch("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
@@ -2088,6 +2200,13 @@ app.patch("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
     Object.prototype.hasOwnProperty.call(req.body, "content") ? req.body.content : existing.content,
     20000
   ).trim();
+  const isPublished = Object.prototype.hasOwnProperty.call(req.body, "is_published")
+    ? req.body.is_published === true
+      ? 1
+      : 0
+    : Number(existing.is_published || 0) === 1
+      ? 1
+      : 0;
 
   if (!Number.isInteger(chapterNumber) || chapterNumber <= 0) {
     return res.status(400).json({ error: "chapter_number must be a positive integer" });
@@ -2125,24 +2244,59 @@ app.patch("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
           chapter_title = ?,
           title = ?,
           content = ?,
+          is_published = ?,
           published_at = ?,
           published_by_user_id = ?,
           updated_at = ?
       WHERE id = ?
     `
-  ).run(chapterNumber, chapterNumber, chapterTitle, title || "Lumi’s Session Recap", content, now, req.session.user.id, now, recapId);
+  ).run(
+    chapterNumber,
+    chapterNumber,
+    chapterTitle,
+    title || "Lumi’s Session Recap",
+    content,
+    isPublished,
+    now,
+    req.session.user.id,
+    now,
+    recapId
+  );
 
   createAuditLog(db, {
     actorUserId: req.session.user.id,
-    actionType: "recap_update",
+    actionType: isPublished ? "recap_update" : "recap_draft_update",
     objectType: "session_recap",
     objectId: String(recapId),
-    message: `Updated recap chapter ${chapterNumber}`,
+    message: `Updated ${isPublished ? "published" : "draft"} recap chapter ${chapterNumber}`,
     createdAt: now,
   });
 
-  const latest = getLatestRecap();
-  res.json(latest || null);
+  const updated = db
+    .prepare(
+      `
+        SELECT
+          session_recaps.id,
+          session_recaps.chapter_number,
+          session_recaps.chapter_title,
+          session_recaps.title,
+          session_recaps.content,
+          session_recaps.is_published,
+          session_recaps.published_at,
+          session_recaps.updated_at,
+          session_recaps.published_by_user_id,
+          users.display_name AS published_by_display_name,
+          users.username AS published_by_username
+        FROM session_recaps
+        LEFT JOIN users
+          ON users.id = session_recaps.published_by_user_id
+        WHERE session_recaps.id = ?
+        LIMIT 1
+      `
+    )
+    .get(recapId);
+
+  res.json(updated ? mapSessionRecapRow(updated) : null);
 });
 
 app.delete("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
