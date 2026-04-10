@@ -5,6 +5,7 @@ import type { MapLayerConfig, MapPin, MapPinCategory } from "../types";
 
 const PIN_CATEGORIES: MapPinCategory[] = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
 const PAN_DRAG_THRESHOLD = 8;
+const PINCH_ZOOM_DAMPING_EXPONENT = 0.45;
 
 type PinDraft = {
   title: string;
@@ -167,6 +168,8 @@ export default function MapsPage() {
         pointerB: number;
         startDistance: number;
         startZoom: number;
+        startWorldX: number;
+        startWorldY: number;
       }
     | { active: false }
   >({ active: false });
@@ -449,18 +452,50 @@ export default function MapsPage() {
 
       if (activeTouchPoints.current.size === 2 && activeLayer) {
         const points = Array.from(activeTouchPoints.current.entries());
-        const distance = Math.hypot(
-          points[0][1].x - points[1][1].x,
-          points[0][1].y - points[1][1].y,
-        );
+        const pointA = points[0][1];
+        const pointB = points[1][1];
+        const distance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
+        const rect = viewportRef.current.getBoundingClientRect();
+        const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
+        const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const startZoom = zoomRef.current;
+        const startOffset = offsetRef.current;
+
         pinchStateRef.current = {
           active: true,
           pointerA: points[0][0],
           pointerB: points[1][0],
           startDistance: distance,
-          startZoom: zoom,
+          startZoom,
+          startWorldX: (midpointX - startOffset.x - centerX) / startZoom,
+          startWorldY: (midpointY - startOffset.y - centerY) / startZoom,
+        };
+
+        dragStateRef.current = {
+          active: false,
+          pointerId: -1,
+          startX: 0,
+          startY: 0,
+          baseX: 0,
+          baseY: 0,
+          moved: true,
+        };
+      } else if (activeTouchPoints.current.size === 1) {
+        dragStateRef.current = {
+          active: true,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          baseX: offsetRef.current.x,
+          baseY: offsetRef.current.y,
+          moved: false,
         };
       }
+
+      viewportRef.current.setPointerCapture(event.pointerId);
+      return;
     }
 
     dragStateRef.current = {
@@ -468,8 +503,8 @@ export default function MapsPage() {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      baseX: offset.x,
-      baseY: offset.y,
+      baseX: offsetRef.current.x,
+      baseY: offsetRef.current.y,
       moved: false,
     };
 
@@ -485,18 +520,40 @@ export default function MapsPage() {
       if (pinch.active) {
         const pointA = activeTouchPoints.current.get(pinch.pointerA);
         const pointB = activeTouchPoints.current.get(pinch.pointerB);
-        if (!pointA || !pointB) return;
+        const viewportEl = viewportRef.current;
+        if (!pointA || !pointB || !viewportEl) return;
 
+        const rect = viewportEl.getBoundingClientRect();
+        const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
+        const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
         const currentDistance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
-        const ratio = pinch.startDistance > 0 ? currentDistance / pinch.startDistance : 1;
+        const rawRatio = pinch.startDistance > 0 ? currentDistance / pinch.startDistance : 1;
+        const dampedRatio = Math.pow(rawRatio, PINCH_ZOOM_DAMPING_EXPONENT);
         const nextZoom = clamp(
-          pinch.startZoom * ratio,
+          pinch.startZoom * dampedRatio,
           activeLayer.min_zoom,
           activeLayer.max_zoom,
         );
+
+        const nextOffset = {
+          x: midpointX - centerX - pinch.startWorldX * nextZoom,
+          y: midpointY - centerY - pinch.startWorldY * nextZoom,
+        };
+        const clampedOffset = clampViewportOffset({
+          offset: nextOffset,
+          layer: activeLayer,
+          zoom: nextZoom,
+          viewport: { width: rect.width, height: rect.height },
+        });
+
+        dragStateRef.current.moved = true;
+        setIsPanning(true);
         setZoom(nextZoom);
+        setOffset(clampedOffset);
+        return;
       }
-      return;
     }
 
     const drag = dragStateRef.current;
@@ -516,7 +573,7 @@ export default function MapsPage() {
     const clampedOffset = clampViewportOffset({
       offset: nextOffset,
       layer: activeLayer,
-      zoom,
+      zoom: zoomRef.current,
       viewport: {
         width: viewportEl?.clientWidth ?? viewportSize.width,
         height: viewportEl?.clientHeight ?? viewportSize.height,
@@ -546,6 +603,9 @@ export default function MapsPage() {
         baseY: 0,
         moved: drag.moved,
       };
+    }
+
+    if (activeTouchPoints.current.size === 0) {
       setIsPanning(false);
     }
   }
