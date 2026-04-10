@@ -305,6 +305,8 @@ export default function MapsPage() {
         viewport: { width: rect.width, height: rect.height },
       });
 
+      zoomRef.current = nextZoom;
+      offsetRef.current = clampedOffset;
       setZoom(nextZoom);
       setOffset(clampedOffset);
     };
@@ -550,6 +552,8 @@ export default function MapsPage() {
 
         dragStateRef.current.moved = true;
         setIsPanning(true);
+        zoomRef.current = nextZoom;
+        offsetRef.current = clampedOffset;
         setZoom(nextZoom);
         setOffset(clampedOffset);
         return;

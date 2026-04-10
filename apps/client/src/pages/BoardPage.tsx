@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   addEdge,
   Background,
@@ -934,6 +935,32 @@ function BoardCanvas() {
     }
   }, [currentBoardId, currentBoardName]);
 
+  const npcPickerModal = showNpcPicker ? (
+    <div className={`board-modal-overlay ${isFullscreen ? "board-modal-overlay-surface" : ""}`.trim()} role="presentation" onClick={() => setShowNpcPicker(false)}>
+      <div className="board-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <h2>Add NPC</h2>
+        <input
+          className="text-input"
+          type="search"
+          placeholder="Search by name or alias..."
+          value={npcSearch}
+          onChange={(event) => setNpcSearch(event.target.value)}
+        />
+        <div className="board-modal-list">
+          {filteredNpcs.map((npc) => (
+            <button key={npc.id} type="button" className="board-npc-button" onClick={() => addNpcNode(npc)}>
+              {npc.name}
+            </button>
+          ))}
+          {!filteredNpcs.length ? <p className="topbar-meta">No NPC matches.</p> : null}
+        </div>
+        <div className="board-modal-actions">
+          <button type="button" className="secondary-link" onClick={() => setShowNpcPicker(false)}>Close</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1069,31 +1096,9 @@ function BoardCanvas() {
         </footer>
       </section>
 
-      {showNpcPicker ? (
-        <div className="board-modal-overlay" role="presentation" onClick={() => setShowNpcPicker(false)}>
-          <div className="board-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <h2>Add NPC</h2>
-            <input
-              className="text-input"
-              type="search"
-              placeholder="Search by name or alias..."
-              value={npcSearch}
-              onChange={(event) => setNpcSearch(event.target.value)}
-            />
-            <div className="board-modal-list">
-              {filteredNpcs.map((npc) => (
-                <button key={npc.id} type="button" className="board-npc-button" onClick={() => addNpcNode(npc)}>
-                  {npc.name}
-                </button>
-              ))}
-              {!filteredNpcs.length ? <p className="topbar-meta">No NPC matches.</p> : null}
-            </div>
-            <div className="board-modal-actions">
-              <button type="button" className="secondary-link" onClick={() => setShowNpcPicker(false)}>Close</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {npcPickerModal && boardSurfaceRef.current
+        ? createPortal(npcPickerModal, isFullscreen ? boardSurfaceRef.current : document.body)
+        : null}
     </div>
   );
 }
