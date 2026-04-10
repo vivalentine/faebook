@@ -847,9 +847,9 @@
 
 .maps-canvas {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform-origin: center center;
+  left: 0;
+  top: 0;
+  transform-origin: top left;
   will-change: transform;
 }
 
