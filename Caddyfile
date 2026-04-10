@@ -1,4 +1,4 @@
-http://faebook.local {
+http://vi-pc.local {
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3001
 	}
