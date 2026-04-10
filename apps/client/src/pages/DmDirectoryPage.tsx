@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import FaeSelect from "../components/FaeSelect";
 import NpcCard from "../components/NpcCard";
 import { apiFetch } from "../lib/api";
 import type { Npc } from "../types";
@@ -143,31 +144,29 @@ export default function DmDirectoryPage() {
 
             <label className="toolbar-field">
               <span>House</span>
-              <select
+              <FaeSelect
                 className="text-input"
                 value={houseFilter}
-                onChange={(event) => setHouseFilter(event.target.value)}
-              >
-                <option value="all">All houses</option>
-                {houses.map((house) => (
-                  <option key={house} value={house}>
-                    {house}
-                  </option>
-                ))}
-              </select>
+                onChange={setHouseFilter}
+                options={[
+                  { value: "all", label: "All houses" },
+                  ...houses.map((house) => ({ value: house, label: house })),
+                ]}
+              />
             </label>
 
             <label className="toolbar-field">
               <span>Visibility</span>
-              <select
+              <FaeSelect
                 className="text-input"
                 value={visibilityFilter}
-                onChange={(event) => setVisibilityFilter(event.target.value)}
-              >
-                <option value="all">All entries</option>
-                <option value="visible">Visible to players</option>
-                <option value="hidden">Hidden from players</option>
-              </select>
+                onChange={setVisibilityFilter}
+                options={[
+                  { value: "all", label: "All entries" },
+                  { value: "visible", label: "Visible to players" },
+                  { value: "hidden", label: "Hidden from players" },
+                ]}
+              />
             </label>
           </div>
         </section>

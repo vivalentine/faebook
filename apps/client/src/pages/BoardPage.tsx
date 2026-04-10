@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import "@xyflow/react/dist/style.css";
 
 import { useAuth } from "../auth/AuthContext";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch, apiUrl } from "../lib/api";
 import { DM_LAST_VIEWED_BOARD_OWNER_KEY, getUserSettings } from "../lib/userSettings";
 import type {
@@ -1041,37 +1042,33 @@ function BoardCanvas() {
           {isDm ? (
             <label className="toolbar-field board-inline-field">
               <span>User</span>
-              <select
+              <FaeSelect
                 className="text-input"
-                value={selectedBoardUserId ?? ""}
-                onChange={(event) => {
-                  void handleBoardOwnerChange(Number(event.target.value));
+                value={selectedBoardUserId != null ? String(selectedBoardUserId) : ""}
+                onChange={(nextValue) => {
+                  void handleBoardOwnerChange(Number(nextValue));
                 }}
-              >
-                {boardUsers.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.display_name} ({entry.role})
-                  </option>
-                ))}
-              </select>
+                options={boardUsers.map((entry) => ({
+                  value: String(entry.id),
+                  label: `${entry.display_name} (${entry.role})`,
+                }))}
+              />
             </label>
           ) : null}
 
           <label className="toolbar-field board-inline-field">
             <span>Board</span>
-            <select
+            <FaeSelect
               className="text-input"
-              value={currentBoardId ?? ""}
-              onChange={(event) => {
-                void handleBoardSwitch(Number(event.target.value));
+              value={currentBoardId != null ? String(currentBoardId) : ""}
+              onChange={(nextValue) => {
+                void handleBoardSwitch(Number(nextValue));
               }}
-            >
-              {boards.map((board) => (
-                <option key={board.id} value={board.id}>
-                  {board.name}{board.is_default ? " • default" : ""}
-                </option>
-              ))}
-            </select>
+              options={boards.map((board) => ({
+                value: String(board.id),
+                label: `${board.name}${board.is_default ? " • default" : ""}`,
+              }))}
+            />
           </label>
 
           <div className="board-icon-group">

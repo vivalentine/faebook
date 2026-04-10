@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
 import { getMapZoomDampingExponent, getUserSettings } from "../lib/userSettings";
@@ -866,17 +867,15 @@ export default function MapsPage() {
         <div className="maps-toolbar-row">
           <label className="toolbar-field">
             <span>Map Layer</span>
-            <select
+            <FaeSelect
               className="text-input maps-layer-select"
               value={activeLayerId}
-              onChange={(event) => onLayerChange(event.target.value)}
-            >
-              {layers.map((layer) => (
-                <option key={layer.map_id} value={layer.map_id}>
-                  {layer.label}
-                </option>
-              ))}
-            </select>
+              onChange={onLayerChange}
+              options={layers.map((layer) => ({
+                value: layer.map_id,
+                label: layer.label,
+              }))}
+            />
           </label>
 
           <div className="maps-controls-inline">
@@ -1100,29 +1099,27 @@ export default function MapsPage() {
 
           <label className="toolbar-field">
             <span>Category</span>
-            <select
+            <FaeSelect
               className="text-input"
               value={editorState.draft.category}
-              onChange={(event) =>
+              onChange={(nextValue) =>
                 setEditorState((current) =>
                   current
                     ? {
                         ...current,
                         draft: {
                           ...current.draft,
-                          category: event.target.value as MapPinCategory,
+                          category: nextValue as MapPinCategory,
                         },
                       }
                     : null,
                 )
               }
-            >
-              {PIN_CATEGORIES.map((category) => (
-                <option key={category} value={category}>
-                  {category[0].toUpperCase() + category.slice(1)}
-                </option>
-              ))}
-            </select>
+              options={PIN_CATEGORIES.map((category) => ({
+                value: category,
+                label: category[0].toUpperCase() + category.slice(1),
+              }))}
+            />
           </label>
 
           <label className="toolbar-field">
@@ -1231,55 +1228,51 @@ export default function MapsPage() {
           <div className="maps-toolbar-row">
             <label className="toolbar-field">
               <span>Marker style</span>
-              <select
+              <FaeSelect
                 className="text-input"
                 value={landmarkEditor.draft.marker_style}
-                onChange={(event) =>
+                onChange={(nextValue) =>
                   setLandmarkEditor((current) =>
                     current
                       ? {
                           ...current,
                           draft: {
                             ...current.draft,
-                            marker_style: event.target.value as MapLandmarkMarkerStyle,
+                            marker_style: nextValue as MapLandmarkMarkerStyle,
                           },
                         }
                       : null,
                   )
                 }
-              >
-                {LANDMARK_MARKER_STYLES.map((style) => (
-                  <option key={style} value={style}>
-                    {style}
-                  </option>
-                ))}
-              </select>
+                options={LANDMARK_MARKER_STYLES.map((style) => ({
+                  value: style,
+                  label: style,
+                }))}
+              />
             </label>
             <label className="toolbar-field">
               <span>Visibility</span>
-              <select
+              <FaeSelect
                 className="text-input"
                 value={landmarkEditor.draft.visibility_scope}
-                onChange={(event) =>
+                onChange={(nextValue) =>
                   setLandmarkEditor((current) =>
                     current
                       ? {
                           ...current,
                           draft: {
                             ...current.draft,
-                            visibility_scope: event.target.value as MapLandmarkVisibilityScope,
+                            visibility_scope: nextValue as MapLandmarkVisibilityScope,
                           },
                         }
                       : null,
                   )
                 }
-              >
-                {LANDMARK_VISIBILITY_SCOPES.map((scope) => (
-                  <option key={scope} value={scope}>
-                    {scope === "dm_only" ? "DM only" : "Public"}
-                  </option>
-                ))}
-              </select>
+                options={LANDMARK_VISIBILITY_SCOPES.map((scope) => ({
+                  value: scope,
+                  label: scope === "dm_only" ? "DM only" : "Public",
+                }))}
+              />
             </label>
           </div>
           <label className="toolbar-field">
