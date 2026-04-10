@@ -1318,32 +1318,29 @@
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 16px;
+  gap: 18px;
 }
 
 .dashboard-card {
   grid-column: span 6;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.dashboard-quick-actions {
-  grid-column: span 12;
+.dashboard-card--npcs,
+.dashboard-card--activity {
+  grid-column: span 4;
 }
 
-.dashboard-suspects {
-  grid-column: span 12;
+.dashboard-card--notes,
+.dashboard-card--recap {
+  grid-column: span 8;
 }
 
-.dashboard-pill-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.dashboard-pill-links .secondary-link {
-  width: auto;
+.dashboard-card--suspects,
+.dashboard-card--dm {
+  grid-column: span 6;
 }
 
 .dashboard-inline-form {
@@ -1454,10 +1451,54 @@
   text-decoration: none;
 }
 
-.dashboard-prewrap {
+.dashboard-recap-chapter-title {
   margin: 0;
-  white-space: pre-wrap;
-  line-height: 1.5;
+  font-size: 20px;
+  color: #efe9ff;
+}
+
+.dashboard-markdown {
+  color: #ddd7ee;
+  line-height: 1.65;
+}
+
+.dashboard-markdown p,
+.dashboard-markdown ul,
+.dashboard-markdown ol,
+.dashboard-markdown blockquote {
+  margin: 0 0 12px;
+}
+
+.dashboard-markdown ul,
+.dashboard-markdown ol {
+  padding-left: 18px;
+}
+
+.dashboard-markdown h1,
+.dashboard-markdown h2,
+.dashboard-markdown h3,
+.dashboard-markdown h4 {
+  color: #f6f0ff;
+  margin: 18px 0 10px;
+}
+
+.dashboard-markdown blockquote {
+  border-left: 3px solid #5c4f7f;
+  padding: 8px 12px;
+  background: #181827;
+  border-radius: 8px;
+  color: #cbc3df;
+}
+
+.dashboard-markdown a {
+  color: #c9b4ff;
+}
+
+.dashboard-recap-empty {
+  border: 1px dashed #39314d;
+  border-radius: 12px;
+  background: #161827;
+  padding: 14px;
 }
 
 .dashboard-recap-editor {
@@ -1466,6 +1507,13 @@
   padding-top: 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.dashboard-recap-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 

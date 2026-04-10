@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch } from "../lib/api";
@@ -20,6 +21,127 @@ function formatDateTime(value: string | null | undefined) {
 
 const SUSPECT_STATUSES: DashboardSuspect["status"][] = ["active", "unknown", "cleared"];
 
+function renderInlineMarkdown(text: string) {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  let lastIndex = 0;
+  let matchIndex = 0;
+  let match: RegExpExecArray | null = pattern.exec(text);
+
+  while (match) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    if (token.startsWith("**") && token.endsWith("**")) {
+      nodes.push(<strong key={`strong-${matchIndex}`}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      nodes.push(<em key={`em-${matchIndex}`}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      nodes.push(<code key={`code-${matchIndex}`}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith("[")) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        nodes.push(
+          <a key={`link-${matchIndex}`} href={linkMatch[2]} target="_blank" rel="noreferrer">
+            {linkMatch[1]}
+          </a>,
+        );
+      } else {
+        nodes.push(token);
+      }
+    } else {
+      nodes.push(token);
+    }
+
+    lastIndex = match.index + token.length;
+    matchIndex += 1;
+    match = pattern.exec(text);
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
+}
+
+function renderRecapMarkdown(content: string) {
+  const lines = content.split(/\r?\n/);
+  const blocks: ReactNode[] = [];
+  let i = 0;
+  let key = 0;
+
+  while (i < lines.length) {
+    const raw = lines[i];
+    const line = raw.trim();
+
+    if (!line) {
+      i += 1;
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      const headingTag = `h${level}` as "h1" | "h2" | "h3" | "h4";
+      const HeadingTag = headingTag;
+      blocks.push(<HeadingTag key={`h-${key++}`}>{renderInlineMarkdown(text)}</HeadingTag>);
+      i += 1;
+      continue;
+    }
+
+    if (line.startsWith(">")) {
+      const quoteLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith(">")) {
+        quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
+        i += 1;
+      }
+      blocks.push(
+        <blockquote key={`q-${key++}`}>{renderInlineMarkdown(quoteLines.join(" "))}</blockquote>,
+      );
+      continue;
+    }
+
+    const unorderedMatch = line.match(/^[-*]\s+(.+)$/);
+    if (unorderedMatch) {
+      const items: ReactNode[] = [];
+      while (i < lines.length) {
+        const itemMatch = lines[i].trim().match(/^[-*]\s+(.+)$/);
+        if (!itemMatch) break;
+        items.push(<li key={`ul-item-${key++}`}>{renderInlineMarkdown(itemMatch[1])}</li>);
+        i += 1;
+      }
+      blocks.push(<ul key={`ul-${key++}`}>{items}</ul>);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (orderedMatch) {
+      const items: ReactNode[] = [];
+      while (i < lines.length) {
+        const itemMatch = lines[i].trim().match(/^\d+\.\s+(.+)$/);
+        if (!itemMatch) break;
+        items.push(<li key={`ol-item-${key++}`}>{renderInlineMarkdown(itemMatch[1])}</li>);
+        i += 1;
+      }
+      blocks.push(<ol key={`ol-${key++}`}>{items}</ol>);
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (i < lines.length && lines[i].trim()) {
+      paragraphLines.push(lines[i].trim());
+      i += 1;
+    }
+    blocks.push(<p key={`p-${key++}`}>{renderInlineMarkdown(paragraphLines.join(" "))}</p>);
+  }
+
+  return blocks.length ? blocks : [<p key="empty">{content}</p>];
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -34,9 +156,11 @@ export default function HomePage() {
   const [noteSaving, setNoteSaving] = useState(false);
   const [noteStatus, setNoteStatus] = useState("");
 
-  const [recapSessionNumber, setRecapSessionNumber] = useState("");
+  const [recapChapterNumber, setRecapChapterNumber] = useState("");
+  const [recapChapterTitle, setRecapChapterTitle] = useState("");
   const [recapContent, setRecapContent] = useState("");
   const [savingRecap, setSavingRecap] = useState(false);
+  const [editingRecap, setEditingRecap] = useState(false);
 
   async function loadDashboard() {
     setLoading(true);
@@ -52,7 +176,8 @@ export default function HomePage() {
 
       setDashboard(data);
       setNoteDraft(data.personal_note?.content || "");
-      setRecapSessionNumber(String(data.latest_recap?.session_number || ""));
+      setRecapChapterNumber(String(data.latest_recap?.chapter_number || ""));
+      setRecapChapterTitle(data.latest_recap?.chapter_title || "");
       setRecapContent(data.latest_recap?.content || "");
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load dashboard");
@@ -256,18 +381,25 @@ export default function HomePage() {
 
     try {
       setSavingRecap(true);
-      const response = await apiFetch("/api/session-recaps", {
-        method: "POST",
-        body: JSON.stringify({
-          session_number: Number.parseInt(recapSessionNumber, 10),
-          title: "Lumi’s Session Recap",
-          content: recapContent,
-        }),
-      });
+      const body = {
+        chapter_number: Number.parseInt(recapChapterNumber, 10),
+        chapter_title: recapChapterTitle,
+        title: "Lumi’s Session Recap",
+        content: recapContent,
+      };
+      const response = editingRecap && dashboard?.latest_recap
+        ? await apiFetch(`/api/session-recaps/${dashboard.latest_recap.id}`, {
+            method: "PATCH",
+            body: JSON.stringify(body),
+          })
+        : await apiFetch("/api/session-recaps", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to publish recap");
+        throw new Error(data.error || "Failed to save recap");
       }
 
       setDashboard((current) =>
@@ -278,8 +410,44 @@ export default function HomePage() {
             }
           : current,
       );
+      setRecapChapterNumber(String(data.chapter_number || ""));
+      setRecapChapterTitle(data.chapter_title || "");
+      setRecapContent(data.content || "");
+      setEditingRecap(false);
     } catch (recapError) {
-      setError(recapError instanceof Error ? recapError.message : "Failed to publish recap");
+      setError(recapError instanceof Error ? recapError.message : "Failed to save recap");
+    } finally {
+      setSavingRecap(false);
+    }
+  }
+
+  async function deleteLatestRecap() {
+    if (!user || user.role !== "dm" || !dashboard?.latest_recap) {
+      return;
+    }
+
+    if (!window.confirm("Delete the latest published recap? This cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setSavingRecap(true);
+      const response = await apiFetch(`/api/session-recaps/${dashboard.latest_recap.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete recap");
+      }
+
+      setDashboard((current) => (current ? { ...current, latest_recap: null } : current));
+      setRecapChapterNumber("");
+      setRecapChapterTitle("");
+      setRecapContent("");
+      setEditingRecap(false);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete recap");
     } finally {
       setSavingRecap(false);
     }
@@ -324,19 +492,7 @@ export default function HomePage() {
       ) : null}
 
       <section className="dashboard-grid">
-        <article className="state-card dashboard-card dashboard-quick-actions">
-          <h2>Continue</h2>
-          <div className="dashboard-pill-links">
-            <Link className="secondary-link" to={dashboard.quick_links.board}>
-              Continue to Board
-            </Link>
-            <Link className="secondary-link" to={dashboard.quick_links.maps}>
-              Continue to Maps
-            </Link>
-          </div>
-        </article>
-
-        <article className="state-card dashboard-card">
+        <article className="state-card dashboard-card dashboard-card--npcs">
           <h2>Recently Unlocked NPCs</h2>
           {dashboard.recently_unlocked_npcs.length ? (
             <ul className="dashboard-list">
@@ -352,7 +508,7 @@ export default function HomePage() {
           )}
         </article>
 
-        <article className="state-card dashboard-card dashboard-suspects">
+        <article className="state-card dashboard-card dashboard-suspects dashboard-card--suspects">
           <h2>Suspect List</h2>
           <div className="dashboard-inline-form">
             <input
@@ -440,7 +596,7 @@ export default function HomePage() {
           </div>
         </article>
 
-        <article className="state-card dashboard-card">
+        <article className="state-card dashboard-card dashboard-card--notes">
           <h2>Personal Notes</h2>
           <textarea
             className="text-area dashboard-notes-text"
@@ -467,50 +623,104 @@ export default function HomePage() {
           </div>
         </article>
 
-        <article className="state-card dashboard-card">
+        <article className="state-card dashboard-card dashboard-card--recap">
           <h2>Lumi’s Session Recap</h2>
           {dashboard.latest_recap ? (
             <>
               <p className="topbar-meta">
-                Session {dashboard.latest_recap.session_number} · Published {formatDateTime(dashboard.latest_recap.published_at)}
+                Chapter {dashboard.latest_recap.chapter_number} · Published{" "}
+                {formatDateTime(dashboard.latest_recap.published_at)}
               </p>
-              <p className="dashboard-prewrap">{dashboard.latest_recap.content}</p>
+              <h3 className="dashboard-recap-chapter-title">{dashboard.latest_recap.chapter_title}</h3>
+              <div className="dashboard-markdown">{renderRecapMarkdown(dashboard.latest_recap.content)}</div>
             </>
           ) : (
-            <p className="topbar-meta">No published recap yet.</p>
+            <div className="dashboard-recap-empty">
+              <p className="topbar-meta">No published recap yet.</p>
+              <p className="topbar-meta">Lumi’s next chapter summary will appear here.</p>
+            </div>
           )}
 
           {user?.role === "dm" ? (
             <div className="dashboard-recap-editor">
-              <h3>Publish Recap</h3>
+              <div className="dashboard-recap-editor-header">
+                <h3>{editingRecap ? "Edit Latest Recap" : "Publish Recap"}</h3>
+                {dashboard.latest_recap ? (
+                  <button
+                    type="button"
+                    className="secondary-link"
+                    onClick={() => {
+                      if (!dashboard.latest_recap) return;
+                      setRecapChapterNumber(String(dashboard.latest_recap.chapter_number));
+                      setRecapChapterTitle(dashboard.latest_recap.chapter_title);
+                      setRecapContent(dashboard.latest_recap.content);
+                      setEditingRecap(true);
+                    }}
+                  >
+                    Edit Latest
+                  </button>
+                ) : null}
+              </div>
               <input
                 className="text-input"
                 type="number"
                 min={1}
-                placeholder="Session number"
-                value={recapSessionNumber}
-                onChange={(event) => setRecapSessionNumber(event.target.value)}
+                placeholder="Chapter number"
+                value={recapChapterNumber}
+                onChange={(event) => setRecapChapterNumber(event.target.value)}
+              />
+              <input
+                className="text-input"
+                placeholder="Chapter title"
+                value={recapChapterTitle}
+                onChange={(event) => setRecapChapterTitle(event.target.value)}
               />
               <textarea
                 className="text-area"
                 rows={6}
                 value={recapContent}
                 onChange={(event) => setRecapContent(event.target.value)}
-                placeholder="Write recap content for players..."
+                placeholder="Write chapter recap in markdown..."
               />
-              <button
-                className="action-button"
-                type="button"
-                disabled={savingRecap || !recapSessionNumber || !recapContent.trim()}
-                onClick={() => void saveRecap()}
-              >
-                {savingRecap ? "Publishing..." : "Publish Recap"}
-              </button>
+              <div className="dashboard-row-actions">
+                <button
+                  className="action-button"
+                  type="button"
+                  disabled={savingRecap || !recapChapterNumber || !recapChapterTitle.trim() || !recapContent.trim()}
+                  onClick={() => void saveRecap()}
+                >
+                  {savingRecap ? "Saving..." : editingRecap ? "Update Recap" : "Publish Recap"}
+                </button>
+                {editingRecap ? (
+                  <button
+                    type="button"
+                    className="secondary-link"
+                    onClick={() => {
+                      setEditingRecap(false);
+                      setRecapChapterNumber(String(dashboard.latest_recap?.chapter_number || ""));
+                      setRecapChapterTitle(dashboard.latest_recap?.chapter_title || "");
+                      setRecapContent(dashboard.latest_recap?.content || "");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+                {dashboard.latest_recap ? (
+                  <button
+                    className="board-node-delete-button"
+                    type="button"
+                    disabled={savingRecap}
+                    onClick={() => void deleteLatestRecap()}
+                  >
+                    Delete Recap
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </article>
 
-        <article className="state-card dashboard-card">
+        <article className="state-card dashboard-card dashboard-card--activity">
           <h2>Recent Personal Activity</h2>
           {dashboard.recent_personal_activity.length ? (
             <ul className="dashboard-list">
@@ -528,7 +738,7 @@ export default function HomePage() {
 
         {user?.role === "dm" ? (
           <>
-            <article className="state-card dashboard-card">
+            <article className="state-card dashboard-card dashboard-card--dm">
               <h2>Quick Links to Player Boards</h2>
               {dashboard.player_board_links?.length ? (
                 <ul className="dashboard-list">
@@ -544,12 +754,12 @@ export default function HomePage() {
               )}
             </article>
 
-            <article className="state-card dashboard-card">
+            <article className="state-card dashboard-card dashboard-card--dm">
               <h2>Recent NPC Imports</h2>
               <p className="topbar-meta">Import audit cards will appear once import tracking is connected.</p>
             </article>
 
-            <article className="state-card dashboard-card">
+            <article className="state-card dashboard-card dashboard-card--dm">
               <h2>Recently Changed NPCs</h2>
               {dashboard.recently_changed_npcs?.length ? (
                 <ul className="dashboard-list">
@@ -565,7 +775,7 @@ export default function HomePage() {
               )}
             </article>
 
-            <article className="state-card dashboard-card">
+            <article className="state-card dashboard-card dashboard-card--dm">
               <h2>Archive Activity Summary</h2>
               <p className="topbar-meta">
                 Archived: {dashboard.archive_activity_summary?.archived_recently ?? 0} · Restored: {dashboard.archive_activity_summary?.restored_recently ?? 0}

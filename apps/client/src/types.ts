@@ -132,7 +132,8 @@ export type DashboardNote = {
 
 export type SessionRecap = {
   id: number;
-  session_number: number;
+  chapter_number: number;
+  chapter_title: string;
   title: string;
   content: string;
   published_at: string;

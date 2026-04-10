@@ -604,7 +604,8 @@ function getLatestRecap() {
       `
         SELECT
           session_recaps.id,
-          session_recaps.session_number,
+          session_recaps.chapter_number,
+          session_recaps.chapter_title,
           session_recaps.title,
           session_recaps.content,
           session_recaps.published_at,
@@ -615,7 +616,7 @@ function getLatestRecap() {
         FROM session_recaps
         LEFT JOIN users
           ON users.id = session_recaps.published_by_user_id
-        ORDER BY session_recaps.published_at DESC, session_recaps.session_number DESC
+        ORDER BY session_recaps.chapter_number DESC, session_recaps.published_at DESC, session_recaps.id DESC
         LIMIT 1
       `
     )
@@ -1924,12 +1925,17 @@ app.get("/api/session-recaps/latest", requireRole("player", "dm"), (_req, res) =
 });
 
 app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
-  const sessionNumber = Number.parseInt(String(req.body.session_number), 10);
+  const chapterNumber = Number.parseInt(String(req.body.chapter_number), 10);
+  const chapterTitle = limitString(req.body.chapter_title, 160).trim();
   const title = limitString(req.body.title || "Lumi’s Session Recap", 120).trim();
   const content = limitString(req.body.content, 20000).trim();
 
-  if (!Number.isInteger(sessionNumber) || sessionNumber <= 0) {
-    return res.status(400).json({ error: "session_number must be a positive integer" });
+  if (!Number.isInteger(chapterNumber) || chapterNumber <= 0) {
+    return res.status(400).json({ error: "chapter_number must be a positive integer" });
+  }
+
+  if (!chapterTitle) {
+    return res.status(400).json({ error: "chapter_title is required" });
   }
 
   if (!content) {
@@ -1942,37 +1948,195 @@ app.post("/api/session-recaps", requireRole("dm"), (req, res) => {
       `
         SELECT id
         FROM session_recaps
-        WHERE session_number = ?
+        WHERE chapter_number = ?
       `
     )
-    .get(sessionNumber);
+    .get(chapterNumber);
 
   if (existing) {
     db.prepare(
       `
         UPDATE session_recaps
-        SET title = ?, content = ?, published_at = ?, published_by_user_id = ?, updated_at = ?
+        SET session_number = ?,
+            chapter_number = ?,
+            chapter_title = ?,
+            title = ?,
+            content = ?,
+            published_at = ?,
+            published_by_user_id = ?,
+            updated_at = ?
         WHERE id = ?
       `
-    ).run(title, content, now, req.session.user.id, now, existing.id);
+    ).run(
+      chapterNumber,
+      chapterNumber,
+      chapterTitle,
+      title,
+      content,
+      now,
+      req.session.user.id,
+      now,
+      existing.id
+    );
   } else {
     db.prepare(
       `
         INSERT INTO session_recaps (
           session_number,
+          chapter_number,
+          chapter_title,
           title,
           content,
           published_at,
           published_by_user_id,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
-    ).run(sessionNumber, title, content, now, req.session.user.id, now);
+    ).run(chapterNumber, chapterNumber, chapterTitle, title, content, now, req.session.user.id, now);
   }
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "recap_publish",
+    objectType: "session_recap",
+    objectId: String(chapterNumber),
+    message: `Published recap chapter ${chapterNumber}`,
+    createdAt: now,
+  });
 
   const latest = getLatestRecap();
   res.json(latest || null);
+});
+
+app.patch("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
+  const recapId = Number(req.params.id);
+  const existing = db
+    .prepare(
+      `
+        SELECT *
+        FROM session_recaps
+        WHERE id = ?
+      `
+    )
+    .get(recapId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Recap not found" });
+  }
+
+  const chapterNumber = Number.parseInt(
+    String(
+      Object.prototype.hasOwnProperty.call(req.body, "chapter_number")
+        ? req.body.chapter_number
+        : existing.chapter_number || existing.session_number
+    ),
+    10
+  );
+  const chapterTitle = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "chapter_title")
+      ? req.body.chapter_title
+      : existing.chapter_title,
+    160
+  ).trim();
+  const title = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "title") ? req.body.title : existing.title,
+    120
+  ).trim();
+  const content = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "content") ? req.body.content : existing.content,
+    20000
+  ).trim();
+
+  if (!Number.isInteger(chapterNumber) || chapterNumber <= 0) {
+    return res.status(400).json({ error: "chapter_number must be a positive integer" });
+  }
+
+  if (!chapterTitle) {
+    return res.status(400).json({ error: "chapter_title is required" });
+  }
+
+  if (!content) {
+    return res.status(400).json({ error: "content is required" });
+  }
+
+  const conflict = db
+    .prepare(
+      `
+        SELECT id
+        FROM session_recaps
+        WHERE chapter_number = ?
+          AND id != ?
+      `
+    )
+    .get(chapterNumber, recapId);
+
+  if (conflict) {
+    return res.status(409).json({ error: "A recap already exists for that chapter_number" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE session_recaps
+      SET session_number = ?,
+          chapter_number = ?,
+          chapter_title = ?,
+          title = ?,
+          content = ?,
+          published_at = ?,
+          published_by_user_id = ?,
+          updated_at = ?
+      WHERE id = ?
+    `
+  ).run(chapterNumber, chapterNumber, chapterTitle, title || "Lumi’s Session Recap", content, now, req.session.user.id, now, recapId);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "recap_update",
+    objectType: "session_recap",
+    objectId: String(recapId),
+    message: `Updated recap chapter ${chapterNumber}`,
+    createdAt: now,
+  });
+
+  const latest = getLatestRecap();
+  res.json(latest || null);
+});
+
+app.delete("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
+  const recapId = Number(req.params.id);
+  const existing = db
+    .prepare(
+      `
+        SELECT id, chapter_number
+        FROM session_recaps
+        WHERE id = ?
+      `
+    )
+    .get(recapId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Recap not found" });
+  }
+
+  db.prepare(
+    `
+      DELETE FROM session_recaps
+      WHERE id = ?
+    `
+  ).run(recapId);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "recap_delete",
+    objectType: "session_recap",
+    objectId: String(recapId),
+    message: `Deleted recap chapter ${existing.chapter_number ?? "unknown"}`,
+    createdAt: new Date().toISOString(),
+  });
+
+  return res.json({ ok: true, id: recapId });
 });
 
 app.get("/api/npcs", requireRole("player", "dm"), (req, res) => {
