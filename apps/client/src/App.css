@@ -802,28 +802,11 @@
 }
 
 .maps-layer-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-right: 42px;
-  background-image:
-    linear-gradient(180deg, #171e31, #131a2a),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d7ccff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat, no-repeat;
-  background-size: auto, 16px;
-  background-position: 0 0, right 13px center;
   border-color: #4a4f71;
-  color: #f4efff;
-  color-scheme: dark;
 }
 
 .maps-layer-select:hover {
   border-color: #6961a0;
-}
-
-.maps-layer-select option,
-.maps-layer-select optgroup {
-  background: #131a2a;
-  color: #f4efff;
 }
 
 .maps-viewport-shell {
@@ -1999,6 +1982,7 @@ body {
 
 .text-input:focus-visible,
 .text-area:focus-visible,
+.fae-select-trigger:focus-visible,
 .action-button:focus-visible,
 .secondary-link:focus-visible,
 .board-node-delete-button:focus-visible,
@@ -2010,6 +1994,74 @@ body {
   outline: none;
   border-color: var(--accent-lavender);
   box-shadow: 0 0 0 3px rgba(143, 119, 255, 0.2);
+}
+
+.fae-select-trigger {
+  width: 100%;
+  border: 1px solid var(--surface-border);
+  border-radius: 13px;
+  min-height: 46px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #151b2a, #131827);
+  color: var(--text-primary);
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.fae-select-trigger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.fae-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fae-select-caret {
+  color: #dac8ff;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.fae-select-menu {
+  position: fixed;
+  z-index: 140;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 12px;
+  border: 1px solid #59508b;
+  background: linear-gradient(175deg, rgba(30, 27, 46, 0.97), rgba(19, 18, 30, 0.98));
+  box-shadow: 0 16px 36px rgba(2, 2, 7, 0.56), 0 0 0 1px rgba(175, 148, 255, 0.1);
+  max-height: min(320px, 48vh);
+  overflow-y: auto;
+}
+
+.fae-select-option {
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.fae-select-option.highlighted {
+  background: rgba(130, 101, 226, 0.26);
+}
+
+.fae-select-option.selected {
+  background: linear-gradient(135deg, rgba(122, 94, 222, 0.48), rgba(92, 58, 188, 0.5));
+  box-shadow: inset 0 0 0 1px rgba(191, 165, 255, 0.35);
+}
+
+.fae-select-option.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .action-button,

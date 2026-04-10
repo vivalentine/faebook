@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch, apiUrl } from "../lib/api";
 import type { Npc, NpcAlias, NpcNote } from "../types";
 
@@ -355,10 +356,15 @@ export default function DmNpcPage() {
             <label className="toolbar-field"><span>Sort name</span><input className="text-input" value={form.sort_name} onChange={(e) => setFormValue("sort_name", e.target.value)} /></label>
             <label className="toolbar-field">
               <span>Visibility</span>
-              <select className="text-input" value={form.visibility} onChange={(e) => setFormValue("visibility", e.target.value as "hidden" | "visible") }>
-                <option value="hidden">hidden</option>
-                <option value="visible">visible</option>
-              </select>
+              <FaeSelect
+                className="text-input"
+                value={form.visibility}
+                onChange={(nextValue) => setFormValue("visibility", nextValue as "hidden" | "visible")}
+                options={[
+                  { value: "hidden", label: "hidden" },
+                  { value: "visible", label: "visible" },
+                ]}
+              />
             </label>
           </div>
 

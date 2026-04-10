@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import { getUserSettings, type DmBoardDefaultView, type MapZoomSensitivity, type UserSettings, updateUserSettings } from "../lib/userSettings";
 
@@ -174,15 +175,16 @@ export default function SettingsPage() {
             <h2>Appearance</h2>
             <label className="settings-field" htmlFor="ui-density-select">
               Interface Density
-              <select
+              <FaeSelect
                 id="ui-density-select"
                 className="text-input"
                 value={settings.uiDensity}
-                onChange={(event) => setPreference("uiDensity", event.target.value as "comfortable" | "compact")}
-              >
-                <option value="comfortable">Comfortable</option>
-                <option value="compact">Compact</option>
-              </select>
+                onChange={(nextValue) => setPreference("uiDensity", nextValue as "comfortable" | "compact")}
+                options={[
+                  { value: "comfortable", label: "Comfortable" },
+                  { value: "compact", label: "Compact" },
+                ]}
+              />
             </label>
 
             <label className="settings-toggle">
@@ -208,16 +210,17 @@ export default function SettingsPage() {
 
             <label className="settings-field" htmlFor="map-zoom-sensitivity-select">
               Map Zoom Sensitivity
-              <select
+              <FaeSelect
                 id="map-zoom-sensitivity-select"
                 className="text-input"
                 value={settings.mapZoomSensitivity}
-                onChange={(event) => setPreference("mapZoomSensitivity", event.target.value as MapZoomSensitivity)}
-              >
-                <option value="gentle">Gentle</option>
-                <option value="balanced">Balanced</option>
-                <option value="quick">Quick</option>
-              </select>
+                onChange={(nextValue) => setPreference("mapZoomSensitivity", nextValue as MapZoomSensitivity)}
+                options={[
+                  { value: "gentle", label: "Gentle" },
+                  { value: "balanced", label: "Balanced" },
+                  { value: "quick", label: "Quick" },
+                ]}
+              />
             </label>
           </section>
 
@@ -226,15 +229,16 @@ export default function SettingsPage() {
               <h2>DM Admin Preferences</h2>
               <label className="settings-field" htmlFor="dm-board-default-select">
                 Default Board Landing
-                <select
+                <FaeSelect
                   id="dm-board-default-select"
                   className="text-input"
                   value={settings.dmBoardDefaultView}
-                  onChange={(event) => setPreference("dmBoardDefaultView", event.target.value as DmBoardDefaultView)}
-                >
-                  <option value="mine">Open my DM board</option>
-                  <option value="last-viewed-player">Open last inspected player board</option>
-                </select>
+                  onChange={(nextValue) => setPreference("dmBoardDefaultView", nextValue as DmBoardDefaultView)}
+                  options={[
+                    { value: "mine", label: "Open my DM board" },
+                    { value: "last-viewed-player", label: "Open last inspected player board" },
+                  ]}
+                />
               </label>
               <p className="settings-inline-note">Only DM users see this section.</p>
             </section>

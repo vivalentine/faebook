@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import type { ArchiveRecord, BoardUserSummary } from "../types";
 
@@ -171,33 +172,31 @@ export default function ArchivePage() {
         <div className="archive-filters-grid">
           <label className="toolbar-field">
             <span>Content Type</span>
-            <select
+            <FaeSelect
               className="text-input"
               value={objectTypeFilter}
-              onChange={(event) => setObjectTypeFilter(event.target.value)}
-            >
-              {CONTENT_TYPE_OPTIONS.map((option) => (
-                <option key={option.value || "all"} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={setObjectTypeFilter}
+              options={CONTENT_TYPE_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+            />
           </label>
 
           <label className="toolbar-field">
             <span>Owner</span>
-            <select
+            <FaeSelect
               className="text-input"
               value={ownerUserIdFilter}
-              onChange={(event) => setOwnerUserIdFilter(event.target.value)}
-            >
-              <option value="">All users</option>
-              {playerUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.display_name || user.username}
-                </option>
-              ))}
-            </select>
+              onChange={setOwnerUserIdFilter}
+              options={[
+                { value: "", label: "All users" },
+                ...playerUsers.map((user) => ({
+                  value: String(user.id),
+                  label: user.display_name || user.username,
+                })),
+              ]}
+            />
           </label>
 
           <label className="toolbar-field">

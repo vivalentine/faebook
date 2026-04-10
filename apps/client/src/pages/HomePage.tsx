@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import FaeSelect from "../components/FaeSelect";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
 import { apiFetch } from "../lib/api";
 import type { DashboardData, DashboardSuspect } from "../types";
@@ -422,21 +423,19 @@ export default function HomePage() {
                     void updateSuspect(suspect.id, { name: event.target.value });
                   }}
                 />
-                <select
+                <FaeSelect
                   className="text-input"
                   value={suspect.status}
-                  onChange={(event) => {
+                  onChange={(nextValue) => {
                     void updateSuspect(suspect.id, {
-                      status: event.target.value as DashboardSuspect["status"],
+                      status: nextValue as DashboardSuspect["status"],
                     });
                   }}
-                >
-                  {SUSPECT_STATUSES.map((statusValue) => (
-                    <option key={statusValue} value={statusValue}>
-                      {statusValue}
-                    </option>
-                  ))}
-                </select>
+                  options={SUSPECT_STATUSES.map((statusValue) => ({
+                    value: statusValue,
+                    label: statusValue,
+                  }))}
+                />
                 <textarea
                   className="text-area"
                   rows={2}
