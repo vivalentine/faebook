@@ -345,7 +345,7 @@ function searchForDm({ db, query, searchPattern, sourceLimit }) {
   const recapRows = db
     .prepare(
       `
-        SELECT id, session_number, title, content, published_at
+        SELECT id, session_number, chapter_number, title, content, published_at
         FROM session_recaps
         WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ?
         ORDER BY published_at DESC, session_number DESC
@@ -362,8 +362,8 @@ function searchForDm({ db, query, searchPattern, sourceLimit }) {
           label: "Session Recap",
           id: row.id,
           title: row.title,
-          url: "/",
-          metadata: { session_number: row.session_number, published_at: row.published_at },
+          url: `/chapters/${row.chapter_number || row.session_number}`,
+          metadata: { session_number: row.session_number, chapter_number: row.chapter_number, published_at: row.published_at },
         },
         query,
         `Session ${row.session_number} • ${row.content}`
@@ -676,9 +676,10 @@ function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit 
   const recapRows = db
     .prepare(
       `
-        SELECT id, session_number, title, content, published_at
+        SELECT id, session_number, chapter_number, title, content, published_at
         FROM session_recaps
-        WHERE LOWER(title) LIKE ? OR LOWER(content) LIKE ?
+        WHERE is_published = 1
+          AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)
         ORDER BY published_at DESC, session_number DESC
         LIMIT ?
       `
@@ -693,8 +694,8 @@ function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit 
           label: "Session Recap",
           id: row.id,
           title: row.title,
-          url: "/",
-          metadata: { session_number: row.session_number, published_at: row.published_at },
+          url: `/chapters/${row.chapter_number || row.session_number}`,
+          metadata: { session_number: row.session_number, chapter_number: row.chapter_number, published_at: row.published_at },
         },
         query,
         `Session ${row.session_number} • ${row.content}`

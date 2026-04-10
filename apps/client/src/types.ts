@@ -136,6 +136,7 @@ export type SessionRecap = {
   chapter_title: string;
   title: string;
   content: string;
+  is_published: boolean;
   published_at: string;
   updated_at: string;
   published_by_user_id: number;

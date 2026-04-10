@@ -145,6 +145,7 @@ db.exec(`
     chapter_title TEXT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
+    is_published INTEGER NOT NULL DEFAULT 1,
     published_at TEXT NOT NULL,
     published_by_user_id INTEGER NOT NULL,
     updated_at TEXT NOT NULL,
@@ -421,6 +422,13 @@ if (!columnExists("session_recaps", "chapter_title")) {
   `);
 }
 
+if (!columnExists("session_recaps", "is_published")) {
+  db.exec(`
+    ALTER TABLE session_recaps
+    ADD COLUMN is_published INTEGER NOT NULL DEFAULT 1
+  `);
+}
+
 db.exec(`
   UPDATE session_recaps
   SET chapter_number = session_number
@@ -436,6 +444,11 @@ db.exec(`
 db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_session_recaps_chapter_number
   ON session_recaps(chapter_number)
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_session_recaps_published_chapter
+  ON session_recaps(is_published, chapter_number DESC, id DESC)
 `);
 
 if (tableExists("board_state")) {
