@@ -219,6 +219,37 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_map_pins_archived
   ON map_pins(archived_at DESC, id DESC);
 
+  CREATE TABLE IF NOT EXISTS map_landmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    map_id TEXT NOT NULL CHECK (map_id IN ('overworld', 'inner-ring', 'outer-ring')),
+    slug TEXT NOT NULL,
+    label TEXT NOT NULL,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    marker_style TEXT NOT NULL DEFAULT 'landmark' CHECK (marker_style IN ('district', 'landmark', 'estate', 'civic', 'market')),
+    visibility_scope TEXT NOT NULL DEFAULT 'public' CHECK (visibility_scope IN ('public', 'dm_only')),
+    description TEXT NOT NULL DEFAULT '',
+    linked_page_slug TEXT,
+    linked_entity_slug TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    unlock_chapter INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by_user_id INTEGER NOT NULL,
+    updated_by_user_id INTEGER NOT NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_map_landmarks_map_slug_unique
+  ON map_landmarks(map_id, slug);
+
+  CREATE INDEX IF NOT EXISTS idx_map_landmarks_map_visibility_sort
+  ON map_landmarks(map_id, visibility_scope, sort_order ASC, label ASC, id ASC);
+
+  CREATE INDEX IF NOT EXISTS idx_map_landmarks_visibility_sort
+  ON map_landmarks(visibility_scope, sort_order ASC, label ASC, id ASC);
+
   CREATE TABLE IF NOT EXISTS archive_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     object_type TEXT NOT NULL,

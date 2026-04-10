@@ -876,6 +876,90 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
 }
 
+.map-landmark {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  border: 1px solid #5f69a8;
+  border-radius: 10px;
+  background: rgba(30, 35, 58, 0.92);
+  color: #f4efff;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  padding: 4px 8px;
+  max-width: 220px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+.map-landmark::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translateX(-50%) rotate(45deg);
+  background: inherit;
+  border-right: inherit;
+  border-bottom: inherit;
+}
+
+.map-landmark span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.map-landmark.is-dm-only {
+  border-style: dashed;
+}
+
+.map-landmark-district {
+  border-color: #7ea8cf;
+}
+
+.map-landmark-estate {
+  border-color: #b691dd;
+}
+
+.map-landmark-civic {
+  border-color: #73c3ab;
+}
+
+.map-landmark-market {
+  border-color: #d8bc7a;
+}
+
+.map-landmark-popover {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 36px));
+  width: min(280px, 60vw);
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid #4f5a89;
+  background: rgba(18, 24, 38, 0.96);
+  color: #eee8ff;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.map-landmark-popover h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.map-landmark-popover p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.map-landmark-popover-meta {
+  color: #bdb4d5;
+}
+
 .map-pin::after {
   content: "";
   position: absolute;
