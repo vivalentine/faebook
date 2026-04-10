@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
+import { getMapZoomDampingExponent, getUserSettings } from "../lib/userSettings";
 import type {
   MapLandmark,
   MapLandmarkMarkerStyle,
@@ -14,7 +15,6 @@ const PIN_CATEGORIES: MapPinCategory[] = ["clue", "lead", "suspect", "danger", "
 const LANDMARK_MARKER_STYLES: MapLandmarkMarkerStyle[] = ["landmark", "district", "estate", "civic", "market"];
 const LANDMARK_VISIBILITY_SCOPES: MapLandmarkVisibilityScope[] = ["public", "dm_only"];
 const PAN_DRAG_THRESHOLD = 8;
-const PINCH_ZOOM_DAMPING_EXPONENT = 0.45;
 
 type PinDraft = {
   title: string;
@@ -235,6 +235,15 @@ export default function MapsPage() {
     () => landmarks.filter((landmark) => landmark.map_id === activeLayerId),
     [landmarks, activeLayerId],
   );
+
+  const zoomDampingExponent = useMemo(() => {
+    if (!user) {
+      return getMapZoomDampingExponent("balanced");
+    }
+
+    const settings = getUserSettings(user.id);
+    return getMapZoomDampingExponent(settings.mapZoomSensitivity);
+  }, [user]);
 
   const selectedLandmark = useMemo(
     () => visibleLandmarks.find((landmark) => landmark.id === selectedLandmarkId) || null,
@@ -668,7 +677,7 @@ export default function MapsPage() {
         const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
         const currentDistance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
         const rawRatio = pinch.startDistance > 0 ? currentDistance / pinch.startDistance : 1;
-        const dampedRatio = Math.pow(rawRatio, PINCH_ZOOM_DAMPING_EXPONENT);
+        const dampedRatio = Math.pow(rawRatio, zoomDampingExponent);
         const nextZoom = clamp(
           pinch.startZoom * dampedRatio,
           activeLayer.min_zoom,

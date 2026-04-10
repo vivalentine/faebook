@@ -850,6 +850,42 @@ app.get("/api/auth/me", (req, res) => {
   });
 });
 
+app.patch("/api/auth/profile", requireRole("player", "dm"), (req, res) => {
+  const displayName = String(req.body.display_name || "").trim();
+
+  if (!displayName) {
+    return res.status(400).json({ error: "display_name is required" });
+  }
+
+  if (displayName.length > 60) {
+    return res.status(400).json({ error: "display_name must be 60 characters or fewer" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        UPDATE users
+        SET display_name = ?,
+            updated_at = ?
+        WHERE id = ?
+      `
+    )
+    .run(displayName, now, req.session.user.id);
+
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const userRow = getUserById(req.session.user.id);
+  if (!userRow) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  req.session.user = getSessionUser(userRow);
+  return res.json({ user: req.session.user });
+});
+
 app.post("/api/auth/login", (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
   const password = String(req.body.password || "");
