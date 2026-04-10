@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch } from "../lib/api";
+import { getUserSettings } from "../lib/userSettings";
 import type { SearchSuggestion, SearchSuggestionsResponse } from "../types";
 
 type NavItem = {
@@ -102,6 +103,17 @@ export default function AppShellLayout() {
     window.addEventListener("pointerdown", handlePointerDown);
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
+
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const settings = getUserSettings(user.id);
+    document.body.classList.toggle("ui-density-compact", settings.uiDensity === "compact");
+    document.body.classList.toggle("prefers-reduced-motion", settings.reducedMotion);
+  }, [user]);
 
   const navItems = useMemo(
     () => NAV_ITEMS.filter((item) => !item.dmOnly || user?.role === "dm"),

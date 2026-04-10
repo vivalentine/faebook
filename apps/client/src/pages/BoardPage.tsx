@@ -18,6 +18,7 @@ import "@xyflow/react/dist/style.css";
 
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, apiUrl } from "../lib/api";
+import { DM_LAST_VIEWED_BOARD_OWNER_KEY, getUserSettings } from "../lib/userSettings";
 import type {
   AuthUser,
   BoardCardData,
@@ -184,7 +185,51 @@ function BoardCanvas() {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!user || user.role !== "dm") {
+      return;
+    }
+
+    if (!selectedBoardUserId || selectedBoardUserId === user.id) {
+      return;
+    }
+
+    window.localStorage.setItem(DM_LAST_VIEWED_BOARD_OWNER_KEY, String(selectedBoardUserId));
+  }, [selectedBoardUserId, user]);
+
   const canMutateDefault = Boolean(user && selectedBoardUserId === user.id);
+
+  useEffect(() => {
+    if (!user || user.role !== "dm") {
+      return;
+    }
+
+    if (searchParams.get("userId")) {
+      return;
+    }
+
+    const settings = getUserSettings(user.id);
+    if (settings.dmBoardDefaultView !== "last-viewed-player") {
+      return;
+    }
+
+    const storedOwnerId = Number(window.localStorage.getItem(DM_LAST_VIEWED_BOARD_OWNER_KEY));
+    if (!Number.isInteger(storedOwnerId) || storedOwnerId <= 0 || storedOwnerId === user.id) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("userId", String(storedOwnerId));
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams, user]);
+
+  const boardAutosaveEnabled = useMemo(() => {
+    if (!user) {
+      return true;
+    }
+
+    return getUserSettings(user.id).boardAutosave;
+  }, [user]);
 
   const markDirty = useCallback(() => {
     if (!hasHydratedRef.current) return;
@@ -416,6 +461,11 @@ function BoardCanvas() {
 
     if (autosaveTimeoutRef.current) {
       window.clearTimeout(autosaveTimeoutRef.current);
+      autosaveTimeoutRef.current = null;
+    }
+
+    if (!boardAutosaveEnabled) {
+      return;
     }
 
     autosaveTimeoutRef.current = window.setTimeout(() => {
@@ -427,7 +477,7 @@ function BoardCanvas() {
         window.clearTimeout(autosaveTimeoutRef.current);
       }
     };
-  }, [edges, markDirty, nodes, persistBoard, viewportVersion]);
+  }, [boardAutosaveEnabled, edges, markDirty, nodes, persistBoard, viewportVersion]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1083,14 +1133,16 @@ function BoardCanvas() {
         <footer className="board-footer-status">
           <span>{currentBoardName}</span>
           <span>
-            Autosave: {" "}
-            {autosaveStatus === "dirty"
-              ? "Waiting..."
-              : autosaveStatus === "saving"
-                ? "Saving..."
-                : autosaveStatus === "saved"
-                  ? "Saved"
-                  : "Idle"}
+            Autosave:{" "}
+            {!boardAutosaveEnabled
+              ? "Off"
+              : autosaveStatus === "dirty"
+                ? "Waiting..."
+                : autosaveStatus === "saving"
+                  ? "Saving..."
+                  : autosaveStatus === "saved"
+                    ? "Saved"
+                    : "Idle"}
           </span>
           <span>Last saved: {lastSavedAt ? new Date(lastSavedAt).toLocaleString() : "Never"}</span>
         </footer>
