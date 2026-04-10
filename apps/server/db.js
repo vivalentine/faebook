@@ -141,6 +141,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS session_recaps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_number INTEGER NOT NULL UNIQUE,
+    chapter_number INTEGER,
+    chapter_title TEXT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
     published_at TEXT NOT NULL,
@@ -373,6 +375,37 @@ if (!columnExists("session_recaps", "updated_at")) {
     SET updated_at = COALESCE(updated_at, published_at)
   `);
 }
+
+if (!columnExists("session_recaps", "chapter_number")) {
+  db.exec(`
+    ALTER TABLE session_recaps
+    ADD COLUMN chapter_number INTEGER
+  `);
+}
+
+if (!columnExists("session_recaps", "chapter_title")) {
+  db.exec(`
+    ALTER TABLE session_recaps
+    ADD COLUMN chapter_title TEXT
+  `);
+}
+
+db.exec(`
+  UPDATE session_recaps
+  SET chapter_number = session_number
+  WHERE chapter_number IS NULL
+`);
+
+db.exec(`
+  UPDATE session_recaps
+  SET chapter_title = 'Chapter ' || session_number
+  WHERE chapter_title IS NULL OR TRIM(chapter_title) = ''
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_session_recaps_chapter_number
+  ON session_recaps(chapter_number)
+`);
 
 if (tableExists("board_state")) {
   const hasNewBoards = db
