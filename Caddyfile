@@ -1,9 +1,9 @@
-http://vi-pc.local {
+:80 {
 	handle /api/* {
 		reverse_proxy 127.0.0.1:3001
 	}
 
-	handle {
-		reverse_proxy 127.0.0.1:5173
-	}
+	root * "C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist"
+	try_files {path} /index.html
+	file_server
 }
