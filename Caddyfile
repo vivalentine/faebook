@@ -9,7 +9,7 @@
 
 	@uploads path /uploads/*
 	handle @uploads {
-		root * "C:\Users\viole\Projects\faebook-repo\faebook\uploads"
+		root * "C:\Users\viole\Projects\faebook-repo\faebook"
 		file_server
 	}
 
