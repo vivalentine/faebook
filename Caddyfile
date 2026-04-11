@@ -7,6 +7,12 @@
 		}
 	}
 
+	@uploads path /uploads/*
+	handle @uploads {
+		root * "C:\Users\viole\Projects\faebook-repo\faebook\uploads"
+		file_server
+	}
+
 	handle {
 		root * "C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist"
 		try_files {path} /index.html
