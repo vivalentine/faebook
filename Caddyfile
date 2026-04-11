@@ -4,7 +4,9 @@
 		reverse_proxy 127.0.0.1:3001
 	}
 
-	root * "C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist"
-	try_files {path} /index.html
-	file_server
+	handle {
+		root * "C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist"
+		try_files {path} /index.html
+		file_server
+	}
 }
