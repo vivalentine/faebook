@@ -4,6 +4,7 @@ export type Npc = {
   id: number;
   slug: string;
   name: string;
+  tier?: "major" | "minor";
   house: string | null;
   faction: string | null;
   court: string | null;
@@ -22,6 +23,8 @@ export type Npc = {
   sort_name?: string | null;
   raw_markdown_body?: string | null;
   last_imported_at?: string | null;
+  archived_at?: string | null;
+  archived_by_user_id?: number | null;
   created_at: string;
   updated_at: string;
 };
