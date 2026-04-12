@@ -28,6 +28,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
+    tier TEXT NOT NULL DEFAULT 'major' CHECK (tier IN ('major', 'minor')),
     house TEXT,
     faction TEXT,
     court TEXT,
@@ -40,8 +41,11 @@ db.exec(`
     short_blurb TEXT,
     is_visible INTEGER NOT NULL DEFAULT 0,
     source_file TEXT,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS npc_notes (
@@ -585,6 +589,28 @@ if (!columnExists("npcs", "last_imported_at")) {
   db.exec(`
     ALTER TABLE npcs
     ADD COLUMN last_imported_at TEXT
+  `);
+}
+
+if (!columnExists("npcs", "tier")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN tier TEXT NOT NULL DEFAULT 'major'
+    CHECK (tier IN ('major', 'minor'))
+  `);
+}
+
+if (!columnExists("npcs", "archived_at")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN archived_at TEXT
+  `);
+}
+
+if (!columnExists("npcs", "archived_by_user_id")) {
+  db.exec(`
+    ALTER TABLE npcs
+    ADD COLUMN archived_by_user_id INTEGER REFERENCES users(id)
   `);
 }
 

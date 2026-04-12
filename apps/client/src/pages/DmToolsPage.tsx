@@ -6,6 +6,7 @@ type ImportPreviewFile = {
   filename: string;
   parsed_name: string | null;
   slug: string | null;
+  tier?: "major" | "minor" | null;
   parser_used?: "fixture" | "obsidian-template";
   status: "create" | "update" | null;
   state: string;
@@ -41,6 +42,17 @@ type BackupResult = {
   path: string;
 };
 
+type NpcCleanupItem = {
+  id: number;
+  name: string;
+  slug: string;
+  tier?: "major" | "minor" | null;
+  portrait_path: string | null;
+  last_imported_at?: string | null;
+  updated_at: string;
+  archived_at?: string | null;
+};
+
 export default function DmToolsPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
@@ -49,6 +61,7 @@ export default function DmToolsPage() {
   const [error, setError] = useState("");
   const [finalizeResult, setFinalizeResult] = useState("");
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
+  const [cleanupItems, setCleanupItems] = useState<NpcCleanupItem[]>([]);
 
   useEffect(() => {
     void refresh();
@@ -59,9 +72,10 @@ export default function DmToolsPage() {
       setLoading(true);
       setError("");
 
-      const [previewResponse, logsResponse] = await Promise.all([
+      const [previewResponse, logsResponse, cleanupResponse] = await Promise.all([
         apiFetch("/api/dm/import/staging"),
         apiFetch("/api/dm/import/logs"),
+        apiFetch("/api/dm/npcs?include_archived=1"),
       ]);
 
       if (!previewResponse.ok) {
@@ -71,13 +85,78 @@ export default function DmToolsPage() {
       if (!logsResponse.ok) {
         throw new Error(`Failed loading import logs: ${logsResponse.status}`);
       }
+      if (!cleanupResponse.ok) {
+        throw new Error(`Failed loading NPC cleanup list: ${cleanupResponse.status}`);
+      }
 
       setPreview(await previewResponse.json());
       setLogs(await logsResponse.json());
+      setCleanupItems(await cleanupResponse.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function archiveNpc(slug: string) {
+    if (!window.confirm(`Archive NPC ${slug}? This is the safer default cleanup action.`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/dm/npcs/${slug}/archive`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Archive failed: ${response.status}`);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreNpc(slug: string) {
+    if (!window.confirm(`Restore archived NPC ${slug}?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/dm/npcs/${slug}/restore`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Restore failed: ${response.status}`);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hardDeleteNpc(slug: string) {
+    const confirmation = window.prompt(
+      `Hard delete is destructive.\nType exactly: DELETE ${slug}\n\nThis removes the NPC and related aliases/notes.`
+    );
+    if (!confirmation) return;
+
+    setBusy(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/dm/npcs/${slug}/hard-delete`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirmation }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Hard delete failed: ${response.status}`);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -327,6 +406,7 @@ export default function DmToolsPage() {
                   <p>Parser: {item.parser_used || "fixture"}</p>
                   <p>Name: {item.parsed_name || "—"}</p>
                   <p>Slug: {item.slug || "—"}</p>
+                  <p>Tier: {item.tier || "major"}</p>
                   <p>Matched portrait: {item.matched_portrait || "Unmatched"}</p>
                   {item.preview_snippet ? <p>Preview: {item.preview_snippet}</p> : null}
                   {item.validation_issues.length ? (
@@ -352,6 +432,47 @@ export default function DmToolsPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="state-card">
+          <h2>NPC Cleanup</h2>
+          {cleanupItems.length === 0 ? (
+            <p>No NPC records found.</p>
+          ) : (
+            <div className="notes-list">
+              {cleanupItems.map((npc) => {
+                const isArchived = Boolean(npc.archived_at);
+                return (
+                  <article className="note-card" key={npc.id}>
+                    <div className="note-card-header">
+                      <strong>{npc.name}</strong>
+                      <span>{isArchived ? "archived" : "active"}</span>
+                    </div>
+                    <p>Slug: {npc.slug}</p>
+                    <p>Tier: {npc.tier || "major"}</p>
+                    <p>Portrait: {npc.portrait_path ? "matched" : "none"}</p>
+                    <p>Last import/update: {new Date(npc.last_imported_at || npc.updated_at).toLocaleString()}</p>
+                    <div className="note-actions">
+                      {isArchived ? (
+                        <>
+                          <button className="action-button" type="button" onClick={() => void restoreNpc(npc.slug)} disabled={busy}>
+                            Restore
+                          </button>
+                          <button className="action-button secondary-link" type="button" onClick={() => void hardDeleteNpc(npc.slug)} disabled={busy}>
+                            Hard delete
+                          </button>
+                        </>
+                      ) : (
+                        <button className="action-button secondary-link" type="button" onClick={() => void archiveNpc(npc.slug)} disabled={busy}>
+                          Archive
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
         </section>
 

@@ -116,6 +116,7 @@ function mapNpcForPlayer(npc) {
     id: npc.id,
     slug: npc.slug,
     name: npc.name,
+    tier: npc.tier || "major",
     house: npc.house,
     faction: npc.faction,
     court: npc.court,
@@ -537,6 +538,49 @@ function archiveRecordAndLog({
   return tx();
 }
 
+function getNpcCleanupImpact(npcId) {
+  const aliases = db
+    .prepare(
+      `
+        SELECT alias_type, COUNT(*) AS count
+        FROM npc_aliases
+        WHERE npc_id = ?
+        GROUP BY alias_type
+      `
+    )
+    .all(npcId);
+
+  const aliasCounts = {
+    canonical: 0,
+    personal: 0,
+  };
+
+  for (const row of aliases) {
+    if (row.alias_type === "canonical") {
+      aliasCounts.canonical = Number(row.count || 0);
+    }
+    if (row.alias_type === "personal") {
+      aliasCounts.personal = Number(row.count || 0);
+    }
+  }
+
+  const notesCountRow = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS count
+        FROM npc_notes
+        WHERE npc_id = ?
+      `
+    )
+    .get(npcId);
+
+  return {
+    aliases: aliasCounts,
+    private_notes: Number(notesCountRow?.count || 0),
+    has_player_content: aliasCounts.personal > 0 || Number(notesCountRow?.count || 0) > 0,
+  };
+}
+
 function mapSuspectForClient(row) {
   return {
     id: row.id,
@@ -937,11 +981,13 @@ app.post("/api/auth/logout", requireAuth, (req, res) => {
 });
 
 app.get("/api/dm/npcs", requireRole("dm"), (_req, res) => {
+  const includeArchived = String(_req.query.include_archived || "") === "1";
   const rows = db
     .prepare(
       `
         SELECT *
         FROM npcs
+        ${includeArchived ? "" : "WHERE archived_at IS NULL"}
         ORDER BY name ASC
       `
     )
@@ -965,6 +1011,7 @@ app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -985,6 +1032,7 @@ app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(slug);
@@ -1003,12 +1051,14 @@ app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
     payload.visibility === "visible" || payload.is_visible === 1 || payload.is_visible === true
       ? 1
       : 0;
+  const tier = payload.tier === "minor" ? "minor" : "major";
 
   db.prepare(
     `
       UPDATE npcs
       SET
         name = ?,
+        tier = ?,
         rank_title = ?,
         house = ?,
         faction = ?,
@@ -1025,6 +1075,7 @@ app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
     `
   ).run(
     name,
+    tier,
     limitString(payload.rank_title, 120).trim() || null,
     limitString(payload.house, 80).trim() || null,
     limitString(payload.faction, 80).trim() || null,
@@ -1055,6 +1106,7 @@ app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(slug);
@@ -1074,6 +1126,7 @@ app.post(
           SELECT *
           FROM npcs
           WHERE slug = ?
+            AND archived_at IS NULL
         `
       )
       .get(slug);
@@ -1144,6 +1197,7 @@ app.post(
           SELECT *
           FROM npcs
           WHERE id = ?
+            AND archived_at IS NULL
         `
       )
       .get(existing.id);
@@ -1159,6 +1213,7 @@ app.get("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
         SELECT id
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -1224,6 +1279,7 @@ app.get("/api/dm/npcs/:slug/notes", requireRole("dm"), (req, res) => {
         SELECT id
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -1283,6 +1339,7 @@ app.post("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
         SELECT id
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -1440,6 +1497,7 @@ app.patch("/api/dm/npcs/:slug/reveal", requireRole("dm"), (req, res) => {
         UPDATE npcs
         SET is_visible = 1, updated_at = ?
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .run(now, slug);
@@ -1454,6 +1512,7 @@ app.patch("/api/dm/npcs/:slug/reveal", requireRole("dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(slug);
@@ -1471,6 +1530,7 @@ app.patch("/api/dm/npcs/:slug/hide", requireRole("dm"), (req, res) => {
         UPDATE npcs
         SET is_visible = 0, updated_at = ?
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .run(now, slug);
@@ -1485,11 +1545,271 @@ app.patch("/api/dm/npcs/:slug/hide", requireRole("dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE slug = ?
+          AND archived_at IS NULL
       `
     )
     .get(slug);
 
   res.json(npc);
+});
+
+app.get("/api/dm/npcs/:slug/cleanup-impact", requireRole("dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const impact = getNpcCleanupImpact(npc.id);
+  return res.json({
+    npc: {
+      id: npc.id,
+      slug: npc.slug,
+      name: npc.name,
+      tier: npc.tier || "major",
+      archived_at: npc.archived_at || null,
+    },
+    impact,
+    recommended_action: impact.has_player_content ? "archive" : "archive",
+    hard_delete_confirmation: `DELETE ${npc.slug}`,
+  });
+});
+
+app.post("/api/dm/npcs/:slug/archive", requireRole("dm"), (req, res) => {
+  const now = new Date().toISOString();
+  const npc = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found or already archived" });
+  }
+
+  const impact = getNpcCleanupImpact(npc.id);
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE npcs
+        SET archived_at = ?,
+            archived_by_user_id = ?,
+            is_visible = 0,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(now, req.session.user.id, now, npc.id);
+
+    createArchiveRecord(db, {
+      objectType: "npc",
+      objectId: npc.id,
+      ownerUserId: req.session.user.id,
+      archivedByUserId: req.session.user.id,
+      archivedAt: now,
+      payload: { row: npc, impact },
+      objectLabel: `${npc.name} (${npc.slug})`,
+      sourceTable: "npcs",
+      archiveReason: "dm-remove",
+    });
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "npc_archive",
+      objectType: "npc",
+      objectId: npc.id,
+      message: `Archived NPC ${npc.slug}`,
+      createdAt: now,
+    });
+  });
+
+  tx();
+  return res.json({ ok: true, npc_id: npc.id, slug: npc.slug, impact });
+});
+
+app.post("/api/dm/npcs/:slug/restore", requireRole("dm"), (req, res) => {
+  const now = new Date().toISOString();
+  const npc = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NOT NULL
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "Archived NPC not found" });
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE npcs
+        SET archived_at = NULL,
+            archived_by_user_id = NULL,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(now, npc.id);
+
+    db.prepare(
+      `
+        DELETE FROM archive_records
+        WHERE object_type = 'npc'
+          AND object_id = ?
+      `
+    ).run(String(npc.id));
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "npc_restore",
+      objectType: "npc",
+      objectId: npc.id,
+      message: `Restored archived NPC ${npc.slug}`,
+      createdAt: now,
+    });
+  });
+
+  tx();
+  return res.json({ ok: true, npc_id: npc.id, slug: npc.slug });
+});
+
+app.delete("/api/dm/npcs/:slug/hard-delete", requireRole("dm"), (req, res) => {
+  const now = new Date().toISOString();
+  const npc = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NOT NULL
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "Archived NPC not found" });
+  }
+
+  const expectedConfirmation = `DELETE ${npc.slug}`;
+  const confirmation = String(req.body?.confirmation || "").trim();
+  if (confirmation !== expectedConfirmation) {
+    return res.status(400).json({
+      error: "Invalid confirmation string for hard delete",
+      expected_confirmation: expectedConfirmation,
+    });
+  }
+
+  const impact = getNpcCleanupImpact(npc.id);
+
+  const tx = db.transaction(() => {
+    const canonicalAliasIds = db
+      .prepare(
+        `
+          SELECT id
+          FROM npc_aliases
+          WHERE npc_id = ?
+            AND alias_type = 'canonical'
+        `
+      )
+      .all(npc.id)
+      .map((row) => Number(row.id));
+    const personalAliasIds = db
+      .prepare(
+        `
+          SELECT id
+          FROM npc_aliases
+          WHERE npc_id = ?
+            AND alias_type = 'personal'
+        `
+      )
+      .all(npc.id)
+      .map((row) => Number(row.id));
+
+    db.prepare(
+      `
+        DELETE FROM npc_aliases
+        WHERE npc_id = ?
+      `
+    ).run(npc.id);
+
+    db.prepare(
+      `
+        DELETE FROM npc_notes
+        WHERE npc_id = ?
+      `
+    ).run(npc.id);
+
+    db.prepare(
+      `
+        DELETE FROM npcs
+        WHERE id = ?
+      `
+    ).run(npc.id);
+
+    db.prepare(
+      `
+        DELETE FROM archive_records
+        WHERE object_type = 'npc'
+          AND object_id = ?
+      `
+    ).run(String(npc.id));
+
+    const deleteAliasArchiveRecord = db.prepare(
+      `
+        DELETE FROM archive_records
+        WHERE object_type = 'npc_alias'
+          AND object_id = ?
+      `
+    );
+    for (const aliasId of [...canonicalAliasIds, ...personalAliasIds]) {
+      deleteAliasArchiveRecord.run(String(aliasId));
+    }
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "npc_hard_delete",
+      objectType: "npc",
+      objectId: npc.id,
+      message: `Hard deleted NPC ${npc.slug} with ${impact.aliases.canonical} canonical aliases, ${impact.aliases.personal} personal aliases, and ${impact.private_notes} private notes removed.`,
+      createdAt: now,
+    });
+  });
+
+  tx();
+  return res.json({
+    ok: true,
+    hard_deleted_npc_id: npc.id,
+    impact_summary: {
+      removed: {
+        npc: 1,
+        canonical_aliases: impact.aliases.canonical,
+        personal_aliases: impact.aliases.personal,
+        private_notes: impact.private_notes,
+      },
+      preserved: {
+        import_logs: "preserved",
+        audit_logs: "preserved",
+      },
+      potentially_orphaned: ["board JSON references to npc_id are not rewritten in v1"],
+    },
+  });
 });
 
 app.get("/api/dm/import/staging", requireRole("dm"), (req, res) => {
@@ -2377,6 +2697,7 @@ app.get("/api/npcs", requireRole("player", "dm"), (req, res) => {
         SELECT *
         FROM npcs
         WHERE is_visible = 1
+          AND archived_at IS NULL
         ORDER BY name ASC
       `
     )
@@ -2406,7 +2727,7 @@ app.get("/api/npcs/:slug", requireRole("player", "dm"), (req, res) => {
       `
         SELECT *
         FROM npcs
-        WHERE slug = ? AND is_visible = 1
+        WHERE slug = ? AND is_visible = 1 AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -2424,7 +2745,7 @@ app.get("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
       `
         SELECT id
         FROM npcs
-        WHERE slug = ? AND is_visible = 1
+        WHERE slug = ? AND is_visible = 1 AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -2472,7 +2793,7 @@ app.get("/api/npcs/:slug/note", requireRole("player", "dm"), (req, res) => {
       `
         SELECT id
         FROM npcs
-        WHERE slug = ? AND is_visible = 1
+        WHERE slug = ? AND is_visible = 1 AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -2515,7 +2836,7 @@ app.put("/api/npcs/:slug/note", requireRole("player", "dm"), (req, res) => {
       `
         SELECT id
         FROM npcs
-        WHERE slug = ? AND is_visible = 1
+        WHERE slug = ? AND is_visible = 1 AND archived_at IS NULL
       `
     )
     .get(req.params.slug);
@@ -2581,7 +2902,7 @@ app.post("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
       `
         SELECT id
         FROM npcs
-        WHERE slug = ? AND is_visible = 1
+        WHERE slug = ? AND is_visible = 1 AND archived_at IS NULL
       `
     )
     .get(req.params.slug);

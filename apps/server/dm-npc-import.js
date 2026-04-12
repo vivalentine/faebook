@@ -54,6 +54,14 @@ const OBSIDIAN_REQUIRED_SECTIONS = [
   "Notes",
 ];
 const OBSIDIAN_OPTIONAL_SECTIONS = ["Combat / Mechanics (optional)"];
+const MINOR_NPC_SECTION_HEADINGS = [
+  "Look",
+  "Personality",
+  "Table Use",
+  "Connections",
+  "Improvised Schedule",
+  "Notes",
+];
 
 function getNow() {
   return new Date().toISOString();
@@ -190,6 +198,16 @@ function parseObsidianSections(body) {
   };
 }
 
+function normalizeNpcTier(value) {
+  const tier = normalizeString(value);
+  if (!tier) return null;
+  const normalized = String(tier).toLowerCase();
+  if (normalized === "minor" || normalized === "major") {
+    return normalized;
+  }
+  return null;
+}
+
 function normalizeForPreview(markdownText) {
   return String(markdownText || "")
     .replace(/!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_full, imageName) => `[image: ${imageName}]`)
@@ -321,6 +339,7 @@ function parseFixtureMarkdown(markdownFile, parsed) {
     state: issues.length ? "invalid" : "warning",
     parsedName: name,
     parsedSlug: slug,
+    parsedTier: "major",
     status: null,
     matchedPortrait: null,
     validationIssues: issues,
@@ -330,6 +349,7 @@ function parseFixtureMarkdown(markdownFile, parsed) {
       name,
       slug,
       role_type: roleType,
+      tier: "major",
       visibility,
       rank_title: normalizeString(data.rank_title),
       house: normalizeString(data.house),
@@ -382,6 +402,9 @@ function parseObsidianMarkdown(markdownFile, parsed) {
   const slug = normalizeString(data.slug) || normalizeNameToSlug(resolvedName);
   const roleType = normalizeString(data.role_type) || "npc";
   const visibility = normalizeString(data.visibility) || "hidden";
+  const frontmatterTier = normalizeNpcTier(data.tier);
+  const tier = frontmatterTier || "major";
+  const isMinorTier = tier === "minor";
 
   if (!resolvedName) {
     issues.push("Missing NPC name (frontmatter name or H1 heading)");
@@ -408,9 +431,27 @@ function parseObsidianMarkdown(markdownFile, parsed) {
   const canonicalAliases = dedupeCaseInsensitive(canonicalAliasesRaw.map((alias) => normalizeWikilinkText(alias)).filter(Boolean));
 
   const sections = parseObsidianSections(parsed.content || "");
-  if (sections.missingRequired.length) {
+  if (!frontmatterTier) {
+    warnings.push("Missing tier in frontmatter; assuming tier=major");
+  }
+
+  const parsedMinorSections = {};
+  for (const heading of MINOR_NPC_SECTION_HEADINGS) {
+    const match = sections.byHeading.get(heading);
+    if (match) {
+      parsedMinorSections[heading] = match.raw;
+    }
+  }
+
+  if (isMinorTier) {
+    const missingMinor = MINOR_NPC_SECTION_HEADINGS.filter((heading) => !sections.byHeading.has(heading));
+    if (missingMinor.length) {
+      warnings.push(`Missing minor sections (non-fatal): ${missingMinor.join(", ")}`);
+    }
+  } else if (sections.missingRequired.length) {
     warnings.push(`Missing sections (non-fatal): ${sections.missingRequired.join(", ")}`);
   }
+
   if (sections.extraSections.length) {
     warnings.push(
       `Extra sections preserved: ${sections.extraSections.map((section) => section.heading).join(", ")}`
@@ -423,6 +464,7 @@ function parseObsidianMarkdown(markdownFile, parsed) {
     state: issues.length ? "invalid" : "warning",
     parsedName: resolvedName,
     parsedSlug: slug,
+    parsedTier: tier,
     status: null,
     matchedPortrait: null,
     validationIssues: issues,
@@ -432,6 +474,7 @@ function parseObsidianMarkdown(markdownFile, parsed) {
       name: resolvedName,
       slug,
       role_type: roleType,
+      tier,
       visibility,
       rank_title: normalizeString(data.rank_title),
       house: normalizeString(data.house),
@@ -447,9 +490,10 @@ function parseObsidianMarkdown(markdownFile, parsed) {
       canonical_aliases: canonicalAliases,
       parser_frontmatter_extras: frontmatterExtras,
       obsidian_sections: sections.sections,
+      obsidian_minor_sections: parsedMinorSections,
       obsidian_structured_frontmatter: {
         type: normalizeString(data.type),
-        tier: normalizeString(data.tier),
+        tier: frontmatterTier,
         pronouns: normalizeString(data.pronouns),
         species: normalizeString(data.species),
         age: normalizeString(data.age),
@@ -478,6 +522,7 @@ function parseMarkdownFile(markdownFile) {
       state: "invalid",
       parsedName: null,
       parsedSlug: null,
+      parsedTier: null,
       status: null,
       matchedPortrait: null,
       validationIssues: ["Invalid frontmatter format"],
@@ -611,6 +656,7 @@ function buildImportPreview(db, dmUserId) {
       filename: item.filename,
       parsed_name: item.parsedName,
       slug: item.parsedSlug,
+      tier: item.parsedTier || item.frontmatter?.tier || null,
       parser_used: item.parserUsed,
       status: item.status,
       state: item.state,
@@ -832,6 +878,7 @@ function finalizeImport(db, dmUserId) {
             SET
               name = ?,
               rank_title = ?,
+              tier = ?,
               house = ?,
               faction = ?,
               court = ?,
@@ -852,6 +899,7 @@ function finalizeImport(db, dmUserId) {
         ).run(
           frontmatter.name,
           frontmatter.rank_title,
+          frontmatter.tier || "major",
           frontmatter.house,
           frontmatter.faction,
           frontmatter.court,
@@ -901,6 +949,7 @@ function finalizeImport(db, dmUserId) {
                 court,
                 ring,
                 rank_title,
+                tier,
                 role,
                 introduced_in,
                 portrait_path,
@@ -915,7 +964,7 @@ function finalizeImport(db, dmUserId) {
                 created_at,
                 updated_at
               )
-              VALUES (?, ?, ?, ?, ?, ?, ?, 'npc', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'npc', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `
           )
           .run(
@@ -926,6 +975,7 @@ function finalizeImport(db, dmUserId) {
             frontmatter.court,
             frontmatter.ring,
             frontmatter.rank_title,
+            frontmatter.tier || "major",
             frontmatter.introduced_in,
             portraitPersisted ? portraitPersisted.assetPath : null,
             frontmatter.met_summary,
