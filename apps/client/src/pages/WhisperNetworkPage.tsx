@@ -1,0 +1,434 @@
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../auth/AuthContext";
+import { apiFetch } from "../lib/api";
+import type { WhisperComment, WhisperPost } from "../types";
+
+type WhisperFeedResponse = {
+  posts: WhisperPost[];
+  pagination: {
+    limit: number;
+    offset: number;
+    total: number;
+  };
+};
+
+type WhisperPostDetailResponse = {
+  post: WhisperPost;
+  comments: WhisperComment[];
+};
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export default function WhisperNetworkPage() {
+  const { user } = useAuth();
+  const isDm = user?.role === "dm";
+
+  const [posts, setPosts] = useState<WhisperPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
+  const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
+  const [expandedPostIds, setExpandedPostIds] = useState<Record<number, boolean>>({});
+  const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<number, string>>({});
+  const [isSubmittingCommentByPostId, setIsSubmittingCommentByPostId] = useState<Record<number, boolean>>({});
+
+  const [postTitleDraft, setPostTitleDraft] = useState("");
+  const [postBodyDraft, setPostBodyDraft] = useState("");
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [isSavingPost, setIsSavingPost] = useState(false);
+
+  const activePost = useMemo(
+    () => posts.find((post) => post.id === selectedPostId) || null,
+    [posts, selectedPostId],
+  );
+
+  async function loadFeed() {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await apiFetch("/api/whisper/posts?limit=40&offset=0");
+      const data = (await response.json()) as WhisperFeedResponse | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
+      }
+      const loadedPosts = (data as WhisperFeedResponse).posts || [];
+      setPosts(loadedPosts);
+      if (loadedPosts.length > 0) {
+        setSelectedPostId((current) => current ?? loadedPosts[0].id);
+      }
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadFeed();
+  }, []);
+
+  async function loadPostDetails(postId: number) {
+    try {
+      const response = await apiFetch(`/api/whisper/posts/${postId}`);
+      const data = (await response.json()) as WhisperPostDetailResponse | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || "Failed to load post details");
+      }
+      const detail = data as WhisperPostDetailResponse;
+      setCommentsByPostId((current) => ({ ...current, [postId]: detail.comments || [] }));
+      setPosts((current) => current.map((post) => (post.id === postId ? detail.post : post)));
+    } catch (detailsError) {
+      setError(detailsError instanceof Error ? detailsError.message : "Failed to load post details");
+    }
+  }
+
+  async function openPost(postId: number) {
+    setSelectedPostId(postId);
+    if (!commentsByPostId[postId]) {
+      await loadPostDetails(postId);
+    }
+  }
+
+  async function togglePostExpansion(postId: number) {
+    setExpandedPostIds((current) => ({ ...current, [postId]: !current[postId] }));
+    await openPost(postId);
+  }
+
+  async function toggleLike(postId: number) {
+    try {
+      const response = await apiFetch(`/api/whisper/posts/${postId}/likes`, { method: "POST" });
+      const data = (await response.json()) as { liked?: boolean; like_count?: number; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to toggle like");
+      }
+
+      const liked = Boolean(data.liked);
+      const likeCount = Number(data.like_count || 0);
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId ? { ...post, liked_by_me: liked, like_count: likeCount } : post,
+        ),
+      );
+    } catch (likeError) {
+      setError(likeError instanceof Error ? likeError.message : "Failed to toggle like");
+    }
+  }
+
+  async function submitComment(postId: number) {
+    const body = String(commentDraftByPostId[postId] || "").trim();
+    if (!body) {
+      return;
+    }
+
+    try {
+      setIsSubmittingCommentByPostId((current) => ({ ...current, [postId]: true }));
+      const response = await apiFetch(`/api/whisper/posts/${postId}/comments`, {
+        method: "POST",
+        body: JSON.stringify({ body }),
+      });
+      const data = (await response.json()) as WhisperComment | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || "Failed to post comment");
+      }
+
+      const createdComment = data as WhisperComment;
+      setCommentsByPostId((current) => ({
+        ...current,
+        [postId]: [...(current[postId] || []), createdComment],
+      }));
+      setCommentDraftByPostId((current) => ({ ...current, [postId]: "" }));
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === postId ? { ...post, comment_count: post.comment_count + 1 } : post,
+        ),
+      );
+    } catch (commentError) {
+      setError(commentError instanceof Error ? commentError.message : "Failed to post comment");
+    } finally {
+      setIsSubmittingCommentByPostId((current) => ({ ...current, [postId]: false }));
+    }
+  }
+
+  function startEditPost(post: WhisperPost) {
+    setEditingPostId(post.id);
+    setPostTitleDraft(post.title);
+    setPostBodyDraft(post.body);
+  }
+
+  function resetPostForm() {
+    setEditingPostId(null);
+    setPostTitleDraft("");
+    setPostBodyDraft("");
+  }
+
+  async function savePost() {
+    const title = postTitleDraft.trim();
+    const body = postBodyDraft.trim();
+    if (!title || !body) {
+      setError("Post title and rumor text are required.");
+      return;
+    }
+
+    try {
+      setIsSavingPost(true);
+      setError("");
+      const response = await apiFetch(editingPostId ? `/api/whisper/posts/${editingPostId}` : "/api/whisper/posts", {
+        method: editingPostId ? "PATCH" : "POST",
+        body: JSON.stringify({ title, body }),
+      });
+      const data = (await response.json()) as WhisperPost | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || "Failed to save post");
+      }
+
+      const savedPost = data as WhisperPost;
+      setPosts((current) => {
+        const others = current.filter((post) => post.id !== savedPost.id);
+        return [savedPost, ...others].sort((a, b) => {
+          const aTime = new Date(a.updated_at).getTime();
+          const bTime = new Date(b.updated_at).getTime();
+          return bTime - aTime;
+        });
+      });
+      setSelectedPostId(savedPost.id);
+      resetPostForm();
+      await loadPostDetails(savedPost.id);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save post");
+    } finally {
+      setIsSavingPost(false);
+    }
+  }
+
+  async function deletePost(post: WhisperPost) {
+    if (!window.confirm(`Delete this rumor post: "${post.title}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/whisper/posts/${post.id}`, { method: "DELETE" });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete post");
+      }
+
+      setPosts((current) => current.filter((entry) => entry.id !== post.id));
+      setCommentsByPostId((current) => {
+        const next = { ...current };
+        delete next[post.id];
+        return next;
+      });
+      if (selectedPostId === post.id) {
+        setSelectedPostId(null);
+      }
+      if (editingPostId === post.id) {
+        resetPostForm();
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete post");
+    }
+  }
+
+  async function deleteComment(comment: WhisperComment) {
+    if (!window.confirm("Delete this anonymous comment?")) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/whisper/comments/${comment.id}`, { method: "DELETE" });
+      const data = (await response.json()) as { ok?: boolean; error?: string };
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete comment");
+      }
+
+      setCommentsByPostId((current) => ({
+        ...current,
+        [comment.post_id]: (current[comment.post_id] || []).filter((entry) => entry.id !== comment.id),
+      }));
+      setPosts((current) =>
+        current.map((post) =>
+          post.id === comment.post_id
+            ? { ...post, comment_count: Math.max(0, post.comment_count - 1) }
+            : post,
+        ),
+      );
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Failed to delete comment");
+    }
+  }
+
+  return (
+    <section className="whisper-page chapters-page">
+      <div className="page-heading">
+        <h1>Whisper Network</h1>
+        <p className="topbar-meta">Anonymous rumors from the city’s shadowed alleys and moonlit taverns.</p>
+      </div>
+
+      {error ? <p className="error-banner">{error}</p> : null}
+
+      <div className="chapters-layout whisper-layout">
+        <article className="state-card chapters-index-card whisper-feed-card">
+          <div className="documents-index-header whisper-feed-header">
+            <h2>Rumor Feed</h2>
+            <p className="topbar-meta">{posts.length} whispers</p>
+          </div>
+          {loading ? <p className="topbar-meta">Gathering whispers…</p> : null}
+          {!loading && posts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}
+          <ul className="chapter-list whisper-list">
+            {posts.map((post) => {
+              const isActive = post.id === selectedPostId;
+              const isExpanded = Boolean(expandedPostIds[post.id]);
+              return (
+                <li key={post.id} className={`chapter-list-item whisper-list-item ${isActive ? "active" : ""}`.trim()}>
+                  <button
+                    type="button"
+                    className="whisper-post-button"
+                    onClick={() => {
+                      void openPost(post.id);
+                    }}
+                  >
+                    <span className="chapter-list-meta">Anonymous rumor · {formatDateTime(post.created_at)}</span>
+                    <strong>{post.title}</strong>
+                    <p className="whisper-list-excerpt">{post.body}</p>
+                    <span className="whisper-post-stats">❤️ {post.like_count} · 💬 {post.comment_count} · 👁 {post.view_count}</span>
+                  </button>
+                  <div className="whisper-post-inline-actions">
+                    <button type="button" className="secondary-link" onClick={() => void toggleLike(post.id)}>
+                      {post.liked_by_me ? "Unlike" : "Like"}
+                    </button>
+                    <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(post.id)}>
+                      {isExpanded ? "Hide comments" : "Show comments"}
+                    </button>
+                  </div>
+                  {isDm ? (
+                    <div className="chapter-list-admin-actions whisper-admin-actions">
+                      <button type="button" className="secondary-link" onClick={() => startEditPost(post)}>
+                        Edit
+                      </button>
+                      <button type="button" className="board-node-delete-button" onClick={() => void deletePost(post)}>
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {isExpanded ? (
+                    <div className="whisper-inline-comments">
+                      <h3>Anonymous Comments</h3>
+                      <ul className="whisper-comment-list">
+                        {(commentsByPostId[post.id] || []).map((comment) => (
+                          <li key={comment.id} className="whisper-comment-card">
+                            <div>
+                              <p className="whisper-comment-meta">Anonymous witness · {formatDateTime(comment.created_at)}</p>
+                              <p>{comment.body}</p>
+                            </div>
+                            {isDm ? (
+                              <button
+                                type="button"
+                                className="board-node-delete-button"
+                                onClick={() => void deleteComment(comment)}
+                              >
+                                Moderate
+                              </button>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="note-form whisper-comment-form">
+                        <textarea
+                          className="text-area"
+                          rows={3}
+                          placeholder="Share a rumor anonymously…"
+                          value={commentDraftByPostId[post.id] || ""}
+                          onChange={(event) =>
+                            setCommentDraftByPostId((current) => ({ ...current, [post.id]: event.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="action-button"
+                          disabled={Boolean(isSubmittingCommentByPostId[post.id])}
+                          onClick={() => {
+                            void submitComment(post.id);
+                          }}
+                        >
+                          {isSubmittingCommentByPostId[post.id] ? "Posting…" : "Post anonymous comment"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </article>
+
+        <article className="state-card chapter-reader-card whisper-reader-card">
+          {activePost ? (
+            <>
+              <header className="chapter-reader-header">
+                <p className="topbar-meta">Anonymous rumor · {formatDateTime(activePost.created_at)}</p>
+                <h2>{activePost.title}</h2>
+                <p className="whisper-reader-body">{activePost.body}</p>
+                <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
+              </header>
+              <div className="whisper-reader-actions">
+                <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
+                  {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
+                </button>
+                <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(activePost.id)}>
+                  {expandedPostIds[activePost.id] ? "Hide thread" : "Open thread"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="topbar-meta">Pick a rumor to inspect the thread.</p>
+          )}
+        </article>
+      </div>
+
+      {isDm ? (
+        <article className="state-card chapter-editor-card whisper-editor-card">
+          <div className="dashboard-recap-editor-header">
+            <h2>{editingPostId ? "Edit whisper" : "Create whisper"}</h2>
+            {editingPostId ? (
+              <button type="button" className="secondary-link" onClick={resetPostForm}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+          <input
+            className="text-input"
+            placeholder="Rumor title"
+            value={postTitleDraft}
+            onChange={(event) => setPostTitleDraft(event.target.value)}
+          />
+          <textarea
+            className="text-area"
+            rows={6}
+            placeholder="Rumor body text"
+            value={postBodyDraft}
+            onChange={(event) => setPostBodyDraft(event.target.value)}
+          />
+          <div className="dashboard-row-actions">
+            <button className="action-button" type="button" disabled={isSavingPost} onClick={() => void savePost()}>
+              {isSavingPost ? "Saving…" : editingPostId ? "Update whisper" : "Publish whisper"}
+            </button>
+          </div>
+        </article>
+      ) : null}
+    </section>
+  );
+}

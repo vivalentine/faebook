@@ -177,6 +177,64 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_documents_type_sort
   ON documents(document_type, published, sort_order ASC, title COLLATE NOCASE ASC, id ASC);
 
+  CREATE TABLE IF NOT EXISTS whisper_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    author_user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    view_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (author_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_whisper_posts_updated
+  ON whisper_posts(updated_at DESC, id DESC);
+
+  CREATE TABLE IF NOT EXISTS whisper_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    author_user_id INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (post_id) REFERENCES whisper_posts(id),
+    FOREIGN KEY (author_user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_whisper_comments_post
+  ON whisper_comments(post_id, created_at ASC, id ASC);
+
+  CREATE TABLE IF NOT EXISTS whisper_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (post_id) REFERENCES whisper_posts(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_likes_post_user
+  ON whisper_likes(post_id, user_id);
+
+  CREATE INDEX IF NOT EXISTS idx_whisper_likes_post
+  ON whisper_likes(post_id, created_at DESC, id DESC);
+
+  CREATE TABLE IF NOT EXISTS whisper_post_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    viewed_at TEXT NOT NULL,
+    FOREIGN KEY (post_id) REFERENCES whisper_posts(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_post_views_post_user
+  ON whisper_post_views(post_id, user_id);
+
+  CREATE INDEX IF NOT EXISTS idx_whisper_post_views_post
+  ON whisper_post_views(post_id, viewed_at DESC, id DESC);
+
   CREATE TABLE IF NOT EXISTS npc_aliases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     npc_id INTEGER NOT NULL,
@@ -470,6 +528,13 @@ if (!columnExists("documents", "sort_order")) {
   db.exec(`
     ALTER TABLE documents
     ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0
+  `);
+}
+
+if (tableExists("whisper_posts") && !columnExists("whisper_posts", "view_count")) {
+  db.exec(`
+    ALTER TABLE whisper_posts
+    ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0
   `);
 }
 
