@@ -1558,6 +1558,33 @@
   gap: 10px;
 }
 
+.search-filter-row {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.search-filter-chip {
+  border: 1px solid #3a3457;
+  background: #171b25;
+  color: #ddd5ef;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.search-filter-chip:hover {
+  border-color: #7f6cb7;
+}
+
+.search-filter-chip.active {
+  border-color: #9f7cff;
+  background: rgba(159, 124, 255, 0.22);
+  color: #f5efff;
+}
+
 .search-submit-button {
   width: auto;
   min-width: 120px;
@@ -2325,6 +2352,11 @@
 
   .search-submit-button {
     width: 100%;
+  }
+
+  .search-filter-chip {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
   }
 }
 

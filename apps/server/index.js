@@ -2701,6 +2701,7 @@ app.get("/api/search", requireRole("player", "dm"), (req, res) => {
     rawQuery: req.query.q,
     rawLimit: req.query.limit,
     rawOffset: req.query.offset,
+    rawEntityFilter: req.query.entity,
   });
 
   return res.json(payload);
