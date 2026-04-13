@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
 import { apiFetch } from "../lib/api";
-import { useWikiNpcIndex } from "../lib/wikiLinks";
+import { useWikiEntityIndex } from "../lib/wikiLinks";
 import type { CampaignDocument } from "../types";
 
 type DocumentFormState = {
@@ -44,7 +44,7 @@ export default function DocumentsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isDm = user?.role === "dm";
-  const npcWikiIndex = useWikiNpcIndex();
+  const entityWikiIndex = useWikiEntityIndex();
 
   const [documents, setDocuments] = useState<CampaignDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,7 +279,7 @@ export default function DocumentsPage() {
                 <h2>{activeDocument.title}</h2>
               </header>
               <div className="dashboard-markdown chapter-reader-markdown documents-reader-markdown">
-                {renderRecapMarkdown(activeDocument.body_markdown, { npcIndex: npcWikiIndex })}
+                {renderRecapMarkdown(activeDocument.body_markdown, { entityIndex: entityWikiIndex })}
               </div>
             </>
           ) : (

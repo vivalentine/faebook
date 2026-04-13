@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import WikiInlineText from "./WikiInlineText";
-import type { WikiNpcIndex } from "../lib/wikiLinks";
+import type { WikiEntityIndex } from "../lib/wikiLinks";
 
 type RenderRecapMarkdownOptions = {
-  npcIndex: WikiNpcIndex;
+  entityIndex: WikiEntityIndex;
 };
 
 function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions) {
@@ -19,7 +19,7 @@ function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions)
         <WikiInlineText
           key={`wiki-text-${matchIndex}`}
           text={text.slice(lastIndex, match.index)}
-          npcIndex={options.npcIndex}
+          entityIndex={options.entityIndex}
         />,
       );
     }
@@ -28,13 +28,13 @@ function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions)
     if (token.startsWith("**") && token.endsWith("**")) {
       nodes.push(
         <strong key={`strong-${matchIndex}`}>
-          <WikiInlineText text={token.slice(2, -2)} npcIndex={options.npcIndex} />
+          <WikiInlineText text={token.slice(2, -2)} entityIndex={options.entityIndex} />
         </strong>,
       );
     } else if (token.startsWith("*") && token.endsWith("*")) {
       nodes.push(
         <em key={`em-${matchIndex}`}>
-          <WikiInlineText text={token.slice(1, -1)} npcIndex={options.npcIndex} />
+          <WikiInlineText text={token.slice(1, -1)} entityIndex={options.entityIndex} />
         </em>,
       );
     } else if (token.startsWith("`") && token.endsWith("`")) {
@@ -60,7 +60,7 @@ function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions)
   }
 
   if (lastIndex < text.length) {
-    nodes.push(<WikiInlineText key="wiki-tail" text={text.slice(lastIndex)} npcIndex={options.npcIndex} />);
+    nodes.push(<WikiInlineText key="wiki-tail" text={text.slice(lastIndex)} entityIndex={options.entityIndex} />);
   }
 
   return nodes;

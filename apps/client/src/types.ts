@@ -181,6 +181,24 @@ export type CampaignDocument = {
   updated_at: string;
 };
 
+export type LocationRecord = {
+  id: number;
+  slug: string;
+  name: string;
+  ring: string | null;
+  court: string | null;
+  faction: string | null;
+  district: string | null;
+  summary: string | null;
+  body_markdown: string;
+  tags: string[];
+  map_id: MapLayerConfig["map_id"] | null;
+  landmark_slug: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DashboardActivityItem = {
   type: string;
   label: string;
@@ -308,6 +326,7 @@ export type MapLandmark = {
   linked_entity_slug: string | null;
   sort_order: number;
   unlock_chapter: number | null;
+  linked_location: Pick<LocationRecord, "slug" | "name" | "ring" | "summary"> | null;
   created_at: string;
   updated_at: string;
 };

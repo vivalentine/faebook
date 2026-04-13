@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
 import { getFallbackReputation } from "../lib/npcReputation";
-import { useWikiNpcIndex } from "../lib/wikiLinks";
+import { useWikiEntityIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
 
 export default function PlayerNpcPage() {
@@ -24,7 +24,7 @@ export default function PlayerNpcPage() {
   const [myNote, setMyNote] = useState<NpcNote | null>(null);
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
-  const npcWikiIndex = useWikiNpcIndex();
+  const entityWikiIndex = useWikiEntityIndex();
 
   useEffect(() => {
     async function loadPage() {
@@ -244,7 +244,7 @@ export default function PlayerNpcPage() {
 
             {npc.short_blurb ? (
               <p className="blurb">
-                <WikiInlineText text={npc.short_blurb} npcIndex={npcWikiIndex} />
+                <WikiInlineText text={npc.short_blurb} entityIndex={entityWikiIndex} />
               </p>
             ) : null}
 
@@ -252,7 +252,7 @@ export default function PlayerNpcPage() {
               <div className="summary-box">
                 <p className="summary-label">Met when</p>
                 <p>
-                  <WikiInlineText text={npc.met_summary} npcIndex={npcWikiIndex} />
+                  <WikiInlineText text={npc.met_summary} entityIndex={entityWikiIndex} />
                 </p>
               </div>
             ) : null}

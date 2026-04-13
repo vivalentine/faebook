@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
@@ -8,6 +9,7 @@ import type {
   MapLandmarkMarkerStyle,
   MapLandmarkVisibilityScope,
   MapLayerConfig,
+  LocationRecord,
   MapPin,
   MapPinCategory,
 } from "../types";
@@ -173,6 +175,7 @@ export default function MapsPage() {
   const [layers, setLayers] = useState<MapLayerConfig[]>([]);
   const [pins, setPins] = useState<MapPin[]>([]);
   const [landmarks, setLandmarks] = useState<MapLandmark[]>([]);
+  const [locationsBySlug, setLocationsBySlug] = useState<Record<string, LocationRecord>>({});
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -250,6 +253,12 @@ export default function MapsPage() {
     () => visibleLandmarks.find((landmark) => landmark.id === selectedLandmarkId) || null,
     [visibleLandmarks, selectedLandmarkId],
   );
+  const selectedLandmarkLocation = useMemo(() => {
+    if (!selectedLandmark) return null;
+    if (selectedLandmark.linked_location) return selectedLandmark.linked_location;
+    if (!selectedLandmark.linked_entity_slug) return null;
+    return locationsBySlug[selectedLandmark.linked_entity_slug] || null;
+  }, [locationsBySlug, selectedLandmark]);
 
   const resetView = useCallback((layer: MapLayerConfig) => {
     const viewportEl = viewportRef.current;
@@ -267,15 +276,17 @@ export default function MapsPage() {
     setError("");
 
     try {
-      const [configResponse, pinResponse, landmarkResponse] = await Promise.all([
+      const [configResponse, pinResponse, landmarkResponse, locationsResponse] = await Promise.all([
         apiFetch("/api/maps/config"),
         apiFetch("/api/maps/pins"),
         apiFetch("/api/maps/landmarks"),
+        apiFetch("/api/locations"),
       ]);
 
       const configData = await configResponse.json();
       const pinData = await pinResponse.json();
       const landmarkData = await landmarkResponse.json();
+      const locationsData = await locationsResponse.json();
 
       if (!configResponse.ok) {
         throw new Error(configData.error || `Failed to load maps config: ${configResponse.status}`);
@@ -297,6 +308,13 @@ export default function MapsPage() {
       setLayers(nextLayers);
       setPins(Array.isArray(pinData.pins) ? pinData.pins : []);
       setLandmarks(Array.isArray(landmarkData.landmarks) ? landmarkData.landmarks : []);
+      const nextLocations = Array.isArray(locationsData.locations) ? locationsData.locations : [];
+      setLocationsBySlug(
+        nextLocations.reduce((acc: Record<string, LocationRecord>, location: LocationRecord) => {
+          acc[location.slug] = location;
+          return acc;
+        }, {}),
+      );
 
       if (nextLayers[0]) {
         setActiveLayerId((current) => {
@@ -1024,10 +1042,22 @@ export default function MapsPage() {
               }}
             >
               <h3>{selectedLandmark.label}</h3>
-              {selectedLandmark.description ? <p>{selectedLandmark.description}</p> : null}
+              {selectedLandmarkLocation?.ring ? (
+                <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
+              ) : null}
+              {selectedLandmarkLocation?.summary ? (
+                <p>{selectedLandmarkLocation.summary}</p>
+              ) : selectedLandmark.description ? (
+                <p>{selectedLandmark.description}</p>
+              ) : null}
               <p className="map-landmark-popover-meta">
                 {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
               </p>
+              {selectedLandmarkLocation?.slug ? (
+                <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
+                  Open location
+                </Link>
+              ) : null}
             </article>
           ) : null}
 
@@ -1286,6 +1316,24 @@ export default function MapsPage() {
                 setLandmarkEditor((current) =>
                   current
                     ? { ...current, draft: { ...current.draft, description: event.target.value } }
+                    : null,
+                )
+              }
+            />
+          </label>
+          <label className="toolbar-field">
+            <span>Linked location slug (optional)</span>
+            <input
+              className="text-input"
+              value={landmarkEditor.draft.linked_entity_slug}
+              placeholder="moonthorn-estate"
+              onChange={(event) =>
+                setLandmarkEditor((current) =>
+                  current
+                    ? {
+                        ...current,
+                        draft: { ...current.draft, linked_entity_slug: event.target.value },
+                      }
                     : null,
                 )
               }
