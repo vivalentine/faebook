@@ -17,6 +17,7 @@ import SearchPage from "./pages/SearchPage";
 import ChaptersPage from "./pages/ChaptersPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ProfilePage from "./pages/ProfilePage";
+import WhisperNetworkPage from "./pages/WhisperNetworkPage";
 import "./App.css";
 
 function DirectoryRoute() {
@@ -59,6 +60,7 @@ export default function App() {
             <Route path="chapters/:chapterNumber" element={<ChaptersPage />} />
             <Route path="documents" element={<DocumentsPage />} />
             <Route path="documents/:slug" element={<DocumentsPage />} />
+            <Route path="whisper-network" element={<WhisperNetworkPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route

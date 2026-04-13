@@ -258,6 +258,28 @@ export type MapPin = {
   updated_at: string;
 };
 
+export type WhisperPost = {
+  id: number;
+  title: string;
+  body: string;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  liked_by_me: boolean;
+  can_moderate: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WhisperComment = {
+  id: number;
+  post_id: number;
+  body: string;
+  can_moderate: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MapLandmarkVisibilityScope = "public" | "dm_only";
 
 export type MapLandmarkMarkerStyle = "district" | "landmark" | "estate" | "civic" | "market";

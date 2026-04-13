@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Search", to: "/search" },
   { label: "Chapter Library", to: "/chapters" },
   { label: "Documents", to: "/documents" },
+  { label: "Whisper Network", to: "/whisper-network" },
   { label: "NPC Directory", to: "/directory" },
   { label: "Investigation Board", to: "/board" },
   { label: "Maps", to: "/maps" },

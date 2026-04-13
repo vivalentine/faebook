@@ -176,6 +176,36 @@ function mapNpcNoteForClient(noteRow) {
   };
 }
 
+function mapWhisperPostForClient(postRow) {
+  if (!postRow) return null;
+
+  return {
+    id: postRow.id,
+    title: postRow.title,
+    body: postRow.body,
+    like_count: Number(postRow.like_count || 0),
+    comment_count: Number(postRow.comment_count || 0),
+    view_count: Number(postRow.view_count || 0),
+    created_at: postRow.created_at,
+    updated_at: postRow.updated_at,
+    liked_by_me: Number(postRow.liked_by_me || 0) === 1,
+    can_moderate: Number(postRow.can_moderate || 0) === 1,
+  };
+}
+
+function mapWhisperCommentForClient(commentRow) {
+  if (!commentRow) return null;
+
+  return {
+    id: commentRow.id,
+    post_id: commentRow.post_id,
+    body: commentRow.body,
+    created_at: commentRow.created_at,
+    updated_at: commentRow.updated_at,
+    can_moderate: Number(commentRow.can_moderate || 0) === 1,
+  };
+}
+
 function getDefaultBoard() {
   return {
     nodes: [],
@@ -3507,6 +3537,491 @@ app.post("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {
     }
     return res.status(500).json({ error: "Failed to create alias" });
   }
+});
+
+app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit || "20"), 10) || 20, 1), 50);
+  const offset = Math.max(Number.parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+  const posts = db
+    .prepare(
+      `
+        SELECT
+          posts.id,
+          posts.title,
+          posts.body,
+          posts.view_count,
+          posts.created_at,
+          posts.updated_at,
+          COUNT(DISTINCT likes.id) AS like_count,
+          COUNT(DISTINCT comments.id) AS comment_count,
+          CASE WHEN my_like.id IS NULL THEN 0 ELSE 1 END AS liked_by_me,
+          CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
+        FROM whisper_posts AS posts
+        LEFT JOIN whisper_likes AS likes
+          ON likes.post_id = posts.id
+        LEFT JOIN whisper_comments AS comments
+          ON comments.post_id = posts.id
+        LEFT JOIN whisper_likes AS my_like
+          ON my_like.post_id = posts.id
+         AND my_like.user_id = ?
+        GROUP BY posts.id
+        ORDER BY posts.updated_at DESC, posts.id DESC
+        LIMIT ?
+        OFFSET ?
+      `
+    )
+    .all(sessionUser.role, sessionUser.id, limit, offset);
+
+  const totalRow = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS total
+        FROM whisper_posts
+      `
+    )
+    .get();
+
+  return res.json({
+    posts: posts.map(mapWhisperPostForClient),
+    pagination: {
+      limit,
+      offset,
+      total: Number(totalRow?.total || 0),
+    },
+  });
+});
+
+app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const postId = Number(req.params.id);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  const now = new Date().toISOString();
+  const viewResult = db
+    .prepare(
+      `
+        INSERT OR IGNORE INTO whisper_post_views (
+          post_id,
+          user_id,
+          viewed_at
+        )
+        VALUES (?, ?, ?)
+      `
+    )
+    .run(postId, sessionUser.id, now);
+
+  if (viewResult.changes > 0) {
+    db.prepare(
+      `
+        UPDATE whisper_posts
+        SET view_count = view_count + 1,
+            updated_at = updated_at
+        WHERE id = ?
+      `
+    ).run(postId);
+  }
+
+  const post = db
+    .prepare(
+      `
+        SELECT
+          posts.id,
+          posts.title,
+          posts.body,
+          posts.view_count,
+          posts.created_at,
+          posts.updated_at,
+          COUNT(DISTINCT likes.id) AS like_count,
+          COUNT(DISTINCT comments.id) AS comment_count,
+          CASE WHEN my_like.id IS NULL THEN 0 ELSE 1 END AS liked_by_me,
+          CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
+        FROM whisper_posts AS posts
+        LEFT JOIN whisper_likes AS likes
+          ON likes.post_id = posts.id
+        LEFT JOIN whisper_comments AS comments
+          ON comments.post_id = posts.id
+        LEFT JOIN whisper_likes AS my_like
+          ON my_like.post_id = posts.id
+         AND my_like.user_id = ?
+        WHERE posts.id = ?
+        GROUP BY posts.id
+      `
+    )
+    .get(sessionUser.role, sessionUser.id, postId);
+
+  if (!post) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const comments = db
+    .prepare(
+      `
+        SELECT
+          comments.id,
+          comments.post_id,
+          comments.body,
+          comments.created_at,
+          comments.updated_at,
+          CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
+        FROM whisper_comments AS comments
+        WHERE comments.post_id = ?
+        ORDER BY comments.created_at ASC, comments.id ASC
+      `
+    )
+    .all(sessionUser.role, postId);
+
+  return res.json({
+    post: mapWhisperPostForClient(post),
+    comments: comments.map(mapWhisperCommentForClient),
+  });
+});
+
+app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const title = String(req.body?.title || "").trim();
+  const body = String(req.body?.body || "").trim();
+  const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
+  const viewCount = Number.isInteger(parsedViewCount) && parsedViewCount >= 0 ? parsedViewCount : 0;
+
+  if (!title || !body) {
+    return res.status(400).json({ error: "Title and body are required" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO whisper_posts (
+          author_user_id,
+          title,
+          body,
+          view_count,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(sessionUser.id, title, body, viewCount, now, now);
+
+  const postId = Number(result.lastInsertRowid);
+  createAuditLog(db, {
+    actorUserId: sessionUser.id,
+    actionType: "whisper_post_created",
+    objectType: "whisper_post",
+    objectId: String(postId),
+    message: `Created whisper post: ${title.slice(0, 80)}`,
+  });
+
+  const post = db
+    .prepare(
+      `
+        SELECT
+          id,
+          title,
+          body,
+          view_count,
+          created_at,
+          updated_at,
+          0 AS like_count,
+          0 AS comment_count,
+          0 AS liked_by_me,
+          1 AS can_moderate
+        FROM whisper_posts
+        WHERE id = ?
+      `
+    )
+    .get(postId);
+
+  return res.status(201).json(mapWhisperPostForClient(post));
+});
+
+app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const postId = Number(req.params.id);
+  const title = String(req.body?.title || "").trim();
+  const body = String(req.body?.body || "").trim();
+  const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  if (!title || !body) {
+    return res.status(400).json({ error: "Title and body are required" });
+  }
+
+  if (!Number.isInteger(parsedViewCount) || parsedViewCount < 0) {
+    return res.status(400).json({ error: "view_count must be a non-negative integer" });
+  }
+
+  const now = new Date().toISOString();
+  const updateResult = db
+    .prepare(
+      `
+        UPDATE whisper_posts
+        SET title = ?,
+            body = ?,
+            view_count = ?,
+            updated_at = ?
+        WHERE id = ?
+      `
+    )
+    .run(title, body, parsedViewCount, now, postId);
+
+  if (updateResult.changes === 0) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  createAuditLog(db, {
+    actorUserId: sessionUser.id,
+    actionType: "whisper_post_updated",
+    objectType: "whisper_post",
+    objectId: String(postId),
+    message: `Updated whisper post: ${title.slice(0, 80)}`,
+  });
+
+  const post = db
+    .prepare(
+      `
+        SELECT
+          posts.id,
+          posts.title,
+          posts.body,
+          posts.view_count,
+          posts.created_at,
+          posts.updated_at,
+          COUNT(DISTINCT likes.id) AS like_count,
+          COUNT(DISTINCT comments.id) AS comment_count,
+          0 AS liked_by_me,
+          1 AS can_moderate
+        FROM whisper_posts AS posts
+        LEFT JOIN whisper_likes AS likes
+          ON likes.post_id = posts.id
+        LEFT JOIN whisper_comments AS comments
+          ON comments.post_id = posts.id
+        WHERE posts.id = ?
+        GROUP BY posts.id
+      `
+    )
+    .get(postId);
+
+  return res.json(mapWhisperPostForClient(post));
+});
+
+app.delete("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const postId = Number(req.params.id);
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id, title
+        FROM whisper_posts
+        WHERE id = ?
+      `
+    )
+    .get(postId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const deleteTx = db.transaction(() => {
+    db.prepare("DELETE FROM whisper_comments WHERE post_id = ?").run(postId);
+    db.prepare("DELETE FROM whisper_likes WHERE post_id = ?").run(postId);
+    db.prepare("DELETE FROM whisper_post_views WHERE post_id = ?").run(postId);
+    db.prepare("DELETE FROM whisper_posts WHERE id = ?").run(postId);
+  });
+  deleteTx();
+
+  createAuditLog(db, {
+    actorUserId: sessionUser.id,
+    actionType: "whisper_post_deleted",
+    objectType: "whisper_post",
+    objectId: String(postId),
+    message: `Deleted whisper post: ${String(existing.title || "").slice(0, 80)}`,
+  });
+
+  return res.json({ ok: true });
+});
+
+app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const postId = Number(req.params.id);
+  const body = String(req.body?.body || "").trim();
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  if (!body) {
+    return res.status(400).json({ error: "Comment body is required" });
+  }
+
+  const postExists = db
+    .prepare(
+      `
+        SELECT id
+        FROM whisper_posts
+        WHERE id = ?
+      `
+    )
+    .get(postId);
+
+  if (!postExists) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `
+        INSERT INTO whisper_comments (
+          post_id,
+          author_user_id,
+          body,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+      `
+    )
+    .run(postId, sessionUser.id, body, now, now);
+
+  db.prepare(
+    `
+      UPDATE whisper_posts
+      SET updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, postId);
+
+  return res.status(201).json(
+    mapWhisperCommentForClient({
+      id: Number(result.lastInsertRowid),
+      post_id: postId,
+      body,
+      created_at: now,
+      updated_at: now,
+      can_moderate: sessionUser.role === "dm" ? 1 : 0,
+    })
+  );
+});
+
+app.delete("/api/whisper/comments/:id", requireRole("dm"), (req, res) => {
+  const commentId = Number(req.params.id);
+
+  if (!Number.isInteger(commentId) || commentId <= 0) {
+    return res.status(400).json({ error: "Invalid comment id" });
+  }
+
+  const comment = db
+    .prepare(
+      `
+        SELECT id, post_id
+        FROM whisper_comments
+        WHERE id = ?
+      `
+    )
+    .get(commentId);
+
+  if (!comment) {
+    return res.status(404).json({ error: "Comment not found" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare("DELETE FROM whisper_comments WHERE id = ?").run(commentId);
+  db.prepare(
+    `
+      UPDATE whisper_posts
+      SET updated_at = ?
+      WHERE id = ?
+    `
+  ).run(now, comment.post_id);
+
+  return res.json({ ok: true });
+});
+
+app.post("/api/whisper/posts/:id/likes", requireRole("player", "dm"), (req, res) => {
+  const sessionUser = req.session.user;
+  const postId = Number(req.params.id);
+  const now = new Date().toISOString();
+
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  const postExists = db
+    .prepare(
+      `
+        SELECT id
+        FROM whisper_posts
+        WHERE id = ?
+      `
+    )
+    .get(postId);
+
+  if (!postExists) {
+    return res.status(404).json({ error: "Post not found" });
+  }
+
+  const existing = db
+    .prepare(
+      `
+        SELECT id
+        FROM whisper_likes
+        WHERE post_id = ?
+          AND user_id = ?
+      `
+    )
+    .get(postId, sessionUser.id);
+
+  let liked = false;
+  if (existing) {
+    db.prepare(
+      `
+        DELETE FROM whisper_likes
+        WHERE id = ?
+      `
+    ).run(existing.id);
+  } else {
+    db.prepare(
+      `
+        INSERT INTO whisper_likes (
+          post_id,
+          user_id,
+          created_at
+        )
+        VALUES (?, ?, ?)
+      `
+    ).run(postId, sessionUser.id, now);
+    liked = true;
+  }
+
+  const totals = db
+    .prepare(
+      `
+        SELECT COUNT(*) AS like_count
+        FROM whisper_likes
+        WHERE post_id = ?
+      `
+    )
+    .get(postId);
+
+  return res.json({
+    liked,
+    like_count: Number(totals?.like_count || 0),
+  });
 });
 
 app.patch("/api/npc-aliases/:id", requireRole("player", "dm"), (req, res) => {

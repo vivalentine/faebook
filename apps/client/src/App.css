@@ -2012,6 +2012,128 @@
   cursor: pointer;
 }
 
+.whisper-layout {
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+}
+
+.whisper-feed-header {
+  margin-bottom: 10px;
+}
+
+.whisper-feed-header p {
+  margin: 0;
+}
+
+.whisper-list-item {
+  gap: 10px;
+}
+
+.whisper-post-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.whisper-list-excerpt {
+  margin: 0;
+  color: #ddd6ef;
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.whisper-post-stats {
+  color: #beafdc;
+  font-size: 12px;
+}
+
+.whisper-post-inline-actions,
+.whisper-reader-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.whisper-post-inline-actions .secondary-link,
+.whisper-reader-actions .action-button,
+.whisper-reader-actions .secondary-link {
+  width: auto;
+  min-width: 120px;
+}
+
+.whisper-admin-actions {
+  justify-content: flex-end;
+}
+
+.whisper-inline-comments {
+  border-top: 1px solid #2f3147;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.whisper-inline-comments h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #d8d0eb;
+}
+
+.whisper-comment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.whisper-comment-card {
+  border-radius: 12px;
+  border: 1px solid #323650;
+  background: #151826;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.whisper-comment-card p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.whisper-comment-meta {
+  margin-bottom: 6px !important;
+  font-size: 12px;
+  color: #bfb2d9;
+}
+
+.whisper-comment-form .action-button {
+  width: auto;
+  align-self: flex-start;
+}
+
+.whisper-reader-card {
+  background: linear-gradient(180deg, #171729 0%, #111320 100%);
+}
+
+.whisper-reader-body {
+  margin: 10px 0;
+  white-space: pre-wrap;
+  color: #ebe6f7;
+  line-height: 1.6;
+}
+
 @media (max-width: 980px) {
   .app-drawer {
     position: fixed;
@@ -2066,6 +2188,17 @@
   }
 
   .documents-index-header .text-input {
+    width: 100%;
+  }
+
+  .whisper-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .whisper-post-inline-actions .secondary-link,
+  .whisper-comment-form .action-button,
+  .whisper-reader-actions .action-button,
+  .whisper-reader-actions .secondary-link {
     width: 100%;
   }
 
