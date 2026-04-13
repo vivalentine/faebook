@@ -299,108 +299,6 @@ export default function HomePage() {
       ) : null}
 
       <section className="dashboard-grid">
-        <article className="state-card dashboard-card dashboard-card--npcs">
-          <h2>Recently Unlocked NPCs</h2>
-          {dashboard.recently_unlocked_npcs.length ? (
-            <ul className="dashboard-list">
-              {dashboard.recently_unlocked_npcs.map((npc) => (
-                <li key={npc.id}>
-                  <Link to={`/directory/${npc.slug}`}>{npc.name}</Link>
-                  <span>{formatDateTime(npc.updated_at)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="topbar-meta">No unlocked NPCs yet.</p>
-          )}
-        </article>
-
-        <article className="state-card dashboard-card dashboard-suspects dashboard-card--suspects">
-          <h2>Suspect List</h2>
-          <div className="dashboard-inline-form">
-            <input
-              className="text-input"
-              placeholder="Suspect name"
-              value={newSuspectName}
-              onChange={(event) => setNewSuspectName(event.target.value)}
-            />
-            <input
-              className="text-input"
-              placeholder="Short note"
-              value={newSuspectNote}
-              onChange={(event) => setNewSuspectNote(event.target.value)}
-            />
-            <button
-              className="action-button"
-              type="button"
-              disabled={addingSuspect || !newSuspectName.trim()}
-              onClick={() => void addSuspect()}
-            >
-              {addingSuspect ? "Adding..." : "Add"}
-            </button>
-          </div>
-
-          <div className="dashboard-suspect-list">
-            {sortedSuspects.map((suspect, index) => (
-              <div key={suspect.id} className="dashboard-suspect-item">
-                <input
-                  className="text-input"
-                  value={suspect.name}
-                  onChange={(event) => {
-                    void updateSuspect(suspect.id, { name: event.target.value });
-                  }}
-                />
-                <FaeSelect
-                  className="text-input"
-                  value={suspect.status}
-                  onChange={(nextValue) => {
-                    void updateSuspect(suspect.id, {
-                      status: nextValue as DashboardSuspect["status"],
-                    });
-                  }}
-                  options={SUSPECT_STATUSES.map((statusValue) => ({
-                    value: statusValue,
-                    label: statusValue,
-                  }))}
-                />
-                <textarea
-                  className="text-area"
-                  rows={2}
-                  value={suspect.note}
-                  onChange={(event) => {
-                    void updateSuspect(suspect.id, { note: event.target.value });
-                  }}
-                />
-                <div className="dashboard-row-actions">
-                  <button
-                    type="button"
-                    className="secondary-link"
-                    disabled={index === 0}
-                    onClick={() => void moveSuspect(suspect, "up")}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-link"
-                    disabled={index === sortedSuspects.length - 1}
-                    onClick={() => void moveSuspect(suspect, "down")}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className="board-node-delete-button"
-                    onClick={() => void archiveSuspect(suspect.id)}
-                  >
-                    Archive
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
         <article className="state-card dashboard-card dashboard-card--recap">
           <h2>Lumi’s Session Recap</h2>
           {dashboard.latest_recap ? (
@@ -505,24 +403,132 @@ export default function HomePage() {
           ) : null}
         </article>
 
-        <article className="state-card dashboard-card dashboard-card--activity">
-          <h2>Recent Personal Activity</h2>
-          {dashboard.recent_personal_activity.length ? (
-            <ul className="dashboard-list">
-              {dashboard.recent_personal_activity.map((item, index) => (
-                <li key={`${item.type}-${index}`}>
-                  <span>{item.label}</span>
-                  <span>{formatDateTime(item.updated_at)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="topbar-meta">No recent activity tracked yet.</p>
-          )}
+        <div className="dashboard-column dashboard-column--investigation">
+          <article className="state-card dashboard-card dashboard-card--npcs">
+            <h2>Recently Unlocked NPCs</h2>
+            {dashboard.recently_unlocked_npcs.length ? (
+              <ul className="dashboard-list">
+                {dashboard.recently_unlocked_npcs.map((npc) => (
+                  <li key={npc.id}>
+                    <Link to={`/directory/${npc.slug}`}>{npc.name}</Link>
+                    <span>{formatDateTime(npc.updated_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="topbar-meta">No unlocked NPCs yet.</p>
+            )}
+          </article>
+
+          <article className="state-card dashboard-card dashboard-card--activity">
+            <h2>Recent Personal Activity</h2>
+            {dashboard.recent_personal_activity.length ? (
+              <ul className="dashboard-list">
+                {dashboard.recent_personal_activity.map((item, index) => (
+                  <li key={`${item.type}-${index}`}>
+                    <span>{item.label}</span>
+                    <span>{formatDateTime(item.updated_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="topbar-meta">No recent activity tracked yet.</p>
+            )}
+          </article>
+        </div>
+
+        <article className="state-card dashboard-card dashboard-suspects dashboard-card--suspects">
+          <h2>Suspect List</h2>
+          <div className="dashboard-inline-form">
+            <input
+              className="text-input"
+              placeholder="Suspect name"
+              value={newSuspectName}
+              onChange={(event) => setNewSuspectName(event.target.value)}
+            />
+            <input
+              className="text-input"
+              placeholder="Short note"
+              value={newSuspectNote}
+              onChange={(event) => setNewSuspectNote(event.target.value)}
+            />
+            <button
+              className="action-button"
+              type="button"
+              disabled={addingSuspect || !newSuspectName.trim()}
+              onClick={() => void addSuspect()}
+            >
+              {addingSuspect ? "Adding..." : "Add"}
+            </button>
+          </div>
+
+          <div className="dashboard-suspect-list">
+            {sortedSuspects.map((suspect, index) => (
+              <div key={suspect.id} className="dashboard-suspect-item">
+                <input
+                  className="text-input"
+                  value={suspect.name}
+                  onChange={(event) => {
+                    void updateSuspect(suspect.id, { name: event.target.value });
+                  }}
+                />
+                <FaeSelect
+                  className="text-input"
+                  value={suspect.status}
+                  onChange={(nextValue) => {
+                    void updateSuspect(suspect.id, {
+                      status: nextValue as DashboardSuspect["status"],
+                    });
+                  }}
+                  options={SUSPECT_STATUSES.map((statusValue) => ({
+                    value: statusValue,
+                    label: statusValue,
+                  }))}
+                />
+                <textarea
+                  className="text-area"
+                  rows={2}
+                  value={suspect.note}
+                  onChange={(event) => {
+                    void updateSuspect(suspect.id, { note: event.target.value });
+                  }}
+                />
+                <div className="dashboard-row-actions">
+                  <button
+                    type="button"
+                    className="secondary-link"
+                    disabled={index === 0}
+                    onClick={() => void moveSuspect(suspect, "up")}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-link"
+                    disabled={index === sortedSuspects.length - 1}
+                    onClick={() => void moveSuspect(suspect, "down")}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="board-node-delete-button"
+                    onClick={() => void archiveSuspect(suspect.id)}
+                  >
+                    Archive
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </article>
 
         {user?.role === "dm" ? (
-          <>
+          <section className="dashboard-dm-section">
+            <div className="dashboard-dm-section-header">
+              <h2>DM Summary</h2>
+              <p className="topbar-meta">Admin-only campaign controls and visibility.</p>
+            </div>
             <article className="state-card dashboard-card dashboard-card--dm">
               <h2>Quick Links to Player Boards</h2>
               {dashboard.player_board_links?.length ? (
@@ -570,7 +576,7 @@ export default function HomePage() {
                 <Link to="/archive">Open Archive</Link>
               </div>
             </article>
-          </>
+          </section>
         ) : null}
       </section>
     </div>
