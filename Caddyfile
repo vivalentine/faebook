@@ -2,9 +2,12 @@
 	encode zstd gzip
 
 	@api path /api/*
-	handle @api {
-		reverse_proxy {$FAEBOOK_API_UPSTREAM:127.0.0.1:3001}
+    handle @api {
+	reverse_proxy 127.0.0.1:3001 {
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
 	}
+    }
 
 	@uploads path /uploads/*
 	handle @uploads {
