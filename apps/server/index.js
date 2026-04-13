@@ -844,6 +844,16 @@ function mapMapPinForClient(row) {
 }
 
 function mapMapLandmarkForClient(row) {
+  let linkedLocation = null;
+  if (row.location_slug && row.location_name) {
+    linkedLocation = {
+      slug: row.location_slug,
+      name: row.location_name,
+      ring: row.location_ring || null,
+      summary: row.location_summary || null,
+    };
+  }
+
   return {
     id: row.id,
     map_id: row.map_id,
@@ -858,6 +868,56 @@ function mapMapLandmarkForClient(row) {
     linked_entity_slug: row.linked_entity_slug || null,
     sort_order: Number(row.sort_order || 0),
     unlock_chapter: row.unlock_chapter == null ? null : Number(row.unlock_chapter),
+    linked_location: linkedLocation,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function sanitizeLocationSlug(value, fallback = "") {
+  return sanitizeOptionalSlug(value, fallback);
+}
+
+function parseLocationTags(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((tag) => String(tag || "").trim())
+      .filter(Boolean)
+      .slice(0, 24);
+  }
+  return String(value)
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 24);
+}
+
+function mapLocationForClient(row) {
+  let parsedTags = [];
+  try {
+    const maybeTags = JSON.parse(row.tags_json || "[]");
+    if (Array.isArray(maybeTags)) {
+      parsedTags = maybeTags.map((tag) => String(tag)).filter(Boolean);
+    }
+  } catch {
+    parsedTags = [];
+  }
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    ring: row.ring || null,
+    court: row.court || null,
+    faction: row.faction || null,
+    district: row.district || null,
+    summary: row.summary || null,
+    body_markdown: row.body_markdown || "",
+    tags: parsedTags,
+    map_id: row.map_id || null,
+    landmark_slug: row.landmark_slug || null,
+    is_published: Number(row.is_published) === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -3296,6 +3356,190 @@ app.get("/api/documents", requireRole("player", "dm"), (req, res) => {
   return res.json(rows.map(mapDocumentRow));
 });
 
+app.get("/api/locations", requireRole("player", "dm"), (req, res) => {
+  const isDm = req.session.user.role === "dm";
+  const rows = db
+    .prepare(
+      `
+        SELECT *
+        FROM locations
+        ${isDm ? "" : "WHERE is_published = 1"}
+        ORDER BY ring COLLATE NOCASE ASC, name COLLATE NOCASE ASC, id ASC
+      `,
+    )
+    .all();
+
+  res.json({
+    locations: rows.map(mapLocationForClient),
+  });
+});
+
+app.get("/api/locations/:slug", requireRole("player", "dm"), (req, res) => {
+  const isDm = req.session.user.role === "dm";
+  const slug = sanitizeLocationSlug(req.params.slug);
+  const row = db
+    .prepare(
+      `
+        SELECT *
+        FROM locations
+        WHERE slug = ?
+      `,
+    )
+    .get(slug);
+
+  if (!row || (!isDm && Number(row.is_published) !== 1)) {
+    return res.status(404).json({ error: "Location not found" });
+  }
+
+  res.json({ location: mapLocationForClient(row) });
+});
+
+app.post("/api/locations", requireRole("dm"), (req, res) => {
+  const name = limitString(req.body.name, 160).trim();
+  const slug = sanitizeLocationSlug(req.body.slug, name);
+  const ring = limitString(req.body.ring, 80).trim() || null;
+  const court = limitString(req.body.court, 120).trim() || null;
+  const faction = limitString(req.body.faction, 120).trim() || null;
+  const district = limitString(req.body.district, 120).trim() || null;
+  const summary = limitString(req.body.summary, 360).trim() || null;
+  const bodyMarkdown = limitString(req.body.body_markdown, 50000);
+  const tags = parseLocationTags(req.body.tags);
+  const mapId = req.body.map_id ? sanitizeMapLayer(String(req.body.map_id)) : null;
+  const landmarkSlug = req.body.landmark_slug ? sanitizeOptionalSlug(req.body.landmark_slug) : null;
+  const isPublished = req.body.is_published ? 1 : 0;
+
+  if (!name || !slug) {
+    return res.status(400).json({ error: "name and slug are required" });
+  }
+
+  const now = new Date().toISOString();
+  try {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO locations (
+            slug, name, ring, court, faction, district, summary, body_markdown,
+            tags_json, map_id, landmark_slug, is_published, created_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      )
+      .run(
+        slug,
+        name,
+        ring,
+        court,
+        faction,
+        district,
+        summary,
+        bodyMarkdown,
+        JSON.stringify(tags),
+        mapId,
+        landmarkSlug,
+        isPublished,
+        now,
+        now,
+      );
+    const created = db.prepare(`SELECT * FROM locations WHERE id = ?`).get(result.lastInsertRowid);
+    res.status(201).json({ location: mapLocationForClient(created) });
+  } catch (error) {
+    if (String(error).includes("UNIQUE")) {
+      return res.status(409).json({ error: "Location slug already exists" });
+    }
+    return res.status(500).json({ error: "Failed to create location" });
+  }
+});
+
+app.patch("/api/locations/:id", requireRole("dm"), (req, res) => {
+  const locationId = Number(req.params.id);
+  const existing = db.prepare(`SELECT * FROM locations WHERE id = ?`).get(locationId);
+  if (!existing) {
+    return res.status(404).json({ error: "Location not found" });
+  }
+
+  const nextName = Object.prototype.hasOwnProperty.call(req.body, "name")
+    ? limitString(req.body.name, 160).trim()
+    : existing.name;
+  const nextSlug = Object.prototype.hasOwnProperty.call(req.body, "slug")
+    ? sanitizeLocationSlug(req.body.slug, nextName)
+    : existing.slug;
+  const nextRing = Object.prototype.hasOwnProperty.call(req.body, "ring")
+    ? limitString(req.body.ring, 80).trim() || null
+    : existing.ring;
+  const nextCourt = Object.prototype.hasOwnProperty.call(req.body, "court")
+    ? limitString(req.body.court, 120).trim() || null
+    : existing.court;
+  const nextFaction = Object.prototype.hasOwnProperty.call(req.body, "faction")
+    ? limitString(req.body.faction, 120).trim() || null
+    : existing.faction;
+  const nextDistrict = Object.prototype.hasOwnProperty.call(req.body, "district")
+    ? limitString(req.body.district, 120).trim() || null
+    : existing.district;
+  const nextSummary = Object.prototype.hasOwnProperty.call(req.body, "summary")
+    ? limitString(req.body.summary, 360).trim() || null
+    : existing.summary;
+  const nextBody = Object.prototype.hasOwnProperty.call(req.body, "body_markdown")
+    ? limitString(req.body.body_markdown, 50000)
+    : existing.body_markdown;
+  const nextTags = Object.prototype.hasOwnProperty.call(req.body, "tags")
+    ? parseLocationTags(req.body.tags)
+    : JSON.parse(existing.tags_json || "[]");
+  const nextMapId = Object.prototype.hasOwnProperty.call(req.body, "map_id")
+    ? req.body.map_id
+      ? sanitizeMapLayer(String(req.body.map_id))
+      : null
+    : existing.map_id;
+  const nextLandmarkSlug = Object.prototype.hasOwnProperty.call(req.body, "landmark_slug")
+    ? req.body.landmark_slug
+      ? sanitizeOptionalSlug(req.body.landmark_slug)
+      : null
+    : existing.landmark_slug;
+  const nextPublished = Object.prototype.hasOwnProperty.call(req.body, "is_published")
+    ? req.body.is_published
+      ? 1
+      : 0
+    : existing.is_published;
+
+  if (!nextName || !nextSlug) {
+    return res.status(400).json({ error: "name and slug are required" });
+  }
+
+  const duplicate = db
+    .prepare(`SELECT id FROM locations WHERE slug = ? AND id != ?`)
+    .get(nextSlug, locationId);
+  if (duplicate) {
+    return res.status(409).json({ error: "Location slug already exists" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE locations
+      SET slug = ?, name = ?, ring = ?, court = ?, faction = ?, district = ?, summary = ?,
+          body_markdown = ?, tags_json = ?, map_id = ?, landmark_slug = ?, is_published = ?, updated_at = ?
+      WHERE id = ?
+    `,
+  ).run(
+    nextSlug,
+    nextName,
+    nextRing,
+    nextCourt,
+    nextFaction,
+    nextDistrict,
+    nextSummary,
+    nextBody,
+    JSON.stringify(nextTags),
+    nextMapId,
+    nextLandmarkSlug,
+    nextPublished,
+    now,
+    locationId,
+  );
+
+  const updated = db.prepare(`SELECT * FROM locations WHERE id = ?`).get(locationId);
+  res.json({ location: mapLocationForClient(updated) });
+});
+
 app.get("/api/documents/:slug", requireRole("player", "dm"), (req, res) => {
   const slug = normalizeDocumentSlug(req.params.slug);
   const row = db
@@ -4465,22 +4709,32 @@ app.get("/api/maps/landmarks", requireRole("player", "dm"), (req, res) => {
   const filters = [];
 
   if (requestedMapId) {
-    filters.push("map_id = ?");
+    filters.push("map_landmarks.map_id = ?");
     values.push(sanitizeMapLayer(requestedMapId));
   }
 
   if (sessionUser.role !== "dm") {
-    filters.push("visibility_scope = 'public'");
+    filters.push("map_landmarks.visibility_scope = 'public'");
+    filters.push(
+      "(map_landmarks.linked_entity_slug IS NULL OR linked_locations.is_published = 1)",
+    );
   }
 
   const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
   const rows = db
     .prepare(
       `
-        SELECT *
+        SELECT
+          map_landmarks.*,
+          linked_locations.slug AS location_slug,
+          linked_locations.name AS location_name,
+          linked_locations.ring AS location_ring,
+          linked_locations.summary AS location_summary
         FROM map_landmarks
+        LEFT JOIN locations AS linked_locations
+          ON linked_locations.slug = map_landmarks.linked_entity_slug
         ${whereClause}
-        ORDER BY sort_order ASC, label COLLATE NOCASE ASC, id ASC
+        ORDER BY map_landmarks.sort_order ASC, map_landmarks.label COLLATE NOCASE ASC, map_landmarks.id ASC
       `
     )
     .all(...values);

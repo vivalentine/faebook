@@ -18,6 +18,8 @@ import ChaptersPage from "./pages/ChaptersPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import ProfilePage from "./pages/ProfilePage";
 import WhisperNetworkPage from "./pages/WhisperNetworkPage";
+import LocationsPage from "./pages/LocationsPage";
+import LocationDetailPage from "./pages/LocationDetailPage";
 import "./App.css";
 
 function DirectoryRoute() {
@@ -55,6 +57,8 @@ export default function App() {
             <Route path="directory/:slug" element={<DirectoryNpcRoute />} />
             <Route path="board" element={<BoardPage />} />
             <Route path="maps" element={<MapsPage />} />
+            <Route path="locations" element={<LocationsPage />} />
+            <Route path="locations/:slug" element={<LocationDetailPage />} />
             <Route path="search" element={<SearchPage />} />
             <Route path="chapters" element={<ChaptersPage />} />
             <Route path="chapters/:chapterNumber" element={<ChaptersPage />} />

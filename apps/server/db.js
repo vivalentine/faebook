@@ -177,6 +177,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_documents_type_sort
   ON documents(document_type, published, sort_order ASC, title COLLATE NOCASE ASC, id ASC);
 
+  CREATE TABLE IF NOT EXISTS locations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    ring TEXT,
+    court TEXT,
+    faction TEXT,
+    district TEXT,
+    summary TEXT,
+    body_markdown TEXT NOT NULL DEFAULT '',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    map_id TEXT CHECK (map_id IN ('overworld', 'inner-ring', 'outer-ring')),
+    landmark_slug TEXT,
+    is_published INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_locations_published_ring
+  ON locations(is_published, ring COLLATE NOCASE ASC, name COLLATE NOCASE ASC, id ASC);
+
+  CREATE INDEX IF NOT EXISTS idx_locations_ring_name
+  ON locations(ring COLLATE NOCASE ASC, name COLLATE NOCASE ASC, id ASC);
+
   CREATE TABLE IF NOT EXISTS whisper_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     author_user_id INTEGER NOT NULL,
@@ -547,6 +571,34 @@ if (!columnExists("documents", "sort_order")) {
   db.exec(`
     ALTER TABLE documents
     ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0
+  `);
+}
+
+if (!columnExists("locations", "district")) {
+  db.exec(`
+    ALTER TABLE locations
+    ADD COLUMN district TEXT
+  `);
+}
+
+if (!columnExists("locations", "tags_json")) {
+  db.exec(`
+    ALTER TABLE locations
+    ADD COLUMN tags_json TEXT NOT NULL DEFAULT '[]'
+  `);
+}
+
+if (!columnExists("locations", "map_id")) {
+  db.exec(`
+    ALTER TABLE locations
+    ADD COLUMN map_id TEXT
+  `);
+}
+
+if (!columnExists("locations", "landmark_slug")) {
+  db.exec(`
+    ALTER TABLE locations
+    ADD COLUMN landmark_slug TEXT
   `);
 }
 

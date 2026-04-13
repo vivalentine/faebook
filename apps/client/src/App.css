@@ -1003,6 +1003,10 @@
   color: #bdb4d5;
 }
 
+.map-landmark-popover .secondary-link {
+  margin-top: 8px;
+}
+
 .map-pin::after {
   content: "";
   position: absolute;
@@ -2070,6 +2074,39 @@
   inset: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.locations-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.locations-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.locations-card {
+  display: block;
+  border: 1px solid #313957;
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(18, 23, 36, 0.72);
+  color: inherit;
+  text-decoration: none;
+}
+
+.locations-card h3 {
+  margin: 6px 0;
+}
+
+.locations-card p {
+  margin: 0 0 6px;
+}
+
+.locations-admin-card .chapter-list {
+  margin-top: 14px;
 }
 
 .whisper-layout {

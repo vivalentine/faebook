@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
 import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
-import { useWikiNpcIndex } from "../lib/wikiLinks";
+import { useWikiEntityIndex } from "../lib/wikiLinks";
 import { getFallbackReputation } from "../lib/npcReputation";
 import type { Npc, NpcAlias, NpcNote, NpcReputationDisplay } from "../types";
 
@@ -82,7 +82,7 @@ export default function DmNpcPage() {
   const [editingAliasValue, setEditingAliasValue] = useState("");
   const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
   const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
-  const npcWikiIndex = useWikiNpcIndex();
+  const entityWikiIndex = useWikiEntityIndex();
 
   useEffect(() => {
     void loadNpcPage();
@@ -386,14 +386,14 @@ export default function DmNpcPage() {
             <p className="rank-line large">{npc.rank_title || npc.role || "Unranked"}</p>
             {npc.short_blurb ? (
               <p className="blurb">
-                <WikiInlineText text={npc.short_blurb} npcIndex={npcWikiIndex} />
+                <WikiInlineText text={npc.short_blurb} entityIndex={entityWikiIndex} />
               </p>
             ) : null}
             {npc.met_summary ? (
               <div className="summary-box">
                 <p className="summary-label">Met when</p>
                 <p>
-                  <WikiInlineText text={npc.met_summary} npcIndex={npcWikiIndex} />
+                  <WikiInlineText text={npc.met_summary} entityIndex={entityWikiIndex} />
                 </p>
               </div>
             ) : null}
