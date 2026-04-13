@@ -356,6 +356,7 @@ export type SearchResponse = {
   offset: number;
   total: number;
   has_more: boolean;
+  entity_filter?: string;
   query_terms?: string[];
   results: SearchResult[];
 };

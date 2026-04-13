@@ -3,6 +3,23 @@ import { Link, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../lib/api";
 import type { SearchResponse, SearchResult } from "../types";
 
+const SEARCH_FILTERS = [
+  { value: "all", label: "All" },
+  { value: "npcs", label: "NPCs" },
+  { value: "locations", label: "Locations" },
+  { value: "documents", label: "Documents" },
+  { value: "chapters", label: "Chapters" },
+  { value: "whisper_network", label: "Whisper Network" },
+  { value: "maps", label: "Maps / Pins / Landmarks" },
+] as const;
+
+type SearchFilterValue = (typeof SEARCH_FILTERS)[number]["value"];
+
+function parseFilterValue(rawValue: string | null): SearchFilterValue {
+  const value = String(rawValue || "all").trim().toLowerCase();
+  return SEARCH_FILTERS.some((filter) => filter.value === value) ? (value as SearchFilterValue) : "all";
+}
+
 function groupByLabel(results: SearchResult[]) {
   const grouped = new Map<string, SearchResult[]>();
 
@@ -19,8 +36,10 @@ function groupByLabel(results: SearchResult[]) {
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
+  const initialEntityFilter = parseFilterValue(searchParams.get("entity"));
 
   const [query, setQuery] = useState(initialQuery);
+  const [entityFilter, setEntityFilter] = useState<SearchFilterValue>(initialEntityFilter);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState<SearchResponse>({
@@ -29,17 +48,28 @@ export default function SearchPage() {
     offset: 0,
     total: 0,
     has_more: false,
+    entity_filter: initialEntityFilter,
     results: [],
   });
 
   useEffect(() => {
     setQuery(initialQuery);
-  }, [initialQuery]);
+    setEntityFilter(initialEntityFilter);
+  }, [initialQuery, initialEntityFilter]);
 
   useEffect(() => {
     const nextQuery = initialQuery.trim();
+    const nextEntityFilter = initialEntityFilter;
     if (!nextQuery) {
-      setResponse({ query: "", limit: 40, offset: 0, total: 0, has_more: false, results: [] });
+      setResponse({
+        query: "",
+        limit: 40,
+        offset: 0,
+        total: 0,
+        has_more: false,
+        entity_filter: nextEntityFilter,
+        results: [],
+      });
       setLoading(false);
       setError("");
       return;
@@ -49,7 +79,9 @@ export default function SearchPage() {
       try {
         setLoading(true);
         setError("");
-        const result = await apiFetch(`/api/search?q=${encodeURIComponent(nextQuery)}`);
+        const result = await apiFetch(
+          `/api/search?q=${encodeURIComponent(nextQuery)}&entity=${encodeURIComponent(nextEntityFilter)}`
+        );
         const data = (await result.json()) as SearchResponse | { error?: string };
 
         if (!result.ok) {
@@ -59,14 +91,22 @@ export default function SearchPage() {
         setResponse(data as SearchResponse);
       } catch (searchError) {
         setError(searchError instanceof Error ? searchError.message : "Search failed");
-        setResponse({ query: nextQuery, limit: 40, offset: 0, total: 0, has_more: false, results: [] });
+        setResponse({
+          query: nextQuery,
+          limit: 40,
+          offset: 0,
+          total: 0,
+          has_more: false,
+          entity_filter: nextEntityFilter,
+          results: [],
+        });
       } finally {
         setLoading(false);
       }
     }
 
     void loadSearch();
-  }, [initialQuery]);
+  }, [initialQuery, initialEntityFilter]);
 
   const grouped = useMemo(() => groupByLabel(response.results), [response.results]);
 
@@ -86,10 +126,14 @@ export default function SearchPage() {
             event.preventDefault();
             const next = query.trim();
             if (!next) {
-              setSearchParams({});
+              setSearchParams(entityFilter === "all" ? {} : { entity: entityFilter });
               return;
             }
-            setSearchParams({ q: next });
+            const nextParams: Record<string, string> = { q: next };
+            if (entityFilter !== "all") {
+              nextParams.entity = entityFilter;
+            }
+            setSearchParams(nextParams);
           }}
         >
           <input
@@ -103,6 +147,31 @@ export default function SearchPage() {
             Search
           </button>
         </form>
+        <div className="search-filter-row" role="tablist" aria-label="Search entity filters">
+          {SEARCH_FILTERS.map((filter) => {
+            const isActive = entityFilter === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`search-filter-chip ${isActive ? "active" : ""}`.trim()}
+                onClick={() => {
+                  setEntityFilter(filter.value);
+                  const nextQuery = query.trim();
+                  if (!nextQuery) {
+                    setSearchParams(filter.value === "all" ? {} : { entity: filter.value });
+                    return;
+                  }
+                  setSearchParams(filter.value === "all" ? { q: nextQuery } : { q: nextQuery, entity: filter.value });
+                }}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       {!response.query && !loading ? (

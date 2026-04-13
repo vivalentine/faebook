@@ -7,6 +7,17 @@ const MAX_SUGGESTION_LIMIT = 8;
 const MIN_QUERY_LENGTH = 2;
 const SOURCE_FETCH_MULTIPLIER = 4;
 const MAX_SOURCE_FETCH_LIMIT = 300;
+const ENTITY_FILTER_ALL = "all";
+
+const ENTITY_FILTER_RESULT_TYPES = {
+  all: null,
+  npcs: new Set(["npc", "canonical_alias", "personal_alias", "npc_note"]),
+  locations: new Set(["location"]),
+  documents: new Set(["document"]),
+  chapters: new Set(["session_recap"]),
+  whisper_network: new Set(["whisper_post"]),
+  maps: new Set(["map_pin", "map_landmark"]),
+};
 
 function toSearchPattern(value) {
   return `%${String(value || "")
@@ -22,6 +33,27 @@ function parsePagination(rawLimit, rawOffset) {
 
 function getSourceFetchLimit(limit, offset) {
   return Math.min(Math.max((offset + limit) * SOURCE_FETCH_MULTIPLIER, limit), MAX_SOURCE_FETCH_LIMIT);
+}
+
+function parseEntityFilter(rawEntityFilter) {
+  const value = String(rawEntityFilter || ENTITY_FILTER_ALL).trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(ENTITY_FILTER_RESULT_TYPES, value)) {
+    return value;
+  }
+  return ENTITY_FILTER_ALL;
+}
+
+function filterResultsByEntity(results, entityFilter) {
+  if (entityFilter === ENTITY_FILTER_ALL) {
+    return results;
+  }
+
+  const allowedTypes = ENTITY_FILTER_RESULT_TYPES[entityFilter];
+  if (!(allowedTypes instanceof Set)) {
+    return results;
+  }
+
+  return results.filter((result) => allowedTypes.has(result.type));
 }
 
 function scoreResult(result, queryLower) {
@@ -338,6 +370,148 @@ function searchForDm({ db, query, searchPattern, sourceLimit }) {
         },
         query,
         `${ownerName} • ${row.map_layer} • ${row.category}${row.note ? ` • ${row.note}` : ""}`
+      )
+    );
+  }
+
+  const locationRows = db
+    .prepare(
+      `
+        SELECT id, slug, name, ring, court, district, summary, map_id, is_published
+        FROM locations
+        WHERE
+          LOWER(name) LIKE ?
+          OR LOWER(COALESCE(ring, '')) LIKE ?
+          OR LOWER(COALESCE(court, '')) LIKE ?
+          OR LOWER(COALESCE(district, '')) LIKE ?
+          OR LOWER(COALESCE(summary, '')) LIKE ?
+        ORDER BY name COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of locationRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "location",
+          label: "Location",
+          id: row.id,
+          title: row.name,
+          url: `/locations/${row.slug}`,
+          metadata: {
+            slug: row.slug,
+            ring: row.ring || null,
+            map_id: row.map_id || null,
+            visibility: Number(row.is_published) === 1 ? "published" : "draft",
+          },
+        },
+        query,
+        [row.ring, row.court, row.district, row.summary].filter(Boolean).join(" • ")
+      )
+    );
+  }
+
+  const documentRows = db
+    .prepare(
+      `
+        SELECT id, slug, title, document_type, published, body_markdown
+        FROM documents
+        WHERE
+          LOWER(title) LIKE ?
+          OR LOWER(COALESCE(document_type, '')) LIKE ?
+          OR LOWER(COALESCE(body_markdown, '')) LIKE ?
+        ORDER BY sort_order ASC, title COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of documentRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "document",
+          label: "Document",
+          id: row.id,
+          title: row.title,
+          url: `/documents/${row.slug}`,
+          metadata: {
+            slug: row.slug,
+            document_type: row.document_type,
+            visibility: Number(row.published) === 1 ? "published" : "draft",
+          },
+        },
+        query,
+        `${row.document_type} • ${row.body_markdown}`
+      )
+    );
+  }
+
+  const whisperRows = db
+    .prepare(
+      `
+        SELECT id, title, body, updated_at
+        FROM whisper_posts
+        WHERE LOWER(title) LIKE ? OR LOWER(body) LIKE ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, sourceLimit);
+
+  for (const row of whisperRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "whisper_post",
+          label: "Whisper Network",
+          id: row.id,
+          title: row.title,
+          url: `/whisper-network?post=${row.id}`,
+          metadata: { updated_at: row.updated_at },
+        },
+        query,
+        row.body
+      )
+    );
+  }
+
+  const mapLandmarkRows = db
+    .prepare(
+      `
+        SELECT id, map_id, label, marker_style, visibility_scope, description, linked_entity_slug
+        FROM map_landmarks
+        WHERE
+          LOWER(label) LIKE ?
+          OR LOWER(COALESCE(description, '')) LIKE ?
+          OR LOWER(COALESCE(marker_style, '')) LIKE ?
+          OR LOWER(COALESCE(map_id, '')) LIKE ?
+        ORDER BY sort_order ASC, label COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of mapLandmarkRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "map_landmark",
+          label: "Map Landmark",
+          id: row.id,
+          title: row.label,
+          url: "/maps",
+          metadata: {
+            map_id: row.map_id,
+            marker_style: row.marker_style,
+            visibility_scope: row.visibility_scope,
+            linked_entity_slug: row.linked_entity_slug || null,
+          },
+        },
+        query,
+        `${row.map_id} • ${row.marker_style}${row.description ? ` • ${row.description}` : ""}`
       )
     );
   }
@@ -673,6 +847,150 @@ function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit 
     );
   }
 
+  const locationRows = db
+    .prepare(
+      `
+        SELECT id, slug, name, ring, court, district, summary, map_id
+        FROM locations
+        WHERE is_published = 1
+          AND (
+            LOWER(name) LIKE ?
+            OR LOWER(COALESCE(ring, '')) LIKE ?
+            OR LOWER(COALESCE(court, '')) LIKE ?
+            OR LOWER(COALESCE(district, '')) LIKE ?
+            OR LOWER(COALESCE(summary, '')) LIKE ?
+          )
+        ORDER BY name COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of locationRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "location",
+          label: "Location",
+          id: row.id,
+          title: row.name,
+          url: `/locations/${row.slug}`,
+          metadata: {
+            slug: row.slug,
+            ring: row.ring || null,
+            map_id: row.map_id || null,
+            visibility: "published",
+          },
+        },
+        query,
+        [row.ring, row.court, row.district, row.summary].filter(Boolean).join(" • ")
+      )
+    );
+  }
+
+  const documentRows = db
+    .prepare(
+      `
+        SELECT id, slug, title, document_type, body_markdown
+        FROM documents
+        WHERE published = 1
+          AND (
+            LOWER(title) LIKE ?
+            OR LOWER(COALESCE(document_type, '')) LIKE ?
+            OR LOWER(COALESCE(body_markdown, '')) LIKE ?
+          )
+        ORDER BY sort_order ASC, title COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of documentRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "document",
+          label: "Document",
+          id: row.id,
+          title: row.title,
+          url: `/documents/${row.slug}`,
+          metadata: { slug: row.slug, document_type: row.document_type, visibility: "published" },
+        },
+        query,
+        `${row.document_type} • ${row.body_markdown}`
+      )
+    );
+  }
+
+  const whisperRows = db
+    .prepare(
+      `
+        SELECT id, title, body, updated_at
+        FROM whisper_posts
+        WHERE LOWER(title) LIKE ? OR LOWER(body) LIKE ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, sourceLimit);
+
+  for (const row of whisperRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "whisper_post",
+          label: "Whisper Network",
+          id: row.id,
+          title: row.title,
+          url: `/whisper-network?post=${row.id}`,
+          metadata: { updated_at: row.updated_at },
+        },
+        query,
+        row.body
+      )
+    );
+  }
+
+  const mapLandmarkRows = db
+    .prepare(
+      `
+        SELECT id, map_id, label, marker_style, description, linked_entity_slug
+        FROM map_landmarks
+        WHERE visibility_scope = 'public'
+          AND (
+            LOWER(label) LIKE ?
+            OR LOWER(COALESCE(description, '')) LIKE ?
+            OR LOWER(COALESCE(marker_style, '')) LIKE ?
+            OR LOWER(COALESCE(map_id, '')) LIKE ?
+          )
+        ORDER BY sort_order ASC, label COLLATE NOCASE ASC, id ASC
+        LIMIT ?
+      `
+    )
+    .all(searchPattern, searchPattern, searchPattern, searchPattern, sourceLimit);
+
+  for (const row of mapLandmarkRows) {
+    results.push(
+      withSnippet(
+        {
+          type: "map_landmark",
+          label: "Map Landmark",
+          id: row.id,
+          title: row.label,
+          url: "/maps",
+          metadata: {
+            map_id: row.map_id,
+            marker_style: row.marker_style,
+            visibility_scope: "public",
+            linked_entity_slug: row.linked_entity_slug || null,
+          },
+        },
+        query,
+        `${row.map_id} • ${row.marker_style}${row.description ? ` • ${row.description}` : ""}`
+      )
+    );
+  }
+
   const recapRows = db
     .prepare(
       `
@@ -706,8 +1024,9 @@ function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit 
   return results;
 }
 
-function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset }) {
+function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset, rawEntityFilter }) {
   const query = String(rawQuery || "").trim();
+  const entity_filter = parseEntityFilter(rawEntityFilter);
   const { limit, offset } = parsePagination(rawLimit, rawOffset);
 
   if (query.length < MIN_QUERY_LENGTH) {
@@ -717,6 +1036,7 @@ function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset }) {
       offset,
       total: 0,
       has_more: false,
+      entity_filter,
       results: [],
     };
   }
@@ -730,7 +1050,8 @@ function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset }) {
       : searchForPlayer({ db, sessionUserId: sessionUser.id, query, searchPattern, sourceLimit });
 
   const rankedResults = rankResults(baseResults, query);
-  const paged = paginateResults(rankedResults, limit, offset);
+  const filteredResults = filterResultsByEntity(rankedResults, entity_filter);
+  const paged = paginateResults(filteredResults, limit, offset);
 
   return {
     query,
@@ -738,6 +1059,7 @@ function runGlobalSearch({ db, sessionUser, rawQuery, rawLimit, rawOffset }) {
     offset,
     total: paged.total,
     has_more: paged.has_more,
+    entity_filter,
     query_terms: getQueryTerms(query),
     results: paged.results,
   };
