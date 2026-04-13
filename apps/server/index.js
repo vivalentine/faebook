@@ -3685,6 +3685,8 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
   const sessionUser = req.session.user;
   const title = String(req.body?.title || "").trim();
   const body = String(req.body?.body || "").trim();
+  const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
+  const viewCount = Number.isInteger(parsedViewCount) && parsedViewCount >= 0 ? parsedViewCount : 0;
 
   if (!title || !body) {
     return res.status(400).json({ error: "Title and body are required" });
@@ -3702,10 +3704,10 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, 0, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
       `
     )
-    .run(sessionUser.id, title, body, now, now);
+    .run(sessionUser.id, title, body, viewCount, now, now);
 
   const postId = Number(result.lastInsertRowid);
   createAuditLog(db, {
@@ -3744,6 +3746,7 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
   const postId = Number(req.params.id);
   const title = String(req.body?.title || "").trim();
   const body = String(req.body?.body || "").trim();
+  const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
 
   if (!Number.isInteger(postId) || postId <= 0) {
     return res.status(400).json({ error: "Invalid post id" });
@@ -3753,6 +3756,10 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
     return res.status(400).json({ error: "Title and body are required" });
   }
 
+  if (!Number.isInteger(parsedViewCount) || parsedViewCount < 0) {
+    return res.status(400).json({ error: "view_count must be a non-negative integer" });
+  }
+
   const now = new Date().toISOString();
   const updateResult = db
     .prepare(
@@ -3760,11 +3767,12 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
         UPDATE whisper_posts
         SET title = ?,
             body = ?,
+            view_count = ?,
             updated_at = ?
         WHERE id = ?
       `
     )
-    .run(title, body, now, postId);
+    .run(title, body, parsedViewCount, now, postId);
 
   if (updateResult.changes === 0) {
     return res.status(404).json({ error: "Post not found" });

@@ -46,6 +46,7 @@ export default function WhisperNetworkPage() {
 
   const [postTitleDraft, setPostTitleDraft] = useState("");
   const [postBodyDraft, setPostBodyDraft] = useState("");
+  const [postViewCountDraft, setPostViewCountDraft] = useState("0");
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [isSavingPost, setIsSavingPost] = useState(false);
 
@@ -166,19 +167,26 @@ export default function WhisperNetworkPage() {
     setEditingPostId(post.id);
     setPostTitleDraft(post.title);
     setPostBodyDraft(post.body);
+    setPostViewCountDraft(String(post.view_count));
   }
 
   function resetPostForm() {
     setEditingPostId(null);
     setPostTitleDraft("");
     setPostBodyDraft("");
+    setPostViewCountDraft("0");
   }
 
   async function savePost() {
     const title = postTitleDraft.trim();
     const body = postBodyDraft.trim();
+    const parsedViewCount = Number.parseInt(postViewCountDraft, 10);
     if (!title || !body) {
       setError("Post title and rumor text are required.");
+      return;
+    }
+    if (!Number.isInteger(parsedViewCount) || parsedViewCount < 0) {
+      setError("View count must be a non-negative integer.");
       return;
     }
 
@@ -187,7 +195,7 @@ export default function WhisperNetworkPage() {
       setError("");
       const response = await apiFetch(editingPostId ? `/api/whisper/posts/${editingPostId}` : "/api/whisper/posts", {
         method: editingPostId ? "PATCH" : "POST",
-        body: JSON.stringify({ title, body }),
+        body: JSON.stringify({ title, body, view_count: parsedViewCount }),
       });
       const data = (await response.json()) as WhisperPost | { error?: string };
       if (!response.ok) {
@@ -421,6 +429,15 @@ export default function WhisperNetworkPage() {
             placeholder="Rumor body text"
             value={postBodyDraft}
             onChange={(event) => setPostBodyDraft(event.target.value)}
+          />
+          <input
+            className="text-input"
+            type="number"
+            min={0}
+            step={1}
+            placeholder="View count"
+            value={postViewCountDraft}
+            onChange={(event) => setPostViewCountDraft(event.target.value)}
           />
           <div className="dashboard-row-actions">
             <button className="action-button" type="button" disabled={isSavingPost} onClick={() => void savePost()}>
