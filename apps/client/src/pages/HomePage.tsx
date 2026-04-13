@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import FaeSelect from "../components/FaeSelect";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
+import { useWikiNpcIndex } from "../lib/wikiLinks";
 import { apiFetch } from "../lib/api";
 import type { DashboardData, DashboardSuspect } from "../types";
 
@@ -41,6 +42,7 @@ export default function HomePage() {
   const [recapContent, setRecapContent] = useState("");
   const [savingRecap, setSavingRecap] = useState(false);
   const [editingRecap, setEditingRecap] = useState(false);
+  const npcWikiIndex = useWikiNpcIndex();
 
   async function loadDashboard() {
     setLoading(true);
@@ -510,7 +512,9 @@ export default function HomePage() {
                 {formatDateTime(dashboard.latest_recap.published_at)}
               </p>
               <h3 className="dashboard-recap-chapter-title">{dashboard.latest_recap.chapter_title}</h3>
-              <div className="dashboard-markdown">{renderRecapMarkdown(dashboard.latest_recap.content)}</div>
+              <div className="dashboard-markdown">
+                {renderRecapMarkdown(dashboard.latest_recap.content, { npcIndex: npcWikiIndex })}
+              </div>
               <div className="dashboard-row-actions">
                 <Link className="secondary-link" to={`/chapters/${dashboard.latest_recap.chapter_number}`}>
                   Read in chapter library

@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
+import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
+import { useWikiNpcIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
 
 type PersonalAliasGroup = {
@@ -68,6 +70,7 @@ export default function DmNpcPage() {
   const [editingAliasValue, setEditingAliasValue] = useState("");
   const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
   const [deletingAliasId, setDeletingAliasId] = useState<number | null>(null);
+  const npcWikiIndex = useWikiNpcIndex();
 
   useEffect(() => {
     void loadNpcPage();
@@ -321,6 +324,19 @@ export default function DmNpcPage() {
           <div className="detail-meta">
             <h1>{npc.name}</h1>
             <p className="rank-line large">{npc.rank_title || npc.role || "Unranked"}</p>
+            {npc.short_blurb ? (
+              <p className="blurb">
+                <WikiInlineText text={npc.short_blurb} npcIndex={npcWikiIndex} />
+              </p>
+            ) : null}
+            {npc.met_summary ? (
+              <div className="summary-box">
+                <p className="summary-label">Met when</p>
+                <p>
+                  <WikiInlineText text={npc.met_summary} npcIndex={npcWikiIndex} />
+                </p>
+              </div>
+            ) : null}
 
             {info ? (
               <div className="state-card small-card">

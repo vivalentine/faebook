@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
 import { apiFetch } from "../lib/api";
+import { useWikiNpcIndex } from "../lib/wikiLinks";
 import type { SessionRecap } from "../types";
 
 type ChapterFormState = {
@@ -35,6 +36,7 @@ export default function ChaptersPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ChapterFormState>(EMPTY_FORM);
+  const npcWikiIndex = useWikiNpcIndex();
 
   const activeChapterNumber = Number.parseInt(chapterNumber || "", 10);
 
@@ -222,7 +224,9 @@ export default function ChaptersPage() {
                 </p>
                 <h2>{activeChapter.chapter_title}</h2>
               </header>
-              <div className="dashboard-markdown chapter-reader-markdown">{renderRecapMarkdown(activeChapter.content)}</div>
+              <div className="dashboard-markdown chapter-reader-markdown">
+                {renderRecapMarkdown(activeChapter.content, { npcIndex: npcWikiIndex })}
+              </div>
               <div className="chapter-reader-nav">
                 {previousChapterNumber ? (
                   <Link to={`/chapters/${previousChapterNumber}`} className="secondary-link">

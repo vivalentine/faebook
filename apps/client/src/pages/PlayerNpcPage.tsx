@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
+import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
+import { useWikiNpcIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
 
 export default function PlayerNpcPage() {
@@ -21,6 +23,7 @@ export default function PlayerNpcPage() {
   const [myNote, setMyNote] = useState<NpcNote | null>(null);
   const [noteInput, setNoteInput] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const npcWikiIndex = useWikiNpcIndex();
 
   useEffect(() => {
     async function loadPage() {
@@ -237,12 +240,18 @@ export default function PlayerNpcPage() {
               {npc.ring ? <span>Ring: {npc.ring}</span> : null}
             </div>
 
-            {npc.short_blurb ? <p className="blurb">{npc.short_blurb}</p> : null}
+            {npc.short_blurb ? (
+              <p className="blurb">
+                <WikiInlineText text={npc.short_blurb} npcIndex={npcWikiIndex} />
+              </p>
+            ) : null}
 
             {npc.met_summary ? (
               <div className="summary-box">
                 <p className="summary-label">Met when</p>
-                <p>{npc.met_summary}</p>
+                <p>
+                  <WikiInlineText text={npc.met_summary} npcIndex={npcWikiIndex} />
+                </p>
               </div>
             ) : null}
           </div>

@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
+import WikiInlineText from "./WikiInlineText";
+import type { WikiNpcIndex } from "../lib/wikiLinks";
 
-function renderInlineMarkdown(text: string) {
+type RenderRecapMarkdownOptions = {
+  npcIndex: WikiNpcIndex;
+};
+
+function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions) {
   const nodes: ReactNode[] = [];
   const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
   let lastIndex = 0;
@@ -9,14 +15,28 @@ function renderInlineMarkdown(text: string) {
 
   while (match) {
     if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
+      nodes.push(
+        <WikiInlineText
+          key={`wiki-text-${matchIndex}`}
+          text={text.slice(lastIndex, match.index)}
+          npcIndex={options.npcIndex}
+        />,
+      );
     }
 
     const token = match[0];
     if (token.startsWith("**") && token.endsWith("**")) {
-      nodes.push(<strong key={`strong-${matchIndex}`}>{token.slice(2, -2)}</strong>);
+      nodes.push(
+        <strong key={`strong-${matchIndex}`}>
+          <WikiInlineText text={token.slice(2, -2)} npcIndex={options.npcIndex} />
+        </strong>,
+      );
     } else if (token.startsWith("*") && token.endsWith("*")) {
-      nodes.push(<em key={`em-${matchIndex}`}>{token.slice(1, -1)}</em>);
+      nodes.push(
+        <em key={`em-${matchIndex}`}>
+          <WikiInlineText text={token.slice(1, -1)} npcIndex={options.npcIndex} />
+        </em>,
+      );
     } else if (token.startsWith("`") && token.endsWith("`")) {
       nodes.push(<code key={`code-${matchIndex}`}>{token.slice(1, -1)}</code>);
     } else if (token.startsWith("[")) {
@@ -40,13 +60,13 @@ function renderInlineMarkdown(text: string) {
   }
 
   if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
+    nodes.push(<WikiInlineText key="wiki-tail" text={text.slice(lastIndex)} npcIndex={options.npcIndex} />);
   }
 
   return nodes;
 }
 
-export function renderRecapMarkdown(content: string) {
+export function renderRecapMarkdown(content: string, options: RenderRecapMarkdownOptions) {
   const lines = content.split(/\r?\n/);
   const blocks: ReactNode[] = [];
   let i = 0;
@@ -67,7 +87,7 @@ export function renderRecapMarkdown(content: string) {
       const text = headingMatch[2];
       const headingTag = `h${level}` as "h1" | "h2" | "h3" | "h4";
       const HeadingTag = headingTag;
-      blocks.push(<HeadingTag key={`h-${key++}`}>{renderInlineMarkdown(text)}</HeadingTag>);
+      blocks.push(<HeadingTag key={`h-${key++}`}>{renderInlineMarkdown(text, options)}</HeadingTag>);
       i += 1;
       continue;
     }
@@ -79,7 +99,7 @@ export function renderRecapMarkdown(content: string) {
         i += 1;
       }
       blocks.push(
-        <blockquote key={`q-${key++}`}>{renderInlineMarkdown(quoteLines.join(" "))}</blockquote>,
+        <blockquote key={`q-${key++}`}>{renderInlineMarkdown(quoteLines.join(" "), options)}</blockquote>,
       );
       continue;
     }
@@ -90,7 +110,7 @@ export function renderRecapMarkdown(content: string) {
       while (i < lines.length) {
         const itemMatch = lines[i].trim().match(/^[-*]\s+(.+)$/);
         if (!itemMatch) break;
-        items.push(<li key={`ul-item-${key++}`}>{renderInlineMarkdown(itemMatch[1])}</li>);
+        items.push(<li key={`ul-item-${key++}`}>{renderInlineMarkdown(itemMatch[1], options)}</li>);
         i += 1;
       }
       blocks.push(<ul key={`ul-${key++}`}>{items}</ul>);
@@ -103,7 +123,7 @@ export function renderRecapMarkdown(content: string) {
       while (i < lines.length) {
         const itemMatch = lines[i].trim().match(/^\d+\.\s+(.+)$/);
         if (!itemMatch) break;
-        items.push(<li key={`ol-item-${key++}`}>{renderInlineMarkdown(itemMatch[1])}</li>);
+        items.push(<li key={`ol-item-${key++}`}>{renderInlineMarkdown(itemMatch[1], options)}</li>);
         i += 1;
       }
       blocks.push(<ol key={`ol-${key++}`}>{items}</ol>);
@@ -115,7 +135,7 @@ export function renderRecapMarkdown(content: string) {
       paragraphLines.push(lines[i].trim());
       i += 1;
     }
-    blocks.push(<p key={`p-${key++}`}>{renderInlineMarkdown(paragraphLines.join(" "))}</p>);
+    blocks.push(<p key={`p-${key++}`}>{renderInlineMarkdown(paragraphLines.join(" "), options)}</p>);
   }
 
   return blocks.length ? blocks : [<p key="empty">{content}</p>];
