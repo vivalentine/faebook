@@ -21,6 +21,9 @@ const { runGlobalSearch, runGlobalSearchSuggestions } = require("./search");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
+const HOST =
+  process.env.HOST ||
+  (process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0");
 const SESSION_COOKIE_NAME = "faebook.sid";
 const CLIENT_DIST_DIR = path.join(__dirname, "../client/dist");
 const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
@@ -29,7 +32,15 @@ const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
 const MAP_PIN_CATEGORIES = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
 const MAP_LANDMARK_MARKER_STYLES = ["district", "landmark", "estate", "civic", "market"];
 const MAP_LANDMARK_VISIBILITY_SCOPES = ["public", "dm_only"];
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_JSON_BODY_SIZE = process.env.JSON_BODY_LIMIT || "1mb";
+const MAX_MARKDOWN_UPLOAD_SIZE_BYTES = Number(
+  process.env.MARKDOWN_UPLOAD_MAX_BYTES || 2 * 1024 * 1024
+);
+const MAX_IMAGE_UPLOAD_SIZE_BYTES = Number(
+  process.env.IMAGE_UPLOAD_MAX_BYTES || 10 * 1024 * 1024
+);
+const MAX_MULTI_UPLOAD_FILES = Number(process.env.MULTI_UPLOAD_MAX_FILES || 50);
+const uploadMemoryStorage = multer.memoryStorage();
 
 const allowedOrigins = new Set(
   String(process.env.CLIENT_URLS || "")
@@ -38,9 +49,179 @@ const allowedOrigins = new Set(
     .filter(Boolean)
 );
 
-if (process.env.TRUST_PROXY === "1") {
-  app.set("trust proxy", 1);
+function logSecurityEvent(eventType, details = {}) {
+  console.warn(
+    `[security] ${eventType} ${JSON.stringify({
+      at: new Date().toISOString(),
+      ...details,
+    })}`
+  );
 }
+
+function safeOriginFromValue(value) {
+  if (!value) return null;
+
+  try {
+    return new URL(value).origin;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getAllowedRequestOrigins(req) {
+  const origins = new Set(allowedOrigins);
+
+  if (req.headers.host) {
+    const protocol = req.protocol || "http";
+    origins.add(`${protocol}://${req.headers.host}`);
+  }
+
+  return origins;
+}
+
+function createFileTypeFilter({ allowedExtensions, allowedMimeTypes, errorMessage }) {
+  return (req, file, callback) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const mimeType = String(file.mimetype || "").toLowerCase();
+    const extensionAllowed = allowedExtensions.has(ext);
+    const mimeAllowed = allowedMimeTypes.has(mimeType);
+
+    if (!extensionAllowed || !mimeAllowed) {
+      return callback(new multer.MulterError("LIMIT_UNEXPECTED_FILE", errorMessage));
+    }
+
+    return callback(null, true);
+  };
+}
+
+const uploadMarkdownSingle = multer({
+  storage: uploadMemoryStorage,
+  limits: { fileSize: MAX_MARKDOWN_UPLOAD_SIZE_BYTES, files: 1 },
+  fileFilter: createFileTypeFilter({
+    allowedExtensions: new Set([".md"]),
+    allowedMimeTypes: new Set(["text/markdown", "text/plain", "application/octet-stream"]),
+    errorMessage: "Unsupported markdown file type",
+  }),
+});
+
+const uploadMarkdownArray = multer({
+  storage: uploadMemoryStorage,
+  limits: { fileSize: MAX_MARKDOWN_UPLOAD_SIZE_BYTES, files: MAX_MULTI_UPLOAD_FILES },
+  fileFilter: createFileTypeFilter({
+    allowedExtensions: new Set([".md"]),
+    allowedMimeTypes: new Set(["text/markdown", "text/plain", "application/octet-stream"]),
+    errorMessage: "Unsupported markdown file type",
+  }),
+});
+
+const uploadImageSingle = multer({
+  storage: uploadMemoryStorage,
+  limits: { fileSize: MAX_IMAGE_UPLOAD_SIZE_BYTES, files: 1 },
+  fileFilter: createFileTypeFilter({
+    allowedExtensions: new Set([".png", ".webp", ".jpg", ".jpeg"]),
+    allowedMimeTypes: new Set(["image/png", "image/webp", "image/jpeg"]),
+    errorMessage: "Unsupported image file type",
+  }),
+});
+
+const uploadImageArray = multer({
+  storage: uploadMemoryStorage,
+  limits: { fileSize: MAX_IMAGE_UPLOAD_SIZE_BYTES, files: MAX_MULTI_UPLOAD_FILES },
+  fileFilter: createFileTypeFilter({
+    allowedExtensions: new Set([".png", ".webp", ".jpg", ".jpeg"]),
+    allowedMimeTypes: new Set(["image/png", "image/webp", "image/jpeg"]),
+    errorMessage: "Unsupported image file type",
+  }),
+});
+
+function createRateLimiter({
+  windowMs,
+  maxRequests,
+  scope,
+  shouldLimit = () => true,
+  getKey = (req) => req.ip,
+}) {
+  const hits = new Map();
+
+  return (req, res, next) => {
+    if (!shouldLimit(req)) {
+      return next();
+    }
+
+    const now = Date.now();
+    const key = getKey(req);
+    const current = hits.get(key);
+
+    if (!current || now > current.resetAt) {
+      hits.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    current.count += 1;
+    const retryAfterSeconds = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    res.setHeader("X-RateLimit-Limit", String(maxRequests));
+    res.setHeader("X-RateLimit-Remaining", String(Math.max(0, maxRequests - current.count)));
+    res.setHeader("X-RateLimit-Reset", String(Math.ceil(current.resetAt / 1000)));
+
+    if (current.count <= maxRequests) {
+      return next();
+    }
+
+    logSecurityEvent(`rate_limit_${scope}`, {
+      ip: req.ip,
+      route: req.originalUrl,
+      user_id: req.session?.user?.id || null,
+    });
+
+    return res.status(429).json({ error: "Too many requests" });
+  };
+}
+
+const loginRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000),
+  maxRequests: Number(process.env.LOGIN_RATE_LIMIT_MAX || 20),
+  scope: "login",
+  shouldLimit: (req) => req.method === "POST",
+  getKey: (req) => `${req.ip}:${String(req.body?.username || "").trim().toLowerCase() || "unknown"}`,
+});
+
+const authApiRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.API_RATE_LIMIT_WINDOW_MS || 60 * 1000),
+  maxRequests: Number(process.env.API_RATE_LIMIT_MAX || 180),
+  scope: "api",
+  shouldLimit: (req) => req.method !== "GET",
+  getKey: (req) => `${req.ip}:${req.session?.user?.id || "anon"}`,
+});
+
+if (process.env.TRUST_PROXY) {
+  const trustProxyRaw = process.env.TRUST_PROXY.trim();
+  const trustProxyValue = Number.parseInt(trustProxyRaw, 10);
+
+  if (trustProxyRaw.toLowerCase() === "true") {
+    app.set("trust proxy", true);
+  } else if (!Number.isNaN(trustProxyValue)) {
+    app.set("trust proxy", trustProxyValue);
+  } else {
+    app.set("trust proxy", trustProxyRaw);
+  }
+}
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      process.env.HSTS_HEADER_VALUE || "max-age=31536000; includeSubDomains"
+    );
+  }
+  next();
+});
 
 app.use(
   cors({
@@ -59,7 +240,8 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: MAX_JSON_BODY_SIZE }));
+app.use(express.urlencoded({ extended: false, limit: MAX_JSON_BODY_SIZE }));
 
 app.use(
   session({
@@ -77,6 +259,38 @@ app.use(
     },
   })
 );
+
+app.use("/api", authApiRateLimiter);
+
+app.use((req, res, next) => {
+  const method = req.method.toUpperCase();
+  const isMutatingMethod = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+  const isAuthenticated = Boolean(req.session?.user);
+  const isApiRoute = req.path.startsWith("/api/");
+
+  if (!isApiRoute || !isMutatingMethod || !isAuthenticated) {
+    return next();
+  }
+
+  const originHeader = safeOriginFromValue(req.get("origin"));
+  const refererOrigin = safeOriginFromValue(req.get("referer"));
+  const sourceOrigin = originHeader || refererOrigin;
+  const allowedRequestOrigins = getAllowedRequestOrigins(req);
+
+  if (sourceOrigin && allowedRequestOrigins.has(sourceOrigin)) {
+    return next();
+  }
+
+  logSecurityEvent("origin_rejected", {
+    ip: req.ip,
+    route: req.originalUrl,
+    user_id: req.session.user.id,
+    origin: originHeader,
+    referer_origin: refererOrigin,
+  });
+
+  return res.status(403).json({ error: "Forbidden" });
+});
 
 function getSessionUser(row) {
   return {
@@ -1306,11 +1520,16 @@ app.patch("/api/profile", requireRole("player", "dm"), (req, res) => {
   return res.json({ profile, user: req.session.user });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", loginRateLimiter, (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
   const password = String(req.body.password || "");
 
   if (!username || !password) {
+    logSecurityEvent("auth_login_bad_request", {
+      ip: req.ip,
+      route: req.originalUrl,
+      username: username || null,
+    });
     return res.status(400).json({ error: "username and password are required" });
   }
 
@@ -1325,6 +1544,11 @@ app.post("/api/auth/login", (req, res) => {
     .get(username);
 
   if (!userRow || !bcrypt.compareSync(password, userRow.password_hash)) {
+    logSecurityEvent("auth_login_failed", {
+      ip: req.ip,
+      route: req.originalUrl,
+      username,
+    });
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
@@ -1351,7 +1575,11 @@ app.post("/api/auth/logout", requireAuth, (req, res) => {
       return res.status(500).json({ error: "Failed to destroy session" });
     }
 
-    res.clearCookie(SESSION_COOKIE_NAME);
+    res.clearCookie(SESSION_COOKIE_NAME, {
+      httpOnly: true,
+      secure: process.env.COOKIE_SECURE === "1",
+      sameSite: "lax",
+    });
     res.json({ ok: true });
   });
 });
@@ -1497,7 +1725,7 @@ app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
 app.post(
   "/api/dm/npcs/:slug/portrait",
   requireRole("dm"),
-  upload.single("portrait"),
+  uploadImageSingle.single("portrait"),
   (req, res) => {
     const { slug } = req.params;
     const existing = db
@@ -2348,7 +2576,7 @@ app.get("/api/dm/import/staging", requireRole("dm"), (req, res) => {
 app.post(
   "/api/dm/import/staging/markdown",
   requireRole("dm"),
-  upload.array("files"),
+  uploadMarkdownArray.array("files"),
   (req, res) => {
     addStagedMarkdownFiles(req.session.user.id, req.files || []);
     const summary = getStagingSummary(db, req.session.user.id);
@@ -2359,7 +2587,7 @@ app.post(
 app.post(
   "/api/dm/import/staging/portraits",
   requireRole("dm"),
-  upload.array("files"),
+  uploadImageArray.array("files"),
   (req, res) => {
     addStagedPortraitFiles(req.session.user.id, req.files || []);
     const summary = getStagingSummary(db, req.session.user.id);
@@ -2498,7 +2726,7 @@ app.patch("/api/dm/profiles/:userId/image-path", requireRole("dm"), (req, res) =
 app.post(
   "/api/dm/profiles/:userId/image-upload",
   requireRole("dm"),
-  upload.single("profile_image"),
+  uploadImageSingle.single("profile_image"),
   (req, res) => {
     const targetUserId = Number(req.params.userId);
     if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
@@ -3764,7 +3992,7 @@ app.delete("/api/documents/:id", requireRole("dm"), (req, res) => {
   return res.json({ ok: true, id: documentId });
 });
 
-app.post("/api/documents/import", requireRole("dm"), upload.single("file"), (req, res) => {
+app.post("/api/documents/import", requireRole("dm"), uploadMarkdownSingle.single("file"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Markdown file is required" });
   }
@@ -5760,6 +5988,27 @@ app.put("/api/board", requireRole("player", "dm"), (req, res) => {
   });
 });
 
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ error: "Uploaded file is too large" });
+    }
+
+    return res.status(400).json({ error: "Invalid upload payload" });
+  }
+
+  if (error?.message?.startsWith("Origin not allowed by CORS")) {
+    logSecurityEvent("cors_rejected", {
+      ip: req.ip,
+      route: req.originalUrl,
+      origin: req.get("origin") || null,
+    });
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  return next(error);
+});
+
 app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
 
 if (fs.existsSync(CLIENT_INDEX_PATH)) {
@@ -5770,6 +6019,6 @@ if (fs.existsSync(CLIENT_INDEX_PATH)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`FaeBook server running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`FaeBook server running at http://${HOST}:${PORT}`);
 });
