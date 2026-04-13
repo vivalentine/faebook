@@ -1,7 +1,10 @@
-:80 {
+{$FAEBOOK_SITE_ADDRESS:127.0.0.1:8080} {
+	bind {$FAEBOOK_BIND:127.0.0.1}
+	encode zstd gzip
+
 	@api path /api/*
 	handle @api {
-		reverse_proxy 127.0.0.1:3001 {
+		reverse_proxy {$FAEBOOK_API_UPSTREAM:127.0.0.1:3001} {
 			header_up X-Forwarded-Proto https
 			header_up X-Forwarded-Host {host}
 		}
@@ -9,12 +12,24 @@
 
 	@uploads path /uploads/*
 	handle @uploads {
-		root * "C:\Users\viole\Projects\faebook-repo\faebook"
+		root * {$FAEBOOK_ROOT:.}
+		try_files {path} =404
+		header Cache-Control "public, max-age=60"
+		file_server
+	}
+
+	@assets path /assets/*
+	handle @assets {
+		root * {$FAEBOOK_CLIENT_DIST:apps/client/dist}
+		try_files {path} =404
+		header Cache-Control "public, max-age=31536000, immutable"
 		file_server
 	}
 
 	handle {
-		root * "C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist"
+		root * {$FAEBOOK_CLIENT_DIST:apps/client/dist}
+		@index path /index.html
+		header @index Cache-Control "no-store"
 		try_files {path} /index.html
 		file_server
 	}

@@ -27,6 +27,8 @@ const HOST =
 const SESSION_COOKIE_NAME = "faebook.sid";
 const CLIENT_DIST_DIR = path.join(__dirname, "../client/dist");
 const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
+const CLIENT_ASSETS_DIR = path.join(CLIENT_DIST_DIR, "assets");
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 const MAPS_CONFIG_DIR = path.join(__dirname, "../../config/maps");
 const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
 const MAP_PIN_CATEGORIES = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
@@ -5988,6 +5990,15 @@ app.put("/api/board", requireRole("player", "dm"), (req, res) => {
   });
 });
 
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "faebook-server",
+    uptime_seconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
@@ -6009,13 +6020,48 @@ app.use((error, req, res, next) => {
   return next(error);
 });
 
-app.use("/uploads", express.static(path.join(__dirname, "../../uploads")));
+app.use(
+  "/uploads",
+  express.static(UPLOADS_DIR, {
+    fallthrough: false,
+    index: false,
+    maxAge: "1m",
+    setHeaders(res) {
+      res.setHeader("Cache-Control", "public, max-age=60");
+    },
+  })
+);
 
 if (fs.existsSync(CLIENT_INDEX_PATH)) {
-  app.use(express.static(CLIENT_DIST_DIR));
+  if (fs.existsSync(CLIENT_ASSETS_DIR)) {
+    app.use(
+      "/assets",
+      express.static(CLIENT_ASSETS_DIR, {
+        fallthrough: false,
+        immutable: true,
+        maxAge: "1y",
+      })
+    );
+  }
+
+  app.use(
+    express.static(CLIENT_DIST_DIR, {
+      index: false,
+      maxAge: 0,
+      setHeaders(res, filePath) {
+        if (path.basename(filePath) === "index.html") {
+          res.setHeader("Cache-Control", "no-store");
+        }
+      },
+    })
+  );
 
   app.get(/^\/(?!api|uploads).*/, (_req, res) => {
-    res.sendFile(CLIENT_INDEX_PATH);
+    res.sendFile(CLIENT_INDEX_PATH, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    });
   });
 }
 
