@@ -9,6 +9,7 @@ type NavItem = {
   label: string;
   to: string;
   dmOnly?: boolean;
+  playerOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -21,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "NPC Directory", to: "/directory" },
   { label: "Investigation Board", to: "/board" },
   { label: "Maps", to: "/maps" },
+  { label: "Player Journal", to: "/journal", playerOnly: true },
   { label: "Locations", to: "/locations" },
   { label: "Archive", to: "/archive", dmOnly: true },
   { label: "DM Tools", to: "/dm-tools", dmOnly: true },
@@ -120,7 +122,16 @@ export default function AppShellLayout() {
   }, [user]);
 
   const navItems = useMemo(
-    () => NAV_ITEMS.filter((item) => !item.dmOnly || user?.role === "dm"),
+    () =>
+      NAV_ITEMS.filter((item) => {
+        if (item.dmOnly) {
+          return user?.role === "dm";
+        }
+        if (item.playerOnly) {
+          return user?.role === "player";
+        }
+        return true;
+      }),
     [user?.role],
   );
 

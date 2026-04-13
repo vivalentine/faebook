@@ -2433,6 +2433,29 @@ app.get("/api/dm/profiles/:userId", requireRole("dm"), (req, res) => {
   return res.json({ profile });
 });
 
+app.get("/api/dm/profiles/:userId/journal", requireRole("dm"), (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+    return res.status(400).json({ error: "Invalid userId" });
+  }
+
+  const targetUser = getUserById(targetUserId);
+  if (!targetUser) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const note = getActiveDashboardNoteByUserId(targetUserId);
+  return res.json({
+    journal_note: note ? mapDashboardNoteForClient(note) : null,
+    owner: {
+      user_id: targetUser.id,
+      username: targetUser.username,
+      display_name: targetUser.display_name,
+      role: targetUser.role,
+    },
+  });
+});
+
 app.patch("/api/dm/profiles/:userId/image-path", requireRole("dm"), (req, res) => {
   const targetUserId = Number(req.params.userId);
   const profileImagePath = String(req.body.profile_image_path || "").trim();

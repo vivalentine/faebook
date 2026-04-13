@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { apiFetch, apiUrl } from "../lib/api";
-import type { UserProfile } from "../types";
+import type { DashboardNote, UserProfile } from "../types";
 
 type ProfileResponse = {
   profile: UserProfile;
   can_manage_image?: boolean;
+};
+
+type DmJournalInspectResponse = {
+  journal_note: DashboardNote | null;
 };
 
 export default function ProfilePage() {
@@ -26,6 +30,7 @@ export default function ProfilePage() {
   const [pronouns, setPronouns] = useState("");
   const [bio, setBio] = useState("");
   const [manualImagePath, setManualImagePath] = useState("");
+  const [dmInspectedJournal, setDmInspectedJournal] = useState<DashboardNote | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -48,6 +53,17 @@ export default function ProfilePage() {
         setPronouns(nextProfile.pronouns || "");
         setBio(nextProfile.bio || "");
         setManualImagePath(nextProfile.profile_image_path || "");
+
+        if (isDmInspectMode && userId) {
+          const journalResponse = await apiFetch(`/api/dm/profiles/${userId}/journal`);
+          const journalData = (await journalResponse.json()) as DmJournalInspectResponse | { error?: string };
+          if (!journalResponse.ok) {
+            throw new Error((journalData as { error?: string }).error || "Failed to load player journal");
+          }
+          setDmInspectedJournal((journalData as DmJournalInspectResponse).journal_note || null);
+        } else {
+          setDmInspectedJournal(null);
+        }
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load profile");
       } finally {
@@ -292,6 +308,21 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
+
+      {isDmInspectMode ? (
+        <section className="state-card profile-card">
+          <h2>Player Journal (DM View)</h2>
+          <p className="topbar-meta">Private player writing, visible in DM admin context.</p>
+          {dmInspectedJournal ? (
+            <>
+              <p className="topbar-meta">Last updated {new Date(dmInspectedJournal.updated_at).toLocaleString()}</p>
+              <pre className="profile-journal-content">{dmInspectedJournal.content}</pre>
+            </>
+          ) : (
+            <p className="topbar-meta">No journal entry yet.</p>
+          )}
+        </section>
+      ) : null}
     </main>
   );
 }
