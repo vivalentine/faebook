@@ -323,6 +323,21 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_import_logs_created_at
   ON import_logs(created_at DESC);
+
+  CREATE TABLE IF NOT EXISTS user_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    bio TEXT NOT NULL DEFAULT '',
+    status_line TEXT NOT NULL DEFAULT '',
+    pronouns TEXT NOT NULL DEFAULT '',
+    profile_image_path TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id
+  ON user_profiles(user_id);
 `);
 
 function tableExists(tableName) {
@@ -638,5 +653,39 @@ if (!columnExists("npcs", "archived_by_user_id")) {
     ADD COLUMN archived_by_user_id INTEGER REFERENCES users(id)
   `);
 }
+
+if (!columnExists("user_profiles", "profile_image_path")) {
+  db.exec(`
+    ALTER TABLE user_profiles
+    ADD COLUMN profile_image_path TEXT
+  `);
+}
+
+const profileSeedNow = new Date().toISOString();
+db.exec(`
+  INSERT INTO user_profiles (
+    user_id,
+    bio,
+    status_line,
+    pronouns,
+    profile_image_path,
+    created_at,
+    updated_at
+  )
+  SELECT
+    users.id,
+    '',
+    '',
+    '',
+    NULL,
+    '${profileSeedNow}',
+    '${profileSeedNow}'
+  FROM users
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM user_profiles
+    WHERE user_profiles.user_id = users.id
+  )
+`);
 
 module.exports = db;

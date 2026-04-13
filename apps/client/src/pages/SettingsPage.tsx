@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
@@ -147,6 +147,9 @@ export default function SettingsPage() {
               <button className="action-button" type="button" disabled={profileSaving} onClick={() => void handleProfileSave()}>
                 {profileSaving ? "Saving..." : "Save Display Name"}
               </button>
+              <Link className="secondary-link settings-inline-link" to="/profile">
+                Open Profile Page
+              </Link>
             </div>
             {profileMessage ? <p className="settings-inline-note">{profileMessage}</p> : null}
           </section>
