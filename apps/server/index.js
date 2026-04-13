@@ -134,9 +134,108 @@ function mapNpcForPlayer(npc) {
     personal_aliases: Array.isArray(npc.personal_aliases)
       ? npc.personal_aliases
       : [],
+    reputation: npc.reputation || null,
     created_at: npc.created_at,
     updated_at: npc.updated_at,
   };
+}
+
+function clampNpcReputationScore(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(-5, Math.min(5, Math.round(parsed)));
+}
+
+function getNpcReputationBucket(scoreValue) {
+  const score = clampNpcReputationScore(scoreValue);
+
+  if (score >= 5) {
+    return {
+      key: "extremely_high",
+      card_indicator: "heart",
+      card_label: "Extremely high reputation",
+      detail_text:
+        "Their gaze lingers on you with dangerous warmth; the thread between you hums like fate.",
+      dm_hint: "Romance may be possible.",
+    };
+  }
+  if (score >= 3) {
+    return {
+      key: "high",
+      card_indicator: "green",
+      card_label: "High reputation",
+      detail_text:
+        "You stand in trusted favor. If you call through the mirror, this soul is likely to answer.",
+      dm_hint: "Will answer mirror calls.",
+    };
+  }
+  if (score >= 1) {
+    return {
+      key: "warming",
+      card_indicator: "yellow",
+      card_label: "Warming reputation",
+      detail_text:
+        "Your standing is cautiously warm. A mirror call may be answered, though never without risk.",
+      dm_hint: "Might answer a mirror call.",
+    };
+  }
+  if (score === 0) {
+    return {
+      key: "neutral",
+      card_indicator: "neutral",
+      card_label: "Neutral reputation",
+      detail_text:
+        "The bond is unreadable and unclaimed; you are known, but not yet favored nor spurned.",
+      dm_hint: "Neutral footing.",
+    };
+  }
+  if (score >= -2) {
+    return {
+      key: "low",
+      card_indicator: "red",
+      card_label: "Low reputation",
+      detail_text:
+        "Distrust has crept in. This NPC will refuse your mirror calls unless forced by circumstance.",
+      dm_hint: "Will not take calls.",
+    };
+  }
+  if (score >= -4) {
+    return {
+      key: "very_negative",
+      card_indicator: "black",
+      card_label: "Very negative reputation",
+      detail_text:
+        "Resentment runs deep. They speak your name with bitterness and sharpened intent.",
+      dm_hint: "Strongly dislikes the player.",
+    };
+  }
+
+  return {
+    key: "hated",
+    card_indicator: "knife",
+    card_label: "Hated reputation",
+    detail_text:
+      "Hatred is absolute. If paths cross, steel and spell are likely to follow at once.",
+    dm_hint: "Will fight on sight.",
+  };
+}
+
+function mapNpcReputationForClient(scoreValue, includeNumericScore = false) {
+  const score = clampNpcReputationScore(scoreValue);
+  const bucket = getNpcReputationBucket(score);
+  const payload = {
+    bucket: bucket.key,
+    card_indicator: bucket.card_indicator,
+    card_label: bucket.card_label,
+    detail_text: bucket.detail_text,
+    dm_hint: bucket.dm_hint,
+  };
+
+  if (includeNumericScore) {
+    payload.score = score;
+  }
+
+  return payload;
 }
 
 function normalizeAlias(value) {
@@ -891,6 +990,46 @@ function getPersonalAliasesByNpcIds(npcIds, userId) {
   return byNpcId;
 }
 
+function getReputationByNpcIdsForUser(npcIds, userId) {
+  if (!npcIds.length || !Number.isInteger(Number(userId))) {
+    return new Map();
+  }
+
+  const placeholders = npcIds.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `
+        SELECT npc_id, score
+        FROM npc_reputations
+        WHERE user_id = ?
+          AND npc_id IN (${placeholders})
+      `
+    )
+    .all(userId, ...npcIds);
+
+  const byNpcId = new Map();
+  for (const row of rows) {
+    byNpcId.set(row.npc_id, clampNpcReputationScore(row.score));
+  }
+  return byNpcId;
+}
+
+function getReputationForNpcAndUser(npcId, userId) {
+  const row = db
+    .prepare(
+      `
+        SELECT score
+        FROM npc_reputations
+        WHERE npc_id = ?
+          AND user_id = ?
+        LIMIT 1
+      `
+    )
+    .get(npcId, userId);
+
+  return row ? clampNpcReputationScore(row.score) : 0;
+}
+
 function safeParseBoard(rawJson) {
   try {
     const parsed = JSON.parse(rawJson);
@@ -1197,7 +1336,11 @@ app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
     return res.status(404).json({ error: "NPC not found" });
   }
 
-  res.json(npc);
+  const myReputationScore = getReputationForNpcAndUser(npc.id, req.session.user.id);
+  res.json({
+    ...npc,
+    reputation: mapNpcReputationForClient(myReputationScore, true),
+  });
 });
 
 app.patch("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
@@ -1506,6 +1649,154 @@ app.get("/api/dm/npcs/:slug/notes", requireRole("dm"), (req, res) => {
 
   return res.json({
     personal_by_user: Object.values(groupedByUser),
+  });
+});
+
+app.get("/api/dm/npcs/:slug/reputations", requireRole("dm"), (req, res) => {
+  const npc = db
+    .prepare(
+      `
+        SELECT id, slug, name
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(req.params.slug);
+
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const players = db
+    .prepare(
+      `
+        SELECT id, username, display_name, role
+        FROM users
+        WHERE role = 'player'
+        ORDER BY display_name COLLATE NOCASE ASC, username COLLATE NOCASE ASC
+      `
+    )
+    .all();
+
+  const rows = db
+    .prepare(
+      `
+        SELECT user_id, score
+        FROM npc_reputations
+        WHERE npc_id = ?
+      `
+    )
+    .all(npc.id);
+  const scoreByUserId = new Map(rows.map((row) => [Number(row.user_id), Number(row.score)]));
+
+  return res.json({
+    npc: {
+      id: npc.id,
+      slug: npc.slug,
+      name: npc.name,
+    },
+    reputations: players.map((player) => {
+      const score = clampNpcReputationScore(scoreByUserId.get(player.id) ?? 0);
+      return {
+        user_id: player.id,
+        username: player.username,
+        display_name: player.display_name,
+        role: player.role,
+        reputation: mapNpcReputationForClient(score, true),
+      };
+    }),
+  });
+});
+
+app.patch("/api/dm/npcs/:slug/reputations/:userId", requireRole("dm"), (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+    return res.status(400).json({ error: "Invalid userId" });
+  }
+
+  const npc = db
+    .prepare(
+      `
+        SELECT id, slug
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(req.params.slug);
+  if (!npc) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  const targetUser = db
+    .prepare(
+      `
+        SELECT id, username, display_name, role
+        FROM users
+        WHERE id = ?
+      `
+    )
+    .get(targetUserId);
+
+  if (!targetUser) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  if (targetUser.role !== "player") {
+    return res.status(400).json({ error: "Reputation can only be edited for player users" });
+  }
+
+  const existingScore = getReputationForNpcAndUser(npc.id, targetUserId);
+  const hasScoreInput = Object.prototype.hasOwnProperty.call(req.body || {}, "score");
+  const hasDeltaInput = Object.prototype.hasOwnProperty.call(req.body || {}, "delta");
+  if (!hasScoreInput && !hasDeltaInput) {
+    return res.status(400).json({ error: "Provide score or delta" });
+  }
+
+  const requestedScore = hasScoreInput
+    ? Number(req.body.score)
+    : existingScore + Number(req.body.delta);
+  if (!Number.isFinite(requestedScore)) {
+    return res.status(400).json({ error: "score or delta must be numeric" });
+  }
+
+  const score = clampNpcReputationScore(requestedScore);
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `
+      INSERT INTO npc_reputations (
+        npc_id,
+        user_id,
+        score,
+        created_at,
+        updated_at,
+        updated_by_user_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(npc_id, user_id) DO UPDATE SET
+        score = excluded.score,
+        updated_at = excluded.updated_at,
+        updated_by_user_id = excluded.updated_by_user_id
+    `
+  ).run(npc.id, targetUserId, score, now, now, req.session.user.id);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "npc_reputation_update",
+    objectType: "npc_reputation",
+    objectId: `${npc.id}:${targetUserId}`,
+    message: `DM set reputation for ${targetUser.username} on NPC ${npc.slug} to ${score}`,
+    createdAt: now,
+  });
+
+  return res.json({
+    user_id: targetUser.id,
+    username: targetUser.username,
+    display_name: targetUser.display_name,
+    role: targetUser.role,
+    reputation: mapNpcReputationForClient(score, true),
   });
 });
 
@@ -3292,12 +3583,14 @@ app.get("/api/npcs", requireRole("player", "dm"), (req, res) => {
     req.session.user.role === "player"
       ? getPersonalAliasesByNpcIds(npcIds, req.session.user.id)
       : new Map();
+  const reputationByNpcId = getReputationByNpcIdsForUser(npcIds, req.session.user.id);
 
   const payload = rows.map((row) =>
     mapNpcForPlayer({
       ...row,
       canonical_aliases: canonicalByNpcId.get(row.id) || [],
       personal_aliases: personalByNpcId.get(row.id) || [],
+      reputation: mapNpcReputationForClient(reputationByNpcId.get(row.id) ?? 0, false),
     })
   );
 
@@ -3319,7 +3612,13 @@ app.get("/api/npcs/:slug", requireRole("player", "dm"), (req, res) => {
     return res.status(404).json({ error: "NPC not found" });
   }
 
-  res.json(mapNpcForPlayer(npc));
+  const score = getReputationForNpcAndUser(npc.id, req.session.user.id);
+  res.json(
+    mapNpcForPlayer({
+      ...npc,
+      reputation: mapNpcReputationForClient(score, false),
+    })
+  );
 });
 
 app.get("/api/npcs/:slug/aliases", requireRole("player", "dm"), (req, res) => {

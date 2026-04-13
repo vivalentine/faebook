@@ -18,6 +18,7 @@ export type Npc = {
   is_visible: number;
   canonical_aliases: string[];
   personal_aliases: string[];
+  reputation?: NpcReputationDisplay | null;
   source_file?: string | null;
   source_file_label?: string | null;
   sort_name?: string | null;
@@ -27,6 +28,15 @@ export type Npc = {
   archived_by_user_id?: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type NpcReputationDisplay = {
+  bucket: string;
+  card_indicator: "heart" | "green" | "yellow" | "neutral" | "red" | "black" | "knife";
+  card_label: string;
+  detail_text: string;
+  dm_hint: string;
+  score?: number;
 };
 
 export type NpcAlias = {

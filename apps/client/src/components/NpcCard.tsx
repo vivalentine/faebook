@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { apiUrl } from "../lib/api";
+import { getFallbackReputation, getReputationIndicatorClassName } from "../lib/npcReputation";
 import type { Npc } from "../types";
 
 type Props = {
@@ -17,10 +18,27 @@ export default function NpcCard({
 }: Props) {
   const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
   const detailsHref = `/directory/${npc.slug}`;
+  const reputation = npc.reputation || getFallbackReputation();
 
   return (
     <article className="npc-card">
       <div className="npc-image-wrap">
+        {mode === "player" ? (
+          <span
+            className={getReputationIndicatorClassName(reputation)}
+            title={reputation.card_label}
+            aria-label={reputation.card_label}
+          >
+            {reputation.card_indicator === "heart"
+              ? "💗"
+              : reputation.card_indicator === "knife"
+              ? "🔪"
+              : reputation.card_indicator === "neutral"
+              ? "○"
+              : "●"}
+          </span>
+        ) : null}
+
         {imageUrl ? (
           <img className="npc-image" src={imageUrl} alt={npc.name} />
         ) : (
@@ -35,15 +53,17 @@ export default function NpcCard({
             <p className="rank-line">{npc.rank_title || npc.role || "Unranked"}</p>
           </div>
 
-          <span
-            className={
-              npc.is_visible
-                ? "visibility-pill visible"
-                : "visibility-pill hidden"
-            }
-          >
-            {mode === "player" ? "Unlocked" : npc.is_visible ? "Visible" : "Hidden"}
-          </span>
+          {mode === "dm" ? (
+            <span
+              className={
+                npc.is_visible
+                  ? "visibility-pill visible"
+                  : "visibility-pill hidden"
+              }
+            >
+              {npc.is_visible ? "Visible" : "Hidden"}
+            </span>
+          ) : null}
         </div>
 
         <div className="meta-row">
