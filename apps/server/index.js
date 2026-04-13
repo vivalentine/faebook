@@ -196,6 +196,50 @@ function getUserById(userId) {
     .get(userId);
 }
 
+function ensureUserProfileRow(userId) {
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      INSERT INTO user_profiles (
+        user_id,
+        bio,
+        status_line,
+        pronouns,
+        profile_image_path,
+        created_at,
+        updated_at
+      )
+      VALUES (?, '', '', '', NULL, ?, ?)
+      ON CONFLICT(user_id) DO NOTHING
+    `
+  ).run(userId, now, now);
+}
+
+function getUserProfileForUserId(userId) {
+  ensureUserProfileRow(userId);
+
+  return db
+    .prepare(
+      `
+        SELECT
+          users.id AS user_id,
+          users.username,
+          users.display_name,
+          users.role,
+          user_profiles.bio,
+          user_profiles.status_line,
+          user_profiles.pronouns,
+          user_profiles.profile_image_path,
+          user_profiles.updated_at
+        FROM users
+        LEFT JOIN user_profiles
+          ON user_profiles.user_id = users.id
+        WHERE users.id = ?
+      `
+    )
+    .get(userId);
+}
+
 function getBoardOwnerForRequest(req) {
   const sessionUser = req.session.user;
 
@@ -963,6 +1007,74 @@ app.patch("/api/auth/profile", requireRole("player", "dm"), (req, res) => {
 
   req.session.user = getSessionUser(userRow);
   return res.json({ user: req.session.user });
+});
+
+app.get("/api/profile", requireRole("player", "dm"), (req, res) => {
+  const profile = getUserProfileForUserId(req.session.user.id);
+  if (!profile) {
+    return res.status(404).json({ error: "Profile not found" });
+  }
+
+  return res.json({ profile, can_manage_image: req.session.user.role === "dm" });
+});
+
+app.patch("/api/profile", requireRole("player", "dm"), (req, res) => {
+  const displayName = String(req.body.display_name || "").trim();
+  const bio = String(req.body.bio || "").trim();
+  const statusLine = String(req.body.status_line || "").trim();
+  const pronouns = String(req.body.pronouns || "").trim();
+
+  if (!displayName) {
+    return res.status(400).json({ error: "display_name is required" });
+  }
+
+  if (displayName.length > 60) {
+    return res.status(400).json({ error: "display_name must be 60 characters or fewer" });
+  }
+  if (bio.length > 1500) {
+    return res.status(400).json({ error: "bio must be 1500 characters or fewer" });
+  }
+  if (statusLine.length > 120) {
+    return res.status(400).json({ error: "status_line must be 120 characters or fewer" });
+  }
+  if (pronouns.length > 60) {
+    return res.status(400).json({ error: "pronouns must be 60 characters or fewer" });
+  }
+
+  const now = new Date().toISOString();
+  ensureUserProfileRow(req.session.user.id);
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+        UPDATE users
+        SET display_name = ?, updated_at = ?
+        WHERE id = ?
+      `
+    ).run(displayName, now, req.session.user.id);
+
+    db.prepare(
+      `
+        UPDATE user_profiles
+        SET bio = ?,
+            status_line = ?,
+            pronouns = ?,
+            updated_at = ?
+        WHERE user_id = ?
+      `
+    ).run(bio, statusLine, pronouns, now, req.session.user.id);
+  });
+
+  tx();
+
+  const userRow = getUserById(req.session.user.id);
+  if (!userRow) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  req.session.user = getSessionUser(userRow);
+  const profile = getUserProfileForUserId(req.session.user.id);
+  return res.json({ profile, user: req.session.user });
 });
 
 app.post("/api/auth/login", (req, res) => {
@@ -1925,6 +2037,119 @@ app.get("/api/users", requireRole("dm"), (_req, res) => {
 
   res.json(users);
 });
+
+app.get("/api/dm/profiles/:userId", requireRole("dm"), (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+    return res.status(400).json({ error: "Invalid userId" });
+  }
+
+  const profile = getUserProfileForUserId(targetUserId);
+  if (!profile) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  return res.json({ profile });
+});
+
+app.patch("/api/dm/profiles/:userId/image-path", requireRole("dm"), (req, res) => {
+  const targetUserId = Number(req.params.userId);
+  const profileImagePath = String(req.body.profile_image_path || "").trim();
+
+  if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+    return res.status(400).json({ error: "Invalid userId" });
+  }
+
+  if (!profileImagePath.startsWith("/uploads/")) {
+    return res.status(400).json({ error: "profile_image_path must be an uploads path" });
+  }
+
+  const targetUser = getUserById(targetUserId);
+  if (!targetUser) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  ensureUserProfileRow(targetUserId);
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE user_profiles
+      SET profile_image_path = ?, updated_at = ?
+      WHERE user_id = ?
+    `
+  ).run(profileImagePath, now, targetUserId);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "player_profile_image_set",
+    objectType: "user_profile",
+    objectId: targetUserId,
+    message: `DM assigned profile image for ${targetUser.username}`,
+    createdAt: now,
+  });
+
+  return res.json({ profile: getUserProfileForUserId(targetUserId) });
+});
+
+app.post(
+  "/api/dm/profiles/:userId/image-upload",
+  requireRole("dm"),
+  upload.single("profile_image"),
+  (req, res) => {
+    const targetUserId = Number(req.params.userId);
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+      return res.status(400).json({ error: "Invalid userId" });
+    }
+
+    const targetUser = getUserById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "profile_image file is required" });
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (![".png", ".webp", ".jpg", ".jpeg"].includes(ext)) {
+      return res.status(400).json({ error: "Unsupported profile image type" });
+    }
+    if (Number(req.file.size || 0) > 10 * 1024 * 1024) {
+      return res.status(400).json({ error: "Profile image exceeds 10MB" });
+    }
+
+    ensureUserProfileRow(targetUserId);
+    const now = new Date().toISOString();
+    const uploadsDir = path.join(__dirname, "../../uploads/player-profiles");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const safeUsername = targetUser.username.replace(/[^a-z0-9_-]/gi, "-");
+    const fileName = `${safeUsername}-${now.replace(/[^0-9]/g, "")}${ext}`;
+    fs.writeFileSync(path.join(uploadsDir, fileName), req.file.buffer);
+    const profileImagePath = `/uploads/player-profiles/${fileName}`;
+
+    db.prepare(
+      `
+        UPDATE user_profiles
+        SET profile_image_path = ?, updated_at = ?
+        WHERE user_id = ?
+      `
+    ).run(profileImagePath, now, targetUserId);
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "player_profile_image_upload",
+      objectType: "user_profile",
+      objectId: targetUserId,
+      message: `DM uploaded profile image for ${targetUser.username}`,
+      createdAt: now,
+    });
+
+    return res.json({ profile: getUserProfileForUserId(targetUserId) });
+  }
+);
 
 app.get("/api/dm/board-users", requireRole("dm"), (_req, res) => {
   const rows = db

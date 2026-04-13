@@ -16,6 +16,7 @@ import ArchivePage from "./pages/ArchivePage";
 import SearchPage from "./pages/SearchPage";
 import ChaptersPage from "./pages/ChaptersPage";
 import DocumentsPage from "./pages/DocumentsPage";
+import ProfilePage from "./pages/ProfilePage";
 import "./App.css";
 
 function DirectoryRoute() {
@@ -59,6 +60,15 @@ export default function App() {
             <Route path="documents" element={<DocumentsPage />} />
             <Route path="documents/:slug" element={<DocumentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route
+              path="dm/profiles/:userId"
+              element={
+                <ProtectedRoute allowRoles={["dm"]}>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="dm-tools"
               element={

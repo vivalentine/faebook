@@ -90,6 +90,18 @@ export type AuthUser = {
   role: AuthRole;
 };
 
+export type UserProfile = {
+  user_id: number;
+  username: string;
+  display_name: string;
+  role: AuthRole;
+  bio: string;
+  status_line: string;
+  pronouns: string;
+  profile_image_path: string | null;
+  updated_at: string;
+};
+
 export type BoardUserSummary = {
   id: number;
   username: string;

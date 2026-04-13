@@ -13,6 +13,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", to: "/" },
+  { label: "My Profile", to: "/profile" },
   { label: "Search", to: "/search" },
   { label: "Chapter Library", to: "/chapters" },
   { label: "Documents", to: "/documents" },
