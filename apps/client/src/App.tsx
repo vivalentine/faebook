@@ -15,6 +15,7 @@ import DmToolsPage from "./pages/DmToolsPage";
 import ArchivePage from "./pages/ArchivePage";
 import SearchPage from "./pages/SearchPage";
 import ChaptersPage from "./pages/ChaptersPage";
+import DocumentsPage from "./pages/DocumentsPage";
 import "./App.css";
 
 function DirectoryRoute() {
@@ -55,6 +56,8 @@ export default function App() {
             <Route path="search" element={<SearchPage />} />
             <Route path="chapters" element={<ChaptersPage />} />
             <Route path="chapters/:chapterNumber" element={<ChaptersPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="documents/:slug" element={<DocumentsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route
               path="dm-tools"

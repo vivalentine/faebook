@@ -147,6 +147,18 @@ export type SessionRecap = {
   published_by_username?: string | null;
 };
 
+export type CampaignDocument = {
+  id: number;
+  slug: string;
+  title: string;
+  document_type: string;
+  body_markdown: string;
+  published: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DashboardActivityItem = {
   type: string;
   label: string;

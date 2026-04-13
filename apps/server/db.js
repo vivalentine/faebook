@@ -159,6 +159,24 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_session_recaps_published_at
   ON session_recaps(published_at DESC, session_number DESC);
 
+  CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    document_type TEXT NOT NULL DEFAULT 'lore',
+    body_markdown TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    published INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_documents_published_sort
+  ON documents(published, sort_order ASC, title COLLATE NOCASE ASC, id ASC);
+
+  CREATE INDEX IF NOT EXISTS idx_documents_type_sort
+  ON documents(document_type, published, sort_order ASC, title COLLATE NOCASE ASC, id ASC);
+
   CREATE TABLE IF NOT EXISTS npc_aliases (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     npc_id INTEGER NOT NULL,
@@ -430,6 +448,13 @@ if (!columnExists("session_recaps", "is_published")) {
   db.exec(`
     ALTER TABLE session_recaps
     ADD COLUMN is_published INTEGER NOT NULL DEFAULT 1
+  `);
+}
+
+if (!columnExists("documents", "sort_order")) {
+  db.exec(`
+    ALTER TABLE documents
+    ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0
   `);
 }
 

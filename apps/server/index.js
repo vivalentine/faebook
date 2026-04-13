@@ -401,6 +401,27 @@ function limitString(value, maxLength) {
   return String(value || "").slice(0, maxLength);
 }
 
+function normalizeDocumentSlug(value) {
+  return limitString(value, 120)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function deriveDocumentTitleFromMarkdown(bodyMarkdown, fallback = "Untitled Document") {
+  const lines = String(bodyMarkdown || "").split(/\r?\n/);
+  for (const line of lines) {
+    const heading = line.trim().match(/^#{1,3}\s+(.+)$/);
+    if (heading && heading[1]) {
+      return limitString(heading[1].trim(), 160) || fallback;
+    }
+  }
+  return fallback;
+}
+
 function formatTimestampForFilename(date = new Date()) {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -722,6 +743,20 @@ function mapSessionRecapRow(row) {
     published_by_user_id: row.published_by_user_id,
     published_by_display_name: row.published_by_display_name ?? null,
     published_by_username: row.published_by_username ?? null,
+  };
+}
+
+function mapDocumentRow(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    document_type: row.document_type,
+    body_markdown: row.body_markdown,
+    published: Number(row.published) === 1,
+    sort_order: Number(row.sort_order || 0),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
   };
 }
 
@@ -2688,6 +2723,299 @@ app.delete("/api/session-recaps/:id", requireRole("dm"), (req, res) => {
   });
 
   return res.json({ ok: true, id: recapId });
+});
+
+app.get("/api/documents", requireRole("player", "dm"), (req, res) => {
+  const showAll = req.session.user.role === "dm";
+  const rows = db
+    .prepare(
+      `
+        SELECT
+          id,
+          slug,
+          title,
+          document_type,
+          body_markdown,
+          published,
+          sort_order,
+          created_at,
+          updated_at
+        FROM documents
+        WHERE (? = 1 OR published = 1)
+        ORDER BY sort_order ASC, title COLLATE NOCASE ASC, id ASC
+      `
+    )
+    .all(showAll ? 1 : 0);
+
+  return res.json(rows.map(mapDocumentRow));
+});
+
+app.get("/api/documents/:slug", requireRole("player", "dm"), (req, res) => {
+  const slug = normalizeDocumentSlug(req.params.slug);
+  const row = db
+    .prepare(
+      `
+        SELECT
+          id,
+          slug,
+          title,
+          document_type,
+          body_markdown,
+          published,
+          sort_order,
+          created_at,
+          updated_at
+        FROM documents
+        WHERE slug = ?
+          AND (? = 1 OR published = 1)
+        LIMIT 1
+      `
+    )
+    .get(slug, req.session.user.role === "dm" ? 1 : 0);
+
+  if (!row) {
+    return res.status(404).json({ error: "Document not found" });
+  }
+
+  return res.json(mapDocumentRow(row));
+});
+
+app.post("/api/documents", requireRole("dm"), (req, res) => {
+  const title = limitString(req.body.title, 160).trim();
+  const bodyMarkdown = limitString(req.body.body_markdown, 120000).trim();
+  const documentType = limitString(req.body.document_type || "lore", 80).trim() || "lore";
+  const published = req.body.published === true ? 1 : 0;
+  const sortOrder = Math.max(0, Number.parseInt(String(req.body.sort_order ?? "0"), 10) || 0);
+  const candidateSlug = normalizeDocumentSlug(req.body.slug || title);
+
+  if (!title) {
+    return res.status(400).json({ error: "title is required" });
+  }
+  if (!bodyMarkdown) {
+    return res.status(400).json({ error: "body_markdown is required" });
+  }
+  if (!candidateSlug) {
+    return res.status(400).json({ error: "slug is required" });
+  }
+
+  const now = new Date().toISOString();
+  try {
+    const result = db
+      .prepare(
+        `
+          INSERT INTO documents (
+            slug,
+            title,
+            document_type,
+            body_markdown,
+            published,
+            sort_order,
+            created_at,
+            updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      )
+      .run(candidateSlug, title, documentType, bodyMarkdown, published, sortOrder, now, now);
+
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: published ? "document_publish" : "document_draft_create",
+      objectType: "document",
+      objectId: String(result.lastInsertRowid),
+      message: `Created ${published ? "published" : "draft"} document ${candidateSlug}`,
+      createdAt: now,
+    });
+
+    const created = db.prepare(`SELECT * FROM documents WHERE id = ?`).get(result.lastInsertRowid);
+    return res.status(201).json(mapDocumentRow(created));
+  } catch (error) {
+    if (String(error && error.message).includes("UNIQUE")) {
+      return res.status(409).json({ error: "A document with this slug already exists" });
+    }
+    return res.status(500).json({ error: "Failed to create document" });
+  }
+});
+
+app.patch("/api/documents/:id", requireRole("dm"), (req, res) => {
+  const documentId = Number(req.params.id);
+  const existing = db.prepare(`SELECT * FROM documents WHERE id = ?`).get(documentId);
+
+  if (!existing) {
+    return res.status(404).json({ error: "Document not found" });
+  }
+
+  const title = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "title") ? req.body.title : existing.title,
+    160
+  ).trim();
+  const bodyMarkdown = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "body_markdown")
+      ? req.body.body_markdown
+      : existing.body_markdown,
+    120000
+  ).trim();
+  const documentType = limitString(
+    Object.prototype.hasOwnProperty.call(req.body, "document_type")
+      ? req.body.document_type
+      : existing.document_type,
+    80
+  ).trim();
+  const slug = normalizeDocumentSlug(
+    Object.prototype.hasOwnProperty.call(req.body, "slug") ? req.body.slug : existing.slug
+  );
+  const published = Object.prototype.hasOwnProperty.call(req.body, "published")
+    ? req.body.published === true
+      ? 1
+      : 0
+    : Number(existing.published) === 1
+      ? 1
+      : 0;
+  const sortOrder = Object.prototype.hasOwnProperty.call(req.body, "sort_order")
+    ? Math.max(0, Number.parseInt(String(req.body.sort_order), 10) || 0)
+    : Number(existing.sort_order || 0);
+
+  if (!title) {
+    return res.status(400).json({ error: "title is required" });
+  }
+  if (!bodyMarkdown) {
+    return res.status(400).json({ error: "body_markdown is required" });
+  }
+  if (!documentType) {
+    return res.status(400).json({ error: "document_type is required" });
+  }
+  if (!slug) {
+    return res.status(400).json({ error: "slug is required" });
+  }
+
+  const conflict = db
+    .prepare(
+      `
+        SELECT id
+        FROM documents
+        WHERE slug = ?
+          AND id != ?
+      `
+    )
+    .get(slug, documentId);
+  if (conflict) {
+    return res.status(409).json({ error: "A document with this slug already exists" });
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+      UPDATE documents
+      SET slug = ?,
+          title = ?,
+          document_type = ?,
+          body_markdown = ?,
+          published = ?,
+          sort_order = ?,
+          updated_at = ?
+      WHERE id = ?
+    `
+  ).run(slug, title, documentType, bodyMarkdown, published, sortOrder, now, documentId);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "document_update",
+    objectType: "document",
+    objectId: String(documentId),
+    message: `Updated ${published ? "published" : "draft"} document ${slug}`,
+    createdAt: now,
+  });
+
+  const updated = db.prepare(`SELECT * FROM documents WHERE id = ?`).get(documentId);
+  return res.json(mapDocumentRow(updated));
+});
+
+app.delete("/api/documents/:id", requireRole("dm"), (req, res) => {
+  const documentId = Number(req.params.id);
+  const existing = db.prepare(`SELECT id, slug FROM documents WHERE id = ?`).get(documentId);
+  if (!existing) {
+    return res.status(404).json({ error: "Document not found" });
+  }
+
+  db.prepare(`DELETE FROM documents WHERE id = ?`).run(documentId);
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "document_delete",
+    objectType: "document",
+    objectId: String(documentId),
+    message: `Deleted document ${existing.slug}`,
+    createdAt: new Date().toISOString(),
+  });
+
+  return res.json({ ok: true, id: documentId });
+});
+
+app.post("/api/documents/import", requireRole("dm"), upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Markdown file is required" });
+  }
+
+  const ext = path.extname(req.file.originalname || "").toLowerCase();
+  if (ext !== ".md") {
+    return res.status(400).json({ error: "Only .md files are supported" });
+  }
+
+  const bodyMarkdown = limitString(req.file.buffer.toString("utf8"), 120000).trim();
+  if (!bodyMarkdown) {
+    return res.status(400).json({ error: "Markdown file is empty" });
+  }
+
+  const filenameBase = path.basename(req.file.originalname, ext);
+  const title = deriveDocumentTitleFromMarkdown(bodyMarkdown, filenameBase);
+  const slug = normalizeDocumentSlug(filenameBase || title);
+  const documentType = limitString(req.body.document_type || "imported", 80).trim() || "imported";
+  const published = req.body.published === "true" || req.body.published === true ? 1 : 0;
+  const sortOrder = Math.max(0, Number.parseInt(String(req.body.sort_order ?? "0"), 10) || 0);
+  const now = new Date().toISOString();
+
+  if (!slug) {
+    return res.status(400).json({ error: "Could not derive slug from file name" });
+  }
+
+  const existing = db.prepare(`SELECT id FROM documents WHERE slug = ?`).get(slug);
+  if (existing) {
+    db.prepare(
+      `
+        UPDATE documents
+        SET title = ?,
+            document_type = ?,
+            body_markdown = ?,
+            published = ?,
+            sort_order = ?,
+            updated_at = ?
+        WHERE id = ?
+      `
+    ).run(title, documentType, bodyMarkdown, published, sortOrder, now, existing.id);
+
+    const updated = db.prepare(`SELECT * FROM documents WHERE id = ?`).get(existing.id);
+    return res.json({ document: mapDocumentRow(updated), mode: "updated" });
+  }
+
+  const result = db
+    .prepare(
+      `
+        INSERT INTO documents (
+          slug,
+          title,
+          document_type,
+          body_markdown,
+          published,
+          sort_order,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(slug, title, documentType, bodyMarkdown, published, sortOrder, now, now);
+
+  const created = db.prepare(`SELECT * FROM documents WHERE id = ?`).get(result.lastInsertRowid);
+  return res.status(201).json({ document: mapDocumentRow(created), mode: "created" });
 });
 
 app.get("/api/npcs", requireRole("player", "dm"), (req, res) => {
