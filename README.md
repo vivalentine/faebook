@@ -212,13 +212,11 @@ Codex should:
 
 ## Deployment direction
 
-Current deployment is local/private.
+Production hardening guidance for Cloudflare Tunnel + Caddy is documented in:
 
-Planned path:
+- `docs/production-deployment.md`
 
-- stable local development
-- mini-PC hosting on the LAN
-- later remote access after the app is hardened
+The documented deployment shape keeps the existing in-app FaeBook login model and supports localhost-only origin binding for Caddy and Express in production.
 
 ## Notes
 
