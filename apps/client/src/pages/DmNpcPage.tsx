@@ -5,7 +5,8 @@ import FaeSelect from "../components/FaeSelect";
 import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
 import { useWikiNpcIndex } from "../lib/wikiLinks";
-import type { Npc, NpcAlias, NpcNote } from "../types";
+import { getFallbackReputation } from "../lib/npcReputation";
+import type { Npc, NpcAlias, NpcNote, NpcReputationDisplay } from "../types";
 
 type PersonalAliasGroup = {
   user_id: number;
@@ -19,6 +20,14 @@ type PersonalNoteGroup = {
   display_name: string;
   username: string;
   note: NpcNote | null;
+};
+
+type NpcReputationRow = {
+  user_id: number;
+  display_name: string;
+  username: string;
+  role: "player";
+  reputation: NpcReputationDisplay;
 };
 
 type NpcEditForm = {
@@ -66,6 +75,9 @@ export default function DmNpcPage() {
   const [info, setInfo] = useState("");
   const [aliasInput, setAliasInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [reputationRows, setReputationRows] = useState<NpcReputationRow[]>([]);
+  const [reputationDraftByUser, setReputationDraftByUser] = useState<Record<number, string>>({});
+  const [updatingReputationUserId, setUpdatingReputationUserId] = useState<number | null>(null);
   const [editingAliasId, setEditingAliasId] = useState<number | null>(null);
   const [editingAliasValue, setEditingAliasValue] = useState("");
   const [updatingAliasId, setUpdatingAliasId] = useState<number | null>(null);
@@ -95,20 +107,68 @@ export default function DmNpcPage() {
       if (!notesResponse.ok) {
         throw new Error(`Failed to load notes: ${notesResponse.status}`);
       }
+      const reputationsResponse = await apiFetch(`/api/dm/npcs/${slug}/reputations`);
+      if (!reputationsResponse.ok) {
+        throw new Error(`Failed to load reputations: ${reputationsResponse.status}`);
+      }
 
       const npcData = await npcResponse.json();
       const aliasesData = await aliasesResponse.json();
       const notesData = await notesResponse.json();
+      const reputationsData = await reputationsResponse.json();
 
       setNpc(npcData);
       setForm(toForm(npcData));
       setCanonicalAliases(aliasesData.canonical || []);
       setPersonalAliasGroups(aliasesData.personal_by_user || []);
       setPersonalNoteGroups(notesData.personal_by_user || []);
+      setReputationRows(reputationsData.reputations || []);
+      const draft: Record<number, string> = {};
+      for (const row of reputationsData.reputations || []) {
+        draft[row.user_id] = String(row.reputation?.score ?? 0);
+      }
+      setReputationDraftByUser(draft);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveReputation(userId: number) {
+    const rawValue = reputationDraftByUser[userId] ?? "";
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      setError("Reputation score must be a number between -5 and 5.");
+      return;
+    }
+
+    try {
+      setUpdatingReputationUserId(userId);
+      setError("");
+      setInfo("");
+
+      const response = await apiFetch(`/api/dm/npcs/${slug}/reputations/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ score: parsed }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to save reputation: ${response.status}`);
+      }
+
+      setReputationRows((current) =>
+        current.map((row) => (row.user_id === userId ? data : row)),
+      );
+      setReputationDraftByUser((current) => ({
+        ...current,
+        [userId]: String(data.reputation?.score ?? 0),
+      }));
+      setInfo("Reputation updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setUpdatingReputationUserId(null);
     }
   }
 
@@ -345,6 +405,58 @@ export default function DmNpcPage() {
             ) : null}
           </div>
         </div>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>Player Reputation</h2>
+            <p>Per-player standing for this NPC. Players never see numeric values.</p>
+          </div>
+
+          {reputationRows.length === 0 ? (
+            <div className="state-card small-card">
+              <p>No player users found.</p>
+            </div>
+          ) : (
+            <div className="notes-list">
+              {reputationRows.map((row) => (
+                <article className="note-card" key={row.user_id}>
+                  <div className="note-card-header">
+                    <strong>
+                      {row.display_name}
+                      {row.username ? ` (@${row.username})` : ""}
+                    </strong>
+                    <span>{(row.reputation || getFallbackReputation()).card_label}</span>
+                  </div>
+                  <p>{(row.reputation || getFallbackReputation()).dm_hint}</p>
+                  <div className="note-actions">
+                    <input
+                      className="text-input"
+                      type="number"
+                      min={-5}
+                      max={5}
+                      step={1}
+                      value={reputationDraftByUser[row.user_id] ?? "0"}
+                      onChange={(event) =>
+                        setReputationDraftByUser((current) => ({
+                          ...current,
+                          [row.user_id]: event.target.value,
+                        }))
+                      }
+                    />
+                    <button
+                      className="action-button"
+                      type="button"
+                      disabled={updatingReputationUserId === row.user_id}
+                      onClick={() => void handleSaveReputation(row.user_id)}
+                    >
+                      {updatingReputationUserId === row.user_id ? "Saving..." : "Set score"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="notes-section">
           <div className="notes-header">

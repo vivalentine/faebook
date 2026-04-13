@@ -3,6 +3,7 @@ import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import WikiInlineText from "../components/WikiInlineText";
 import { apiFetch, apiUrl } from "../lib/api";
+import { getFallbackReputation } from "../lib/npcReputation";
 import { useWikiNpcIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
 
@@ -211,6 +212,7 @@ export default function PlayerNpcPage() {
   if (!npc) return null;
 
   const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
+  const reputation = npc.reputation || getFallbackReputation();
 
   return (
     <div className="app-shell">
@@ -256,6 +258,13 @@ export default function PlayerNpcPage() {
             ) : null}
           </div>
         </div>
+
+        <section className="notes-section">
+          <div className="notes-header">
+            <h2>Reputation</h2>
+            <p>{reputation.detail_text}</p>
+          </div>
+        </section>
 
         <section className="notes-section">
           <div className="notes-header">

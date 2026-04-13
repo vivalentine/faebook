@@ -271,6 +271,25 @@ db.exec(`
   ON npc_aliases(npc_id, user_id, alias_type, alias_normalized)
   WHERE alias_type = 'personal' AND archived_at IS NULL;
 
+  CREATE TABLE IF NOT EXISTS npc_reputations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    npc_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    score INTEGER NOT NULL DEFAULT 0 CHECK (score >= -5 AND score <= 5),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY (npc_id) REFERENCES npcs(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_npc_reputations_npc_user_unique
+  ON npc_reputations(npc_id, user_id);
+
+  CREATE INDEX IF NOT EXISTS idx_npc_reputations_user_npc
+  ON npc_reputations(user_id, npc_id);
+
   CREATE TABLE IF NOT EXISTS map_pins (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
