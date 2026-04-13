@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiUrl } from "../lib/api";
 import { getUserSettings } from "../lib/userSettings";
-import type { SearchSuggestion, SearchSuggestionsResponse } from "../types";
+import type { SearchSuggestion, SearchSuggestionsResponse, UserProfile } from "../types";
 
 type NavItem = {
   label: string;
@@ -14,7 +14,6 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", to: "/" },
-  { label: "My Profile", to: "/profile" },
   { label: "Search", to: "/search" },
   { label: "Chapter Library", to: "/chapters" },
   { label: "Documents", to: "/documents" },
@@ -40,6 +39,7 @@ export default function AppShellLayout() {
   const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const [isSuggestionsLoading, setIsSuggestionsLoading] = useState(false);
+  const [profileImagePath, setProfileImagePath] = useState<string | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -113,12 +113,41 @@ export default function AppShellLayout() {
 
   useEffect(() => {
     if (!user) {
+      setProfileImagePath(null);
       return;
     }
 
     const settings = getUserSettings(user.id);
     document.body.classList.toggle("ui-density-compact", settings.uiDensity === "compact");
     document.body.classList.toggle("prefers-reduced-motion", settings.reducedMotion);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setProfileImagePath(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    async function loadProfileImage() {
+      try {
+        const response = await apiFetch("/api/profile", { signal: controller.signal });
+        const data = (await response.json()) as { profile?: UserProfile; error?: string };
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load profile");
+        }
+        setProfileImagePath(data.profile?.profile_image_path || null);
+      } catch {
+        if (!controller.signal.aborted) {
+          setProfileImagePath(null);
+        }
+      }
+    }
+
+    void loadProfileImage();
+
+    return () => controller.abort();
   }, [user]);
 
   const navItems = useMemo(
@@ -213,7 +242,6 @@ export default function AppShellLayout() {
       <aside className={`app-drawer ${isDrawerOpen ? "open" : ""}`}>
         <div className="drawer-top">
           <p className="eyebrow">FaeBook</p>
-          <p className="drawer-user">{user?.display_name || user?.username}</p>
 
           <nav className="drawer-nav" aria-label="Primary">
             {navItems.map((item) => (
@@ -232,6 +260,20 @@ export default function AppShellLayout() {
         </div>
 
         <div className="drawer-utility-row">
+          <NavLink to="/profile" className="drawer-account-chip">
+            {profileImagePath ? (
+              <img
+                className="drawer-account-avatar"
+                src={apiUrl(profileImagePath)}
+                alt={`${user?.display_name || user?.username || "User"} token`}
+              />
+            ) : (
+              <span className="drawer-account-avatar drawer-account-avatar-fallback" aria-hidden="true">
+                {(user?.display_name || user?.username || "?").trim().charAt(0).toUpperCase()}
+              </span>
+            )}
+            <span className="drawer-account-name">{user?.display_name || user?.username}</span>
+          </NavLink>
           <NavLink to="/settings" className="drawer-settings" aria-label="Settings">
             ⚙️
           </NavLink>
