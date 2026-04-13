@@ -1265,30 +1265,29 @@
   width: 290px;
   height: 100vh;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid #2a2f3a;
   background: linear-gradient(180deg, #161924 0%, #10131b 100%);
   padding: 24px 16px 16px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
 }
 
 .drawer-top {
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.drawer-user {
-  margin: 0;
-  color: #c3bed4;
+  flex: 1;
+  min-height: 0;
 }
 
 .drawer-nav {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .drawer-link {
@@ -1306,12 +1305,16 @@
 }
 
 .drawer-utility-row {
-  display: flex;
-  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(96, 104, 130, 0.4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
 }
 
+.drawer-account-chip,
 .drawer-settings,
 .drawer-signout {
   border-radius: 12px;
@@ -1320,6 +1323,41 @@
   color: #f4f1ea;
   text-decoration: none;
   font: inherit;
+}
+
+.drawer-account-chip {
+  min-height: 44px;
+  padding: 6px 10px 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.drawer-account-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid #5f6784;
+  flex: 0 0 30px;
+}
+
+.drawer-account-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #353d53;
+  color: #f2ebff;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.drawer-account-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drawer-settings {
@@ -2555,6 +2593,7 @@ body {
 .board-node-delete-button:focus-visible,
 .board-edge-delete-button:focus-visible,
 .drawer-link:focus-visible,
+.drawer-account-chip:focus-visible,
 .drawer-settings:focus-visible,
 .drawer-signout:focus-visible,
 .hamburger:focus-visible {
@@ -2690,6 +2729,11 @@ body {
 .drawer-settings,
 .drawer-signout,
 .hamburger {
+  background: linear-gradient(180deg, #24293b, #1d2130);
+  border-color: #454b64;
+}
+
+.drawer-account-chip {
   background: linear-gradient(180deg, #24293b, #1d2130);
   border-color: #454b64;
 }
