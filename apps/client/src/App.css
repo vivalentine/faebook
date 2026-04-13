@@ -1541,6 +1541,19 @@
   resize: vertical;
 }
 
+.profile-journal-content {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #31374a;
+  border-radius: 10px;
+  background: #161a24;
+  color: #ddd7ee;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+}
+
 .shell-error-banner {
   margin-bottom: 16px;
 }
@@ -1714,6 +1727,36 @@
 
 .dashboard-notes-text {
   min-height: 220px;
+}
+
+.journal-page-shell {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.journal-card {
+  gap: 16px;
+}
+
+.journal-header h1 {
+  margin: 0 0 6px;
+}
+
+.journal-header p {
+  margin: 0 0 6px;
+}
+
+.journal-textarea {
+  min-height: clamp(320px, 52vh, 640px);
+  line-height: 1.65;
+}
+
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 .archive-filters-card {

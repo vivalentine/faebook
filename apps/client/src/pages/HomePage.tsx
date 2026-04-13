@@ -33,9 +33,6 @@ export default function HomePage() {
   const [newSuspectNote, setNewSuspectNote] = useState("");
   const [addingSuspect, setAddingSuspect] = useState(false);
 
-  const [noteDraft, setNoteDraft] = useState("");
-  const [noteSaving, setNoteSaving] = useState(false);
-  const [noteStatus, setNoteStatus] = useState("");
 
   const [recapChapterNumber, setRecapChapterNumber] = useState("");
   const [recapChapterTitle, setRecapChapterTitle] = useState("");
@@ -57,7 +54,6 @@ export default function HomePage() {
       }
 
       setDashboard(data);
-      setNoteDraft(data.personal_note?.content || "");
       setRecapChapterNumber(String(data.latest_recap?.chapter_number || ""));
       setRecapChapterTitle(data.latest_recap?.chapter_title || "");
       setRecapContent(data.latest_recap?.content || "");
@@ -183,77 +179,6 @@ export default function HomePage() {
       updateSuspect(suspect.id, { sort_order: target.sort_order }),
       updateSuspect(target.id, { sort_order: suspect.sort_order }),
     ]);
-  }
-
-  async function saveNotes() {
-    try {
-      setNoteSaving(true);
-      setNoteStatus("");
-      const response = await apiFetch("/api/dashboard/notes", {
-        method: "PUT",
-        body: JSON.stringify({
-          content: noteDraft,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to save personal notes");
-      }
-
-      setDashboard((current) =>
-        current
-          ? {
-              ...current,
-              personal_note: data,
-            }
-          : current,
-      );
-      setNoteStatus("Saved");
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save personal notes");
-    } finally {
-      setNoteSaving(false);
-    }
-  }
-
-  async function archivePersonalNote() {
-    if (!dashboard?.personal_note) {
-      return;
-    }
-
-    if (!window.confirm("Archive your active personal note?")) {
-      return;
-    }
-
-    try {
-      setNoteSaving(true);
-      setNoteStatus("");
-
-      const response = await apiFetch(`/api/dashboard/notes/${dashboard.personal_note.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to archive personal note");
-      }
-
-      setDashboard((current) =>
-        current
-          ? {
-              ...current,
-              personal_note: null,
-            }
-          : current,
-      );
-      setNoteDraft("");
-      setNoteStatus("Archived");
-    } catch (archiveError) {
-      setError(archiveError instanceof Error ? archiveError.message : "Failed to archive personal note");
-    } finally {
-      setNoteSaving(false);
-    }
   }
 
   async function saveRecap() {
@@ -473,33 +398,6 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
-          </div>
-        </article>
-
-        <article className="state-card dashboard-card dashboard-card--notes">
-          <h2>Personal Notes</h2>
-          <textarea
-            className="text-area dashboard-notes-text"
-            value={noteDraft}
-            onChange={(event) => {
-              setNoteDraft(event.target.value);
-              setNoteStatus("");
-            }}
-            placeholder="Track theories, questions, and reminders..."
-          />
-          <div className="dashboard-row-actions">
-            <button className="action-button" type="button" disabled={noteSaving} onClick={() => void saveNotes()}>
-              {noteSaving ? "Saving..." : "Save Notes"}
-            </button>
-            <button
-              className="board-node-delete-button"
-              type="button"
-              disabled={noteSaving || !dashboard.personal_note}
-              onClick={() => void archivePersonalNote()}
-            >
-              Archive Note
-            </button>
-            <span className="topbar-meta">{noteStatus}</span>
           </div>
         </article>
 
