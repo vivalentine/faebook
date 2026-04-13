@@ -1663,29 +1663,38 @@
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 18px;
+  gap: 16px;
 }
 
 .dashboard-card {
-  grid-column: span 6;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-.dashboard-card--npcs,
-.dashboard-card--activity {
-  grid-column: span 4;
-}
-
-.dashboard-card--notes,
 .dashboard-card--recap {
   grid-column: span 8;
 }
 
-.dashboard-card--suspects,
+.dashboard-column {
+  grid-column: span 4;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.dashboard-column .dashboard-card {
+  gap: 10px;
+}
+
+.dashboard-card--npcs,
+.dashboard-card--activity,
 .dashboard-card--dm {
-  grid-column: span 6;
+  grid-column: span 4;
+}
+
+.dashboard-card--suspects {
+  grid-column: span 8;
 }
 
 .dashboard-inline-form {
@@ -1697,7 +1706,7 @@
 .dashboard-suspect-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .dashboard-suspect-item {
@@ -1805,7 +1814,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .dashboard-list li {
@@ -1813,7 +1822,7 @@
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid #2d3344;
-  padding-bottom: 8px;
+  padding-bottom: 7px;
 }
 
 .dashboard-list li span {
@@ -1867,6 +1876,28 @@
 
 .dashboard-markdown a {
   color: #c9b4ff;
+}
+
+.dashboard-dm-section {
+  grid-column: span 12;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 2px;
+}
+
+.dashboard-dm-section-header {
+  grid-column: span 12;
+  border-left: 2px solid #5f4e7c;
+  padding-left: 12px;
+}
+
+.dashboard-dm-section-header h2 {
+  margin: 0 0 4px;
+}
+
+.dashboard-dm-section-header p {
+  margin: 0;
 }
 
 .wiki-link-wrap {
@@ -2335,6 +2366,16 @@
 
   .dashboard-card {
     grid-column: span 12;
+  }
+
+  .dashboard-column,
+  .dashboard-dm-section {
+    grid-column: span 12;
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-dm-section-header {
+    grid-column: span 1;
   }
 
   .chapters-layout {
