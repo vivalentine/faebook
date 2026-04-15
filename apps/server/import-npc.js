@@ -67,7 +67,7 @@ function stageSiblingPortraits(dmUserId, mdFilePath) {
   }
 }
 
-function main() {
+async function main() {
   const mdFilePath = process.argv[2];
 
   if (!mdFilePath) {
@@ -93,14 +93,16 @@ function main() {
     throw new Error(`Import validation failed: ${item.validation_issues.join("; ")}`);
   }
 
-  const result = finalizeImport(db, dmUserId);
+  const result = await finalizeImport(db, dmUserId);
   console.log(`Import complete for ${item.filename}: ${result.results.map((r) => r.result).join(", ")}`);
 }
 
+(async () => {
 try {
-  main();
+  await main();
   process.exit(0);
 } catch (error) {
   console.error(error.message);
   process.exit(1);
 }
+})();

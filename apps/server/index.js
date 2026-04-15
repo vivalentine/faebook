@@ -18,6 +18,15 @@ const {
   stageFixtures,
 } = require("./dm-npc-import");
 const { runGlobalSearch, runGlobalSearchSuggestions } = require("./search");
+const {
+  buildPortraitMetadata,
+  clearNpcPortrait,
+  getFileExtension,
+  MAX_PORTRAIT_BYTES,
+  processPortraitUpload,
+  replaceNpcPortrait,
+  SUPPORTED_EXTENSIONS,
+} = require("./portrait-assets");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -1630,6 +1639,7 @@ app.get("/api/dm/npcs/:slug", requireRole("dm"), (req, res) => {
   res.json({
     ...npc,
     reputation: mapNpcReputationForClient(myReputationScore, true),
+    portrait_metadata: buildPortraitMetadata(npc.portrait_path),
   });
 });
 
@@ -1728,7 +1738,7 @@ app.post(
   "/api/dm/npcs/:slug/portrait",
   requireRole("dm"),
   uploadImageSingle.single("portrait"),
-  (req, res) => {
+  async (req, res) => {
     const { slug } = req.params;
     const existing = db
       .prepare(
@@ -1749,72 +1759,88 @@ app.post(
       return res.status(400).json({ error: "portrait file is required" });
     }
 
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    if (![".png", ".webp", ".jpg", ".jpeg"].includes(ext)) {
+    const ext = getFileExtension(req.file.originalname);
+    if (!SUPPORTED_EXTENSIONS.has(ext)) {
       return res.status(400).json({ error: "Unsupported portrait file type" });
     }
-    if (Number(req.file.size || 0) > 10 * 1024 * 1024) {
+
+    if (Number(req.file.size || 0) > MAX_PORTRAIT_BYTES) {
       return res.status(400).json({ error: "Portrait file exceeds 10MB" });
     }
 
     const now = new Date().toISOString();
-    const uploadsDir = path.join(__dirname, "../../uploads/npc-portraits");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    const fileName = `${slug}-${now.replace(/[^0-9]/g, "")}${ext}`;
-    fs.writeFileSync(path.join(uploadsDir, fileName), req.file.buffer);
-    const portraitPath = `/uploads/npc-portraits/${fileName}`;
 
-    if (existing.portrait_path && existing.portrait_path !== portraitPath) {
-      createArchiveRecord(db, {
-        objectType: "portrait_asset",
-        objectId: `${existing.id}:${now}`,
-        ownerUserId: req.session.user.id,
-        archivedByUserId: req.session.user.id,
-        archivedAt: now,
-        payload: {
-          npc_id: existing.id,
-          prior_portrait_path: existing.portrait_path,
-          source_action: "manual-replacement",
+    try {
+      const replacement = await processPortraitUpload({
+        slug,
+        portrait: {
+          filename: req.file.originalname,
+          ext,
+          buffer: req.file.buffer,
+          size: Number(req.file.size || 0),
+          mimeType: String(req.file.mimetype || ""),
         },
-        objectLabel: `Portrait replaced for ${slug}`,
-        sourceTable: "npcs",
-        archiveReason: "manual-replacement",
+        now,
+      });
+
+      const updated = replaceNpcPortrait({
+        db,
+        npcRow: existing,
+        replacement,
+        dmUserId: req.session.user.id,
+        now,
+        sourceAction: "manual-replacement",
+        auditActionType: "npc_portrait_replace",
+        auditMessage: `DM replaced portrait in-app: ${slug}`,
+      });
+
+      return res.json({
+        ...updated,
+        portrait_metadata: buildPortraitMetadata(updated.portrait_path),
+      });
+    } catch (error) {
+      return res.status(400).json({
+        error: error instanceof Error ? error.message : "Failed to process portrait",
       });
     }
-
-    db.prepare(
-      `
-        UPDATE npcs
-        SET portrait_path = ?, updated_at = ?
-        WHERE id = ?
-      `
-    ).run(portraitPath, now, existing.id);
-
-    createAuditLog(db, {
-      actorUserId: req.session.user.id,
-      actionType: "npc_portrait_replace",
-      objectType: "npc",
-      objectId: existing.id,
-      message: `DM replaced portrait in-app: ${slug}`,
-      createdAt: now,
-    });
-
-    const updated = db
-      .prepare(
-        `
-          SELECT *
-          FROM npcs
-          WHERE id = ?
-            AND archived_at IS NULL
-        `
-      )
-      .get(existing.id);
-
-    res.json(updated);
   }
 );
+
+app.delete("/api/dm/npcs/:slug/portrait", requireRole("dm"), (req, res) => {
+  const { slug } = req.params;
+  const existing = db
+    .prepare(
+      `
+        SELECT *
+        FROM npcs
+        WHERE slug = ?
+          AND archived_at IS NULL
+      `
+    )
+    .get(slug);
+
+  if (!existing) {
+    return res.status(404).json({ error: "NPC not found" });
+  }
+
+  if (!existing.portrait_path) {
+    return res.status(400).json({ error: "NPC does not have an active portrait" });
+  }
+
+  const now = new Date().toISOString();
+  const updated = clearNpcPortrait({
+    db,
+    npcRow: existing,
+    dmUserId: req.session.user.id,
+    now,
+    sourceAction: "manual-remove",
+  });
+
+  return res.json({
+    ...updated,
+    portrait_metadata: buildPortraitMetadata(updated.portrait_path),
+  });
+});
 
 app.get("/api/dm/npcs/:slug/aliases", requireRole("dm"), (req, res) => {
   const npc = db
@@ -2609,8 +2635,8 @@ app.post("/api/dm/import/staging/clear", requireRole("dm"), (req, res) => {
   res.json(summary);
 });
 
-app.post("/api/dm/import/finalize", requireRole("dm"), (req, res) => {
-  const results = finalizeImport(db, req.session.user.id);
+app.post("/api/dm/import/finalize", requireRole("dm"), async (req, res) => {
+  const results = await finalizeImport(db, req.session.user.id);
   res.json(results);
 });
 

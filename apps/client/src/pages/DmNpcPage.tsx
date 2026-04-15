@@ -62,6 +62,17 @@ function toForm(npc: Npc): NpcEditForm {
   };
 }
 
+function formatBytes(value: number | null | undefined) {
+  if (!Number.isFinite(Number(value)) || Number(value) <= 0) {
+    return "Unknown";
+  }
+
+  const bytes = Number(value);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 export default function DmNpcPage() {
   const { slug = "" } = useParams();
 
@@ -260,13 +271,38 @@ export default function DmNpcPage() {
       }
 
       setNpc(data);
-      setForm((current) => (current ? { ...current } : current));
-      setInfo("Portrait replaced. Previous portrait archived.");
+      setInfo("Portrait updated with optimized delivery asset. Previous portrait archived.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setSaving(false);
       event.target.value = "";
+    }
+  }
+
+  async function handleClearPortrait() {
+    if (!window.confirm("Clear the active portrait? This archives the current asset.")) return;
+
+    try {
+      setSaving(true);
+      setError("");
+      setInfo("");
+
+      const response = await apiFetch(`/api/dm/npcs/${slug}/portrait`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to clear portrait: ${response.status}`);
+      }
+
+      setNpc(data);
+      setInfo("Portrait cleared and archived.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -369,16 +405,44 @@ export default function DmNpcPage() {
             ) : (
               <div className="detail-image placeholder">No image</div>
             )}
-            <label className="toolbar-field">
-              <span>Replace portrait</span>
-              <input
-                className="text-input"
-                type="file"
-                accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg"
-                onChange={(event) => void handlePortraitUpload(event)}
-                disabled={saving}
-              />
-            </label>
+            <section className="state-card small-card">
+              <h3>Portrait management</h3>
+              <p>Upload a replacement portrait or clear the active one. Replacement archives the prior asset automatically.</p>
+              <label className="toolbar-field">
+                <span>Upload replacement</span>
+                <input
+                  className="text-input"
+                  type="file"
+                  accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg"
+                  onChange={(event) => void handlePortraitUpload(event)}
+                  disabled={saving}
+                />
+              </label>
+              <div className="note-actions">
+                <button
+                  className="action-button secondary-link"
+                  type="button"
+                  onClick={() => void handleClearPortrait()}
+                  disabled={saving || !npc.portrait_path}
+                >
+                  Clear portrait
+                </button>
+              </div>
+              <div className="summary-box">
+                <p className="summary-label">Active portrait path</p>
+                <p>{npc.portrait_metadata?.active_path || npc.portrait_path || "No active portrait"}</p>
+                <p className="summary-label">Format</p>
+                <p>{npc.portrait_metadata?.extension || "Unknown"}</p>
+                <p className="summary-label">Size</p>
+                <p>{formatBytes(npc.portrait_metadata?.size_bytes)}</p>
+                {npc.portrait_metadata?.updated_at ? (
+                  <>
+                    <p className="summary-label">Last file update</p>
+                    <p>{new Date(npc.portrait_metadata.updated_at).toLocaleString()}</p>
+                  </>
+                ) : null}
+              </div>
+            </section>
           </div>
 
           <div className="detail-meta">
