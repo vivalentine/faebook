@@ -1,6 +1,7 @@
 map_id: inner-ring
 label: Inner Ring
 image_filename: inner-ring-map.png
+tile_source: /maps/tiles/inner-ring/inner-ring.dzi
 width: 2048
 height: 2048
 default_zoom: 1

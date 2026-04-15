@@ -333,6 +333,7 @@ Expected config data per map:
 - `map_id`
 - `label`
 - `image_filename`
+- `tile_source`
 - `width`
 - `height`
 - `default_zoom`

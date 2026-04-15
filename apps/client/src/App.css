@@ -887,6 +887,35 @@
   cursor: grab;
 }
 
+.maps-osd-host {
+  position: absolute;
+  inset: 0;
+}
+
+.maps-marker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.maps-marker-layer .map-pin,
+.maps-marker-layer .map-landmark {
+  pointer-events: auto;
+}
+
+.maps-layer-error {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 10;
+  max-width: 24rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid rgba(253, 114, 114, 0.4);
+  background: rgba(41, 12, 18, 0.9);
+  color: #ffd6d8;
+}
+
 .maps-viewport-shell[data-panning="true"] {
   cursor: grabbing;
 }

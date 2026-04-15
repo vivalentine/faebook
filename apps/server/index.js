@@ -37,6 +37,8 @@ const SESSION_COOKIE_NAME = "faebook.sid";
 const CLIENT_DIST_DIR = path.join(__dirname, "../client/dist");
 const CLIENT_INDEX_PATH = path.join(CLIENT_DIST_DIR, "index.html");
 const CLIENT_ASSETS_DIR = path.join(CLIENT_DIST_DIR, "assets");
+const CLIENT_MAPS_DIR = path.join(CLIENT_DIST_DIR, "maps");
+const CLIENT_MAP_TILES_DIR = path.join(CLIENT_MAPS_DIR, "tiles");
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 const MAPS_CONFIG_DIR = path.join(__dirname, "../../config/maps");
 const MAP_LAYER_IDS = ["overworld", "inner-ring", "outer-ring"];
@@ -898,6 +900,8 @@ function loadMapsConfig() {
       label: String(parsed.label || parsed.map_id),
       image_filename: String(parsed.image_filename),
       image_path: `/maps/${String(parsed.image_filename)}`,
+      tile_source: String(parsed.tile_source || ""),
+      tile_source_type: "deepzoom",
       width,
       height,
       default_zoom: defaultZoom,
@@ -6059,6 +6063,28 @@ app.use(
 );
 
 if (fs.existsSync(CLIENT_INDEX_PATH)) {
+  if (fs.existsSync(CLIENT_MAP_TILES_DIR)) {
+    app.use(
+      "/maps/tiles",
+      express.static(CLIENT_MAP_TILES_DIR, {
+        fallthrough: false,
+        immutable: true,
+        maxAge: "1y",
+      })
+    );
+  }
+
+  if (fs.existsSync(CLIENT_MAPS_DIR)) {
+    app.use(
+      "/maps",
+      express.static(CLIENT_MAPS_DIR, {
+        fallthrough: false,
+        immutable: true,
+        maxAge: "1y",
+      })
+    );
+  }
+
   if (fs.existsSync(CLIENT_ASSETS_DIR)) {
     app.use(
       "/assets",
