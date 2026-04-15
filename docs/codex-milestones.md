@@ -826,3 +826,16 @@ Use clear milestone branch names.
 ## Final advice
 
 Keep Codex focused on one milestone at a time. Merge each PR only after manual review. If Codex starts making the same mistake across runs, tighten `AGENTS.md` and add one small corrective note for the next milestone.
+
+---
+
+## Milestone 6A
+
+### Goal
+Upgrade map delivery to tiled Deep Zoom assets and use a tiled viewer while preserving per-user pins, normalized coordinates, and DM landmark behavior.
+
+### Suggested branch
+- `feat/codex-map-tiling-optimization`
+
+### Suggested PR name
+- `Milestone 6A: tiled maps and map delivery optimization`

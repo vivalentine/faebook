@@ -1,6 +1,7 @@
 map_id: overworld
 label: Overworld
 image_filename: overworld-map.png
+tile_source: /maps/tiles/overworld/overworld.dzi
 width: 4096
 height: 3072
 default_zoom: 0.25

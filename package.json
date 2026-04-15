@@ -6,9 +6,10 @@
   "scripts": {
     "dev:client": "npm --prefix apps/client run dev",
     "dev:server": "npm --prefix apps/server run dev",
-    "build": "npm --prefix apps/client run build",
+    "build": "npm run maps:tiles && npm --prefix apps/client run build",
     "start": "npm --prefix apps/server run start",
-    "seed:users": "npm --prefix apps/server run seed:users"
+    "seed:users": "npm --prefix apps/server run seed:users",
+    "maps:tiles": "node scripts/maps/generate-map-tiles.mjs"
   },
   "keywords": [],
   "author": "",
