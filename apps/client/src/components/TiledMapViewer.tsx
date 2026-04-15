@@ -60,9 +60,57 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
 ) {
   const viewerHostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
+  const layerRef = useRef(layer);
+  const addModeRef = useRef(addMode);
+  const landmarkAddModeRef = useRef(landmarkAddMode);
+  const onMapPlacementRef = useRef(onMapPlacement);
+  const onPinClickRef = useRef(onPinClick);
+  const onLandmarkClickRef = useRef(onLandmarkClick);
+  const onViewerPanningChangeRef = useRef(onViewerPanningChange);
+  const pinsRef = useRef(pins);
+  const landmarksRef = useRef(landmarks);
+  const recalculateMarkersRef = useRef<() => void>(() => {});
   const [mapError, setMapError] = useState("");
   const [pinScreenPositions, setPinScreenPositions] = useState<MarkerScreenPosition[]>([]);
   const [landmarkScreenPositions, setLandmarkScreenPositions] = useState<MarkerScreenPosition[]>([]);
+
+  useEffect(() => {
+    layerRef.current = layer;
+  }, [layer]);
+
+  useEffect(() => {
+    addModeRef.current = addMode;
+  }, [addMode]);
+
+  useEffect(() => {
+    landmarkAddModeRef.current = landmarkAddMode;
+  }, [landmarkAddMode]);
+
+  useEffect(() => {
+    onMapPlacementRef.current = onMapPlacement;
+  }, [onMapPlacement]);
+
+  useEffect(() => {
+    onPinClickRef.current = onPinClick;
+  }, [onPinClick]);
+
+  useEffect(() => {
+    onLandmarkClickRef.current = onLandmarkClick;
+  }, [onLandmarkClick]);
+
+  useEffect(() => {
+    onViewerPanningChangeRef.current = onViewerPanningChange;
+  }, [onViewerPanningChange]);
+
+  useEffect(() => {
+    pinsRef.current = pins;
+    landmarksRef.current = landmarks;
+    recalculateMarkersRef.current();
+  }, [pins, landmarks]);
+
+  useEffect(() => {
+    recalculateMarkersRef.current();
+  }, [layer.width, layer.height]);
 
   useImperativeHandle(ref, () => ({
     zoomIn() {
@@ -85,8 +133,6 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   }));
 
   useEffect(() => {
-    let isCancelled = false;
-
     const host = viewerHostRef.current;
     if (!host) {
       return;
@@ -103,10 +149,6 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     }
 
     setMapError("");
-
-    if (isCancelled) {
-      return;
-    }
 
     const viewer = OpenSeadragon({
       element: host,
@@ -142,9 +184,12 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     const updateMarkerPositions = () => {
       const viewport = viewer.viewport;
       if (!viewport) return;
+      const currentLayer = layerRef.current;
+      const width = currentLayer.width;
+      const height = currentLayer.height;
 
-      const nextPins = pins.map((pin) => {
-        const viewportPoint = viewport.imageToViewportCoordinates(pin.x * layer.width, pin.y * layer.height);
+      const nextPins = pinsRef.current.map((pin) => {
+        const viewportPoint = viewport.imageToViewportCoordinates(pin.x * width, pin.y * height);
         const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
         return {
           id: pin.id,
@@ -153,11 +198,8 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
         };
       });
 
-      const nextLandmarks = landmarks.map((landmark) => {
-        const viewportPoint = viewport.imageToViewportCoordinates(
-          landmark.x * layer.width,
-          landmark.y * layer.height,
-        );
+      const nextLandmarks = landmarksRef.current.map((landmark) => {
+        const viewportPoint = viewport.imageToViewportCoordinates(landmark.x * width, landmark.y * height);
         const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
         return {
           id: landmark.id,
@@ -169,8 +211,10 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
       setPinScreenPositions(nextPins);
       setLandmarkScreenPositions(nextLandmarks);
     };
+    recalculateMarkersRef.current = updateMarkerPositions;
 
     const mapCanvasPointToNormalized = (eventPosition: { x: number; y: number }) => {
+      const currentLayer = layerRef.current;
       const viewportPoint = viewer.viewport.pointFromPixel(
         new OpenSeadragon.Point(eventPosition.x, eventPosition.y),
         true,
@@ -178,8 +222,8 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
       const imagePoint = viewer.viewport.viewportToImageCoordinates(viewportPoint);
 
       return {
-        x: Math.max(0, Math.min(1, imagePoint.x / layer.width)),
-        y: Math.max(0, Math.min(1, imagePoint.y / layer.height)),
+        x: Math.max(0, Math.min(1, imagePoint.x / currentLayer.width)),
+        y: Math.max(0, Math.min(1, imagePoint.y / currentLayer.height)),
       };
     };
 
@@ -201,20 +245,20 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
         return;
       }
 
-      if (!addMode && !landmarkAddMode) {
+      if (!addModeRef.current && !landmarkAddModeRef.current) {
         return;
       }
 
       const point = mapCanvasPointToNormalized(event.position);
-      onMapPlacement(point);
+      onMapPlacementRef.current(point);
     });
 
     viewer.addHandler("canvas-drag", () => {
-      onViewerPanningChange?.(true);
+      onViewerPanningChangeRef.current?.(true);
     });
 
     viewer.addHandler("canvas-release", () => {
-      onViewerPanningChange?.(false);
+      onViewerPanningChangeRef.current?.(false);
     });
 
     viewer.addHandler("animation", updateMarkerPositions);
@@ -222,17 +266,14 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     viewer.addHandler("viewport-change", updateMarkerPositions);
 
     return () => {
-      isCancelled = true;
       viewer.destroy();
       viewerRef.current = null;
+      recalculateMarkersRef.current = () => {};
       setPinScreenPositions([]);
       setLandmarkScreenPositions([]);
-      onViewerPanningChange?.(false);
+      onViewerPanningChangeRef.current?.(false);
     };
   }, [
-    addMode,
-    landmarkAddMode,
-    landmarks,
     layer.default_zoom,
     layer.height,
     layer.label,
@@ -240,9 +281,6 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     layer.min_zoom,
     layer.tile_source,
     layer.width,
-    onMapPlacement,
-    onViewerPanningChange,
-    pins,
   ]);
 
   const pinScreenById = useMemo(() => {
@@ -279,7 +317,7 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
               style={{ left: `${position.left}px`, top: `${position.top}px` }}
               onClick={(event) => {
                 event.stopPropagation();
-                onLandmarkClick(landmark);
+                onLandmarkClickRef.current(landmark);
               }}
               title={landmark.label}
             >
@@ -300,7 +338,7 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
               style={{ left: `${position.left}px`, top: `${position.top}px` }}
               onClick={(event) => {
                 event.stopPropagation();
-                onPinClick(pin);
+                onPinClickRef.current(pin);
               }}
             >
               <span>{pin.title}</span>

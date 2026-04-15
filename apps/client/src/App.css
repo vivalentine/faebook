@@ -953,6 +953,7 @@
   min-height: 36px;
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.32);
+  touch-action: manipulation;
 }
 
 .map-landmark {
@@ -969,6 +970,7 @@
   max-width: 220px;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  touch-action: manipulation;
 }
 
 .map-landmark::after {
