@@ -206,7 +206,13 @@ db.exec(`
     author_user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     body TEXT NOT NULL,
+    like_count INTEGER NOT NULL DEFAULT 0,
     view_count INTEGER NOT NULL DEFAULT 0,
+    crown_year INTEGER,
+    bloom_index INTEGER,
+    petal INTEGER,
+    bell INTEGER,
+    chime INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (author_user_id) REFERENCES users(id)
@@ -220,6 +226,11 @@ db.exec(`
     post_id INTEGER NOT NULL,
     author_user_id INTEGER NOT NULL,
     body TEXT NOT NULL,
+    crown_year INTEGER,
+    bloom_index INTEGER,
+    petal INTEGER,
+    bell INTEGER,
+    chime INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (post_id) REFERENCES whisper_posts(id),
@@ -607,6 +618,38 @@ if (tableExists("whisper_posts") && !columnExists("whisper_posts", "view_count")
     ALTER TABLE whisper_posts
     ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0
   `);
+}
+
+if (tableExists("whisper_posts") && !columnExists("whisper_posts", "like_count")) {
+  db.exec(`
+    ALTER TABLE whisper_posts
+    ADD COLUMN like_count INTEGER NOT NULL DEFAULT 0
+  `);
+
+  db.exec(`
+    UPDATE whisper_posts
+    SET like_count = (
+      SELECT COUNT(*)
+      FROM whisper_likes
+      WHERE whisper_likes.post_id = whisper_posts.id
+    )
+  `);
+}
+
+for (const columnName of ["crown_year", "bloom_index", "petal", "bell", "chime"]) {
+  if (tableExists("whisper_posts") && !columnExists("whisper_posts", columnName)) {
+    db.exec(`
+      ALTER TABLE whisper_posts
+      ADD COLUMN ${columnName} INTEGER
+    `);
+  }
+
+  if (tableExists("whisper_comments") && !columnExists("whisper_comments", columnName)) {
+    db.exec(`
+      ALTER TABLE whisper_comments
+      ADD COLUMN ${columnName} INTEGER
+    `);
+  }
 }
 
 db.exec(`
