@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const sourceDir = path.join(repoRoot, "apps/client/public/maps");
 const tilesRoot = path.join(repoRoot, "apps/client/public/maps/tiles");
 const sharpModulePath = path.join(repoRoot, "apps/server/node_modules/sharp/lib/index.js");
@@ -14,15 +15,13 @@ const MAPS = [
 ];
 
 async function generateTiles() {
-  const sharpImport = await import(`file://${sharpModulePath}`);
+  const sharpImport = await import(pathToFileURL(sharpModulePath).href);
   const sharp = sharpImport.default;
 
   for (const map of MAPS) {
     const sourcePath = path.join(sourceDir, map.sourceFile);
     const mapOutputDir = path.join(tilesRoot, map.mapId);
-    const outputBasePath = path.join(mapOutputDir, map.mapId);
-    const dzOutputPath = `${outputBasePath}.dz`;
-    const dziOutputPath = `${outputBasePath}.dzi`;
+    const dziOutputPath = path.join(mapOutputDir, `${map.mapId}.dzi`);
 
     if (!fs.existsSync(sourcePath)) {
       throw new Error(`Missing map source image: ${sourcePath}`);
@@ -32,14 +31,14 @@ async function generateTiles() {
     fs.mkdirSync(mapOutputDir, { recursive: true });
 
     await sharp(sourcePath)
-      .webp({ quality: 82 })
       .tile({
         layout: "dz",
         container: "fs",
         size: 256,
         overlap: 1,
       })
-      .toFile(dzOutputPath);
+      .webp({ quality: 82 })
+      .toFile(dziOutputPath);
 
     process.stdout.write(`Generated tiles for ${map.mapId}: ${path.relative(repoRoot, dziOutputPath)}\n`);
   }
