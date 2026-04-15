@@ -278,7 +278,7 @@ export default function DocumentsPage() {
                 </p>
                 <h2>{activeDocument.title}</h2>
               </header>
-              <div className="dashboard-markdown chapter-reader-markdown documents-reader-markdown">
+              <div className="dashboard-markdown chapter-reader-markdown documents-reader-markdown reader-prose">
                 {renderRecapMarkdown(activeDocument.body_markdown, { entityIndex: entityWikiIndex })}
               </div>
             </>

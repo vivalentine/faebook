@@ -224,7 +224,7 @@ export default function ChaptersPage() {
                 </p>
                 <h2>{activeChapter.chapter_title}</h2>
               </header>
-              <div className="dashboard-markdown chapter-reader-markdown">
+              <div className="dashboard-markdown chapter-reader-markdown reader-prose">
                 {renderRecapMarkdown(activeChapter.content, { entityIndex: entityWikiIndex })}
               </div>
               <div className="chapter-reader-nav">
