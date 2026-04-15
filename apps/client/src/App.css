@@ -341,6 +341,13 @@
   align-items: start;
 }
 
+.detail-media-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
 .detail-meta {
   padding: 20px;
   border-radius: 18px;
