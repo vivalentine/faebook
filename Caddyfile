@@ -25,9 +25,9 @@
 		file_server
 	}
 
-	@mapTiles path /maps/tiles/*
+	@mapTiles path /apps/client/public/maps/tiles/*
 	handle @mapTiles {
-		root * {$FAEBOOK_CLIENT_DIST:C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist}
+		root * {$FAEBOOK_ROOT:C:\Users\viole\Projects\faebook-repo\faebook}
 		try_files {path} =404
 		header Cache-Control "public, max-age=31536000, immutable"
 		file_server
