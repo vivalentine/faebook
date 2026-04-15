@@ -305,6 +305,11 @@ export type WhisperPost = {
   like_count: number;
   comment_count: number;
   view_count: number;
+  crown_year: number | null;
+  bloom_index: number | null;
+  petal: number | null;
+  bell: number | null;
+  chime: number | null;
   liked_by_me: boolean;
   can_moderate: boolean;
   created_at: string;
@@ -315,6 +320,11 @@ export type WhisperComment = {
   id: number;
   post_id: number;
   body: string;
+  crown_year: number | null;
+  bloom_index: number | null;
+  petal: number | null;
+  bell: number | null;
+  chime: number | null;
   can_moderate: boolean;
   created_at: string;
   updated_at: string;
