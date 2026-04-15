@@ -399,12 +399,14 @@ export default function DmNpcPage() {
 
       <section className="detail-shell">
         <div className="detail-hero">
-          <div className="detail-image-wrap">
-            {imageUrl ? (
-              <img className="detail-image" src={imageUrl} alt={npc.name} />
-            ) : (
-              <div className="detail-image placeholder">No image</div>
-            )}
+          <div className="detail-media-column">
+            <div className="detail-image-wrap">
+              {imageUrl ? (
+                <img className="detail-image" src={imageUrl} alt={npc.name} />
+              ) : (
+                <div className="detail-image placeholder">No image</div>
+              )}
+            </div>
             <section className="state-card small-card">
               <h3>Portrait management</h3>
               <p>Upload a replacement portrait or clear the active one. Replacement archives the prior asset automatically.</p>
