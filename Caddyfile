@@ -25,6 +25,14 @@
 		file_server
 	}
 
+    @maps path /maps/*
+    handle @maps {
+	root * {$FAEBOOK_CLIENT_DIST:C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist}
+	try_files {path} =404
+	header Cache-Control "public, max-age=31536000, immutable"
+	file_server
+    }
+	
 	handle {
 		root * {$FAEBOOK_CLIENT_DIST:C:\Users\viole\Projects\faebook-repo\faebook\apps\client\dist}
 		@index path /index.html
