@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
+import TiledMapViewer, { type TiledMapViewerHandle } from "../components/TiledMapViewer";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
-import { getMapZoomDampingExponent, getUserSettings } from "../lib/userSettings";
 import type {
   MapLandmark,
   MapLandmarkMarkerStyle,
@@ -17,7 +17,6 @@ import type {
 const PIN_CATEGORIES: MapPinCategory[] = ["clue", "lead", "suspect", "danger", "meeting", "theory"];
 const LANDMARK_MARKER_STYLES: MapLandmarkMarkerStyle[] = ["landmark", "district", "estate", "civic", "market"];
 const LANDMARK_VISIBILITY_SCOPES: MapLandmarkVisibilityScope[] = ["public", "dm_only"];
-const PAN_DRAG_THRESHOLD = 8;
 
 type PinDraft = {
   title: string;
@@ -38,11 +37,6 @@ type EditorState = {
   x: number;
   y: number;
   draft: PinDraft;
-};
-
-type ViewportSize = {
-  width: number;
-  height: number;
 };
 
 type LandmarkDraft = {
@@ -68,88 +62,6 @@ const EMPTY_LANDMARK_DRAFT: LandmarkDraft = {
   sort_order: 0,
   unlock_chapter: "",
 };
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function clampViewportOffsetAxis({
-  offset,
-  mapLength,
-  viewportLength,
-  zoom,
-}: {
-  offset: number;
-  mapLength: number;
-  viewportLength: number;
-  zoom: number;
-}) {
-  if (viewportLength <= 0 || mapLength <= 0 || zoom <= 0) {
-    return offset;
-  }
-
-  const scaledLength = mapLength * zoom;
-  if (scaledLength <= viewportLength) {
-    return (viewportLength - scaledLength) / 2;
-  }
-
-  const minOffset = viewportLength - scaledLength;
-  const maxOffset = 0;
-  return clamp(offset, minOffset, maxOffset);
-}
-
-function clampViewportOffset({
-  offset,
-  layer,
-  zoom,
-  viewport,
-}: {
-  offset: { x: number; y: number };
-  layer: Pick<MapLayerConfig, "width" | "height">;
-  zoom: number;
-  viewport: ViewportSize;
-}) {
-  return {
-    x: clampViewportOffsetAxis({
-      offset: offset.x,
-      mapLength: layer.width,
-      viewportLength: viewport.width,
-      zoom,
-    }),
-    y: clampViewportOffsetAxis({
-      offset: offset.y,
-      mapLength: layer.height,
-      viewportLength: viewport.height,
-      zoom,
-    }),
-  };
-}
-
-function computeInitialViewport({
-  layer,
-  viewport,
-}: {
-  layer: Pick<MapLayerConfig, "width" | "height" | "default_zoom">;
-  viewport: ViewportSize;
-}) {
-  const zoom = layer.default_zoom;
-  const scaledWidth = layer.width * zoom;
-  const scaledHeight = layer.height * zoom;
-  const centeredOffset = {
-    x: (viewport.width - scaledWidth) / 2,
-    y: (viewport.height - scaledHeight) / 2,
-  };
-
-  return {
-    zoom,
-    offset: clampViewportOffset({
-      offset: centeredOffset,
-      layer,
-      zoom,
-      viewport,
-    }),
-  };
-}
 
 function formatTimestampForFilename(date = new Date()) {
   const year = date.getUTCFullYear();
@@ -177,9 +89,6 @@ export default function MapsPage() {
   const [landmarks, setLandmarks] = useState<MapLandmark[]>([]);
   const [locationsBySlug, setLocationsBySlug] = useState<Record<string, LocationRecord>>({});
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
-  const [zoom, setZoom] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -198,32 +107,8 @@ export default function MapsPage() {
     | null
   >(null);
   const [selectedLandmarkId, setSelectedLandmarkId] = useState<number | null>(null);
-  const [isPanning, setIsPanning] = useState(false);
 
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const mapStageRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef({
-    active: false,
-    pointerId: -1,
-    startX: 0,
-    startY: 0,
-    baseX: 0,
-    baseY: 0,
-    moved: false,
-  });
-  const pinchStateRef = useRef<
-    | {
-        active: true;
-        pointerA: number;
-        pointerB: number;
-        startDistance: number;
-        startZoom: number;
-        startWorldX: number;
-        startWorldY: number;
-      }
-    | { active: false }
-  >({ active: false });
-  const activeTouchPoints = useRef(new Map<number, { x: number; y: number }>());
+  const mapViewerRef = useRef<TiledMapViewerHandle | null>(null);
 
   const activeLayer = useMemo(
     () => layers.find((layer) => layer.map_id === activeLayerId) || null,
@@ -240,15 +125,6 @@ export default function MapsPage() {
     [landmarks, activeLayerId],
   );
 
-  const zoomDampingExponent = useMemo(() => {
-    if (!user) {
-      return getMapZoomDampingExponent("balanced");
-    }
-
-    const settings = getUserSettings(user.id);
-    return getMapZoomDampingExponent(settings.mapZoomSensitivity);
-  }, [user]);
-
   const selectedLandmark = useMemo(
     () => visibleLandmarks.find((landmark) => landmark.id === selectedLandmarkId) || null,
     [visibleLandmarks, selectedLandmarkId],
@@ -259,17 +135,6 @@ export default function MapsPage() {
     if (!selectedLandmark.linked_entity_slug) return null;
     return locationsBySlug[selectedLandmark.linked_entity_slug] || null;
   }, [locationsBySlug, selectedLandmark]);
-
-  const resetView = useCallback((layer: MapLayerConfig) => {
-    const viewportEl = viewportRef.current;
-    const viewport = {
-      width: viewportEl?.clientWidth ?? viewportSize.width,
-      height: viewportEl?.clientHeight ?? viewportSize.height,
-    };
-    const initialViewport = computeInitialViewport({ layer, viewport });
-    setZoom(initialViewport.zoom);
-    setOffset(initialViewport.offset);
-  }, [viewportSize.height, viewportSize.width]);
 
   const loadMaps = useCallback(async () => {
     setLoading(true);
@@ -320,15 +185,6 @@ export default function MapsPage() {
         setActiveLayerId((current) => {
           const selected = current || nextLayers[0].map_id;
           const layer = nextLayers.find((entry) => entry.map_id === selected) || nextLayers[0];
-          const initialViewport = computeInitialViewport({
-            layer,
-            viewport: {
-              width: viewportRef.current?.clientWidth ?? 0,
-              height: viewportRef.current?.clientHeight ?? 0,
-            },
-          });
-          setZoom(initialViewport.zoom);
-          setOffset(initialViewport.offset);
           return layer.map_id;
         });
       }
@@ -340,121 +196,8 @@ export default function MapsPage() {
   }, []);
 
   useEffect(() => {
-    const viewportEl = viewportRef.current;
-    if (!viewportEl) {
-      return;
-    }
-
-    const syncViewportSize = () => {
-      setViewportSize({
-        width: viewportEl.clientWidth,
-        height: viewportEl.clientHeight,
-      });
-    };
-
-    syncViewportSize();
-    const resizeObserver = new ResizeObserver(() => {
-      syncViewportSize();
-    });
-    resizeObserver.observe(viewportEl);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     void loadMaps();
   }, [loadMaps]);
-
-  useEffect(() => {
-    const viewportEl = viewportRef.current;
-    if (!viewportEl || !activeLayer) {
-      return;
-    }
-
-    const onWheel = (event: WheelEvent) => {
-      event.preventDefault();
-
-      const rect = viewportEl.getBoundingClientRect();
-      const pointerX = event.clientX - rect.left;
-      const pointerY = event.clientY - rect.top;
-
-      const zoomFactor = event.deltaY < 0 ? 1.12 : 0.9;
-      const nextZoom = clamp(zoomRef.current * zoomFactor, activeLayer.min_zoom, activeLayer.max_zoom);
-
-      const worldX = (pointerX - offsetRef.current.x) / zoomRef.current;
-      const worldY = (pointerY - offsetRef.current.y) / zoomRef.current;
-
-      const nextOffsetX = pointerX - worldX * nextZoom;
-      const nextOffsetY = pointerY - worldY * nextZoom;
-      const clampedOffset = clampViewportOffset({
-        offset: { x: nextOffsetX, y: nextOffsetY },
-        layer: activeLayer,
-        zoom: nextZoom,
-        viewport: { width: rect.width, height: rect.height },
-      });
-
-      zoomRef.current = nextZoom;
-      offsetRef.current = clampedOffset;
-      setZoom(nextZoom);
-      setOffset(clampedOffset);
-    };
-
-    viewportEl.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      viewportEl.removeEventListener("wheel", onWheel);
-    };
-  }, [activeLayer]);
-
-  const zoomRef = useRef(zoom);
-  const offsetRef = useRef(offset);
-
-  useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
-
-  useEffect(() => {
-    offsetRef.current = offset;
-  }, [offset]);
-
-  useEffect(() => {
-    if (!activeLayer || viewportSize.width <= 0 || viewportSize.height <= 0) {
-      return;
-    }
-
-    setOffset((current) => {
-      const next = clampViewportOffset({
-        offset: current,
-        layer: activeLayer,
-        zoom,
-        viewport: viewportSize,
-      });
-
-      if (Math.abs(next.x - current.x) < 0.001 && Math.abs(next.y - current.y) < 0.001) {
-        return current;
-      }
-      return next;
-    });
-  }, [activeLayer, viewportSize, zoom]);
-
-  const computeNormalizedFromClientPoint = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!mapStageRef.current) {
-        return { x: 0.5, y: 0.5 };
-      }
-
-      const mapRect = mapStageRef.current.getBoundingClientRect();
-      const localX = clientX - mapRect.left;
-      const localY = clientY - mapRect.top;
-
-      return {
-        x: clamp(localX / mapRect.width, 0, 1),
-        y: clamp(localY / mapRect.height, 0, 1),
-      };
-    },
-    [],
-  );
 
   async function savePin(payload: {
     method: "POST" | "PATCH";
@@ -605,7 +348,7 @@ export default function MapsPage() {
     if (!nextLayer) return;
 
     setActiveLayerId(nextLayer.map_id);
-    resetView(nextLayer);
+    mapViewerRef.current?.resetView();
     setAddMode(false);
     setLandmarkAddMode(false);
     setEditorState(null);
@@ -613,181 +356,10 @@ export default function MapsPage() {
     setSelectedLandmarkId(null);
   }
 
-  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (!viewportRef.current) return;
-
-    const isTouch = event.pointerType === "touch";
-    if (isTouch) {
-      activeTouchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-
-      if (activeTouchPoints.current.size === 2 && activeLayer) {
-        const points = Array.from(activeTouchPoints.current.entries());
-        const pointA = points[0][1];
-        const pointB = points[1][1];
-        const distance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
-        const rect = viewportRef.current.getBoundingClientRect();
-        const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
-        const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
-        const startZoom = zoomRef.current;
-        const startOffset = offsetRef.current;
-
-        pinchStateRef.current = {
-          active: true,
-          pointerA: points[0][0],
-          pointerB: points[1][0],
-          startDistance: distance,
-          startZoom,
-          startWorldX: (midpointX - startOffset.x) / startZoom,
-          startWorldY: (midpointY - startOffset.y) / startZoom,
-        };
-
-        dragStateRef.current = {
-          active: false,
-          pointerId: -1,
-          startX: 0,
-          startY: 0,
-          baseX: 0,
-          baseY: 0,
-          moved: true,
-        };
-      } else if (activeTouchPoints.current.size === 1) {
-        dragStateRef.current = {
-          active: true,
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-          baseX: offsetRef.current.x,
-          baseY: offsetRef.current.y,
-          moved: false,
-        };
-      }
-
-      viewportRef.current.setPointerCapture(event.pointerId);
-      return;
-    }
-
-    dragStateRef.current = {
-      active: true,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      baseX: offsetRef.current.x,
-      baseY: offsetRef.current.y,
-      moved: false,
-    };
-
-    viewportRef.current.setPointerCapture(event.pointerId);
-  }
-
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!activeLayer) return;
-
-    if (event.pointerType === "touch") {
-      activeTouchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      const pinch = pinchStateRef.current;
-      if (pinch.active) {
-        const pointA = activeTouchPoints.current.get(pinch.pointerA);
-        const pointB = activeTouchPoints.current.get(pinch.pointerB);
-        const viewportEl = viewportRef.current;
-        if (!pointA || !pointB || !viewportEl) return;
-
-        const rect = viewportEl.getBoundingClientRect();
-        const midpointX = (pointA.x + pointB.x) / 2 - rect.left;
-        const midpointY = (pointA.y + pointB.y) / 2 - rect.top;
-        const currentDistance = Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
-        const rawRatio = pinch.startDistance > 0 ? currentDistance / pinch.startDistance : 1;
-        const dampedRatio = Math.pow(rawRatio, zoomDampingExponent);
-        const nextZoom = clamp(
-          pinch.startZoom * dampedRatio,
-          activeLayer.min_zoom,
-          activeLayer.max_zoom,
-        );
-
-        const nextOffset = {
-          x: midpointX - pinch.startWorldX * nextZoom,
-          y: midpointY - pinch.startWorldY * nextZoom,
-        };
-        const clampedOffset = clampViewportOffset({
-          offset: nextOffset,
-          layer: activeLayer,
-          zoom: nextZoom,
-          viewport: { width: rect.width, height: rect.height },
-        });
-
-        dragStateRef.current.moved = true;
-        setIsPanning(true);
-        zoomRef.current = nextZoom;
-        offsetRef.current = clampedOffset;
-        setZoom(nextZoom);
-        setOffset(clampedOffset);
-        return;
-      }
-    }
-
-    const drag = dragStateRef.current;
-    if (!drag.active || drag.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    if (Math.abs(dx) > PAN_DRAG_THRESHOLD || Math.abs(dy) > PAN_DRAG_THRESHOLD) {
-      drag.moved = true;
-      setIsPanning(true);
-    }
-
-    const viewportEl = viewportRef.current;
-    const nextOffset = { x: drag.baseX + dx, y: drag.baseY + dy };
-    const clampedOffset = clampViewportOffset({
-      offset: nextOffset,
-      layer: activeLayer,
-      zoom: zoomRef.current,
-      viewport: {
-        width: viewportEl?.clientWidth ?? viewportSize.width,
-        height: viewportEl?.clientHeight ?? viewportSize.height,
-      },
-    });
-    setOffset(clampedOffset);
-  }
-
-  function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    const drag = dragStateRef.current;
-    activeTouchPoints.current.delete(event.pointerId);
-
-    if (pinchStateRef.current.active) {
-      const pinch = pinchStateRef.current;
-      if (event.pointerId === pinch.pointerA || event.pointerId === pinch.pointerB) {
-        pinchStateRef.current = { active: false };
-      }
-    }
-
-    if (drag.active && drag.pointerId === event.pointerId) {
-      dragStateRef.current = {
-        active: false,
-        pointerId: -1,
-        startX: 0,
-        startY: 0,
-        baseX: 0,
-        baseY: 0,
-        moved: drag.moved,
-      };
-    }
-
-    if (activeTouchPoints.current.size === 0) {
-      setIsPanning(false);
-    }
-  }
-
-  function onMapClick(event: React.MouseEvent<HTMLDivElement>) {
+  function onMapPlacement(point: { x: number; y: number }) {
     if (!activeLayer) {
       return;
     }
-
-    if (dragStateRef.current.moved) {
-      return;
-    }
-
-    const point = computeNormalizedFromClientPoint(event.clientX, event.clientY);
     if (landmarkAddMode && user?.role === "dm") {
       setLandmarkEditor({
         mode: "create",
@@ -900,22 +472,22 @@ export default function MapsPage() {
             <button
               className="secondary-link maps-action"
               type="button"
-              onClick={() =>
-                setZoom((current) => clamp(current * 1.15, activeLayer.min_zoom, activeLayer.max_zoom))
-              }
+              onClick={() => mapViewerRef.current?.zoomIn()}
             >
               Zoom In
             </button>
             <button
               className="secondary-link maps-action"
               type="button"
-              onClick={() =>
-                setZoom((current) => clamp(current / 1.15, activeLayer.min_zoom, activeLayer.max_zoom))
-              }
+              onClick={() => mapViewerRef.current?.zoomOut()}
             >
               Zoom Out
             </button>
-            <button className="secondary-link maps-action" type="button" onClick={() => resetView(activeLayer)}>
+            <button
+              className="secondary-link maps-action"
+              type="button"
+              onClick={() => mapViewerRef.current?.resetView()}
+            >
               Reset View
             </button>
             <button
@@ -962,137 +534,79 @@ export default function MapsPage() {
         </p>
       </section>
 
-      <section
-        className={`maps-viewport-shell ${addMode ? "add-mode" : ""}`.trim()}
-        ref={viewportRef}
-        onDragStart={(event) => event.preventDefault()}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onClick={onMapClick}
-        data-panning={isPanning ? "true" : "false"}
-      >
-        <div
-          className="maps-canvas"
-          ref={mapStageRef}
-          style={{
-            width: `${activeLayer.width}px`,
-            height: `${activeLayer.height}px`,
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-          }}
-        >
-          <img
-            src={activeLayer.image_path}
-            alt={activeLayer.label}
-            className="maps-image"
-            draggable={false}
-            onDragStart={(event) => event.preventDefault()}
-          />
+      <TiledMapViewer
+        ref={mapViewerRef}
+        layer={activeLayer}
+        addMode={addMode}
+        landmarkAddMode={landmarkAddMode}
+        pins={visiblePins}
+        landmarks={visibleLandmarks}
+        onMapPlacement={onMapPlacement}
+        onLandmarkClick={(landmark) => {
+          setSelectedLandmarkId(landmark.id);
+          if (user?.role === "dm") {
+            setLandmarkEditor({
+              mode: "edit",
+              landmarkId: landmark.id,
+              map_id: landmark.map_id,
+              x: landmark.x,
+              y: landmark.y,
+              draft: {
+                label: landmark.label,
+                slug: landmark.slug,
+                marker_style: landmark.marker_style,
+                visibility_scope: landmark.visibility_scope,
+                description: landmark.description || "",
+                linked_page_slug: landmark.linked_page_slug || "",
+                linked_entity_slug: landmark.linked_entity_slug || "",
+                sort_order: landmark.sort_order || 0,
+                unlock_chapter: landmark.unlock_chapter == null ? "" : String(landmark.unlock_chapter),
+              },
+            });
+            setAddMode(false);
+          }
+        }}
+        onPinClick={(pin) => {
+          setAddMode(false);
+          setLandmarkAddMode(false);
+          setEditorState({
+            mode: "edit",
+            pinId: pin.id,
+            mapLayer: pin.map_layer,
+            x: pin.x,
+            y: pin.y,
+            draft: {
+              title: pin.title,
+              note: pin.note,
+              category: pin.category,
+            },
+          });
+        }}
+      />
 
-          {visibleLandmarks.map((landmark) => (
-            <button
-              type="button"
-              key={`landmark-${landmark.id}`}
-              className={`map-landmark map-landmark-${landmark.marker_style} ${
-                landmark.visibility_scope === "dm_only" ? "is-dm-only" : ""
-              }`.trim()}
-              style={{ left: `${landmark.x * 100}%`, top: `${landmark.y * 100}%` }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.stopPropagation();
-                setSelectedLandmarkId(landmark.id);
-                if (user?.role === "dm") {
-                  setLandmarkEditor({
-                    mode: "edit",
-                    landmarkId: landmark.id,
-                    map_id: landmark.map_id,
-                    x: landmark.x,
-                    y: landmark.y,
-                    draft: {
-                      label: landmark.label,
-                      slug: landmark.slug,
-                      marker_style: landmark.marker_style,
-                      visibility_scope: landmark.visibility_scope,
-                      description: landmark.description || "",
-                      linked_page_slug: landmark.linked_page_slug || "",
-                      linked_entity_slug: landmark.linked_entity_slug || "",
-                      sort_order: landmark.sort_order || 0,
-                      unlock_chapter:
-                        landmark.unlock_chapter == null ? "" : String(landmark.unlock_chapter),
-                    },
-                  });
-                  setAddMode(false);
-                }
-              }}
-              title={landmark.label}
-            >
-              <span>{landmark.label}</span>
-            </button>
-          ))}
-
-          {selectedLandmark ? (
-            <article
-              className="map-landmark-popover"
-              style={{ left: `${selectedLandmark.x * 100}%`, top: `${selectedLandmark.y * 100}%` }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-            >
-              <h3>{selectedLandmark.label}</h3>
-              {selectedLandmarkLocation?.ring ? (
-                <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
-              ) : null}
-              {selectedLandmarkLocation?.summary ? (
-                <p>{selectedLandmarkLocation.summary}</p>
-              ) : selectedLandmark.description ? (
-                <p>{selectedLandmark.description}</p>
-              ) : null}
-              <p className="map-landmark-popover-meta">
-                {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
-              </p>
-              {selectedLandmarkLocation?.slug ? (
-                <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
-                  Open location
-                </Link>
-              ) : null}
-            </article>
+      {selectedLandmark ? (
+        <section className="maps-editor-card">
+          <div className="maps-editor-header">
+            <h2>{selectedLandmark.label}</h2>
+          </div>
+          {selectedLandmarkLocation?.ring ? (
+            <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
           ) : null}
-
-          {visiblePins.map((pin) => (
-            <button
-              type="button"
-              key={pin.id}
-              className={`map-pin map-pin-${pin.category}`}
-              style={{ left: `${pin.x * 100}%`, top: `${pin.y * 100}%` }}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.stopPropagation();
-                setAddMode(false);
-                setLandmarkAddMode(false);
-                setEditorState({
-                  mode: "edit",
-                  pinId: pin.id,
-                  mapLayer: pin.map_layer,
-                  x: pin.x,
-                  y: pin.y,
-                  draft: {
-                    title: pin.title,
-                    note: pin.note,
-                    category: pin.category,
-                  },
-                });
-              }}
-            >
-              <span>{pin.title}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+          {selectedLandmarkLocation?.summary ? (
+            <p>{selectedLandmarkLocation.summary}</p>
+          ) : selectedLandmark.description ? (
+            <p>{selectedLandmark.description}</p>
+          ) : null}
+          <p className="map-landmark-popover-meta">
+            {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
+          </p>
+          {selectedLandmarkLocation?.slug ? (
+            <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
+              Open location
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       {editorState ? (
         <section className="maps-editor-card">

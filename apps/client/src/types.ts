@@ -273,6 +273,8 @@ export type MapLayerConfig = {
   label: string;
   image_filename: string;
   image_path: string;
+  tile_source: string;
+  tile_source_type: "deepzoom";
   width: number;
   height: number;
   default_zoom: number;
