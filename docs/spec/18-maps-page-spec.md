@@ -8,6 +8,7 @@ Defines the Maps page behavior and user experience for v1.
 
 - Maps is a first-class top-level page
 - map data is file/config-backed
+- tiled rendering via OpenSeadragon + Deep Zoom is an approved v1 implementation for required maps
 - map pins are per-user in v1
 - players manage their own pins
 - player pin removal archives pins
@@ -56,6 +57,8 @@ Maps page includes:
 - initial state comes from map config
 - zoom is clamped by config values
 - map remains readable in dark app shell
+- required map layers should render from configured tile sources when present
+- a missing tile source should show a clear non-crashing error state
 
 ## Pins
 
@@ -89,7 +92,7 @@ Maps page includes:
 
 ## Pin Placement Rules
 
-- use normalized coordinates from 0 to 1
+- use normalized coordinates from 0 to 1 (locked)
 - pin locations should remain stable if the same image is rendered responsively
 - accidental placement should be avoided during pan gestures
 
@@ -141,3 +144,11 @@ Possible later additions:
 - icon-based pin styles
 
 These are outside v1 scope.
+
+
+## Tiled Delivery Notes
+
+- Overworld, Inner Ring, and Outer Ring are tiled in v1.
+- Tile descriptors and tile paths are config-driven, not database-driven.
+- Per-user map pins remain unchanged and stored with normalized `x`/`y` coordinates from 0 to 1.
+- DM landmark behavior remains supported on tiled layers.

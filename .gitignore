@@ -12,3 +12,6 @@ backups/
 *.log
 .DS_Store
 Thumbs.db
+apps/client/public/maps/tiles/**/*.dzi
+apps/client/public/maps/tiles/**/*_files/
+apps/client/public/maps/tiles/**/*_files/**

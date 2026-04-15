@@ -49,6 +49,8 @@ Each map layer in FaeBook is a configured asset with:
 
 In v1, map metadata lives in file/config, not in the database.
 
+In v1, Overworld, Inner Ring, and Outer Ring are approved for tiled delivery using Deep Zoom tile pyramids.
+
 ---
 
 ## Required Map Layers for v1
@@ -135,6 +137,7 @@ Each map must have a config entry.
 map_id:
 label:
 image_filename:
+tile_source:
 width:
 height:
 default_zoom:
@@ -187,6 +190,17 @@ Rules:
 * string
 * exact filename
 * max 255 characters
+
+#### `tile_source`
+
+Deep Zoom tile source descriptor path.
+
+Rules:
+
+* required for `overworld`, `inner-ring`, and `outer-ring` in v1
+* string
+* points to a `.dzi` descriptor
+* expected served path example: `/maps/tiles/overworld/overworld.dzi`
 
 #### `width`
 
@@ -309,6 +323,7 @@ Rules:
 map_id: inner-ring
 label: Inner Ring
 image_filename: inner-ring-map.png
+tile_source: /maps/tiles/inner-ring/inner-ring.dzi
 width: 4096
 height: 4096
 default_zoom: 1
@@ -558,7 +573,7 @@ Allow strict rejection later if desired.
 
 ## Missing Asset Behavior
 
-If a map config exists but the image file is missing:
+If a map config exists but the tiled source is missing:
 
 * map must not silently render a broken surface
 * UI should show a clear DM-facing or user-facing error state
@@ -640,7 +655,7 @@ Map viewer should remain usable on:
 
 If needed later:
 
-* image tiling
+* tile cache prewarming
 * lazy loading
 * downscaled preview layers
 * thumbnail preloading
@@ -744,6 +759,7 @@ These decisions are final for v1:
 * map metadata lives in file/config
 * required maps are Overworld, Inner Ring, and Outer Ring
 * PNG is the preferred map source format
+* tiled delivery using Deep Zoom is approved in v1 for required maps
 * pins use normalized coordinates from 0 to 1
 * maps are config assets, not player-managed content
 * pins are personal per-user in v1
@@ -760,7 +776,6 @@ This schema does not include:
 * public map publishing
 * live synced party map annotations
 * map image editing inside the app
-* image tiling engine
 * GIS-style coordinate systems
 * complex geospatial projections
 
@@ -771,9 +786,10 @@ This schema does not include:
 A clean map setup flow should look like this:
 
 1. place source map images in the map asset directory
-2. define each map in config
-3. validate filenames and metadata on app start or DM/admin load
-4. render map layers using config
-5. store pins with normalized coordinates
-6. convert click/tap positions into normalized coordinates
-7. restore pins correctly at any zoom or viewport size
+2. generate Deep Zoom tiles into the public map tile path
+3. define each map in config, including `tile_source`
+4. validate filenames and metadata on app start or DM/admin load
+5. render map layers using a tiled viewer
+6. store pins with normalized coordinates
+7. convert click/tap positions into normalized coordinates
+8. restore pins correctly at any zoom or viewport size
