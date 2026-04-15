@@ -4,7 +4,7 @@ image_filename: outer-ring-map.png
 tile_source: /maps/tiles/outer-ring/outer-ring.dzi
 width: 2048
 height: 2048
-default_zoom: 0.5
+default_zoom: 1
 min_zoom: 0.1
-max_zoom: 2
+max_zoom: 2.5
 pin_scale: 1
