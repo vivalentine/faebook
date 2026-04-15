@@ -1,5 +1,14 @@
 import type { Edge, Node, Viewport } from "@xyflow/react";
 
+export type NpcPortraitMetadata = {
+  active_path: string;
+  file_name?: string | null;
+  extension?: string | null;
+  size_bytes?: number | null;
+  updated_at?: string | null;
+  exists_on_disk?: boolean;
+};
+
 export type Npc = {
   id: number;
   slug: string;
@@ -13,6 +22,7 @@ export type Npc = {
   role: string | null;
   introduced_in: string | null;
   portrait_path: string | null;
+  portrait_metadata?: NpcPortraitMetadata | null;
   met_summary: string | null;
   short_blurb: string | null;
   is_visible: number;

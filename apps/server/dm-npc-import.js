@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const matter = require("gray-matter");
 const { createArchiveRecord, createAuditLog } = require("./archive");
+const { processPortraitUpload, replaceNpcPortrait } = require("./portrait-assets");
 
 const STAGED_IMPORTS = new Map();
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -674,55 +675,24 @@ function buildImportPreview(db, dmUserId) {
   };
 }
 
-function persistPortrait({ slug, portrait, dmUserId, now }) {
-  if (!portrait || !portrait.buffer) {
-    return null;
-  }
-
-  const uploadsDir = getPortraitUploadsDir();
-  const ext = portrait.ext || path.extname(portrait.filename || "").toLowerCase() || ".png";
-  const base = `${slug}-${now.replace(/[^0-9]/g, "")}`;
-  const fileName = `${base}${ext}`;
-  const diskPath = path.join(uploadsDir, fileName);
-  fs.writeFileSync(diskPath, portrait.buffer);
-
-  return {
-    assetPath: `/uploads/npc-portraits/${fileName}`,
-    originalFilename: portrait.filename,
-    mimeType: portrait.mimeType || null,
-    fileSizeBytes: portrait.size || null,
-    uploadedByUserId: dmUserId,
-  };
+async function persistPortrait({ slug, portrait, now }) {
+  return processPortraitUpload({ slug, portrait, now });
 }
 
-function archivePortraitIfReplaced(db, npcRow, newPortraitPath, dmUserId, now) {
-  if (!npcRow?.portrait_path || !newPortraitPath || npcRow.portrait_path === newPortraitPath) {
+function archivePortraitIfReplaced(db, npcRow, replacement, dmUserId, now) {
+  if (!replacement?.assetPath) {
     return;
   }
 
-  createArchiveRecord(db, {
-    objectType: "portrait_asset",
-    objectId: `${npcRow.id}:${now}`,
-    ownerUserId: dmUserId,
-    archivedByUserId: dmUserId,
-    archivedAt: now,
-    payload: {
-      npc_id: npcRow.id,
-      prior_portrait_path: npcRow.portrait_path,
-      source_action: "import-replacement",
-    },
-    objectLabel: `Portrait replaced for ${npcRow.slug}`,
-    sourceTable: "npcs",
-    archiveReason: "import-replacement",
-  });
-
-  createAuditLog(db, {
-    actorUserId: dmUserId,
-    actionType: "portrait_replace",
-    objectType: "npc",
-    objectId: npcRow.id,
-    message: `Replaced portrait during import: ${npcRow.slug}`,
-    createdAt: now,
+  replaceNpcPortrait({
+    db,
+    npcRow,
+    replacement,
+    dmUserId,
+    now,
+    sourceAction: "import-replacement",
+    auditActionType: "npc_portrait_replace",
+    auditMessage: `Replaced portrait during import: ${npcRow.slug}`,
   });
 }
 
@@ -816,10 +786,29 @@ function importCanonicalAliases(db, npcId, canonicalAliases, dmUserId, now) {
   }
 }
 
-function finalizeImport(db, dmUserId) {
+async function finalizeImport(db, dmUserId) {
   const preview = buildImportPreview(db, dmUserId);
   const now = getNow();
   const results = [];
+  const portraitPersistedByFilename = new Map();
+
+  for (const file of preview.internal.markdownPreview) {
+    if (file.validationIssues.length) continue;
+    const portrait = file.matchedPortrait
+      ? preview.internal.portraitsByFilename.get(file.matchedPortrait) ||
+        preview.internal.portraitsByFilename.get(String(file.matchedPortrait).toLowerCase())
+      : null;
+
+    if (!portrait) continue;
+
+    const persisted = await persistPortrait({
+      slug: file.frontmatter.slug,
+      portrait,
+      now,
+    });
+
+    portraitPersistedByFilename.set(file.filename, persisted);
+  }
 
   const tx = db.transaction(() => {
     for (const file of preview.internal.markdownPreview) {
@@ -842,16 +831,7 @@ function finalizeImport(db, dmUserId) {
       }
 
       const frontmatter = file.frontmatter;
-      const portrait = file.matchedPortrait
-        ? preview.internal.portraitsByFilename.get(file.matchedPortrait) ||
-          preview.internal.portraitsByFilename.get(String(file.matchedPortrait).toLowerCase())
-        : null;
-      const portraitPersisted = persistPortrait({
-        slug: frontmatter.slug,
-        portrait,
-        dmUserId,
-        now,
-      });
+      const portraitPersisted = portraitPersistedByFilename.get(file.filename) || null;
 
       const existing = db
         .prepare(
@@ -864,13 +844,7 @@ function finalizeImport(db, dmUserId) {
         .get(frontmatter.slug);
 
       if (existing) {
-        archivePortraitIfReplaced(
-          db,
-          existing,
-          portraitPersisted ? portraitPersisted.assetPath : existing.portrait_path,
-          dmUserId,
-          now
-        );
+        archivePortraitIfReplaced(db, existing, portraitPersisted, dmUserId, now);
 
         db.prepare(
           `
