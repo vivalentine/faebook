@@ -21,7 +21,7 @@ async function generateTiles() {
   for (const map of MAPS) {
     const sourcePath = path.join(sourceDir, map.sourceFile);
     const mapOutputDir = path.join(tilesRoot, map.mapId);
-    const dziOutputPath = path.join(mapOutputDir, `${map.mapId}.dzi`);
+    const outputBasePath = path.join(mapOutputDir, map.mapId);
 
     if (!fs.existsSync(sourcePath)) {
       throw new Error(`Missing map source image: ${sourcePath}`);
@@ -31,16 +31,16 @@ async function generateTiles() {
     fs.mkdirSync(mapOutputDir, { recursive: true });
 
     await sharp(sourcePath)
+      .webp({ quality: 82 })
       .tile({
         layout: "dz",
         container: "fs",
         size: 256,
         overlap: 1,
       })
-      .webp({ quality: 82 })
-      .toFile(dziOutputPath);
+      .toFile(`${outputBasePath}.dz`);
 
-    process.stdout.write(`Generated tiles for ${map.mapId}: ${path.relative(repoRoot, dziOutputPath)}\n`);
+    process.stdout.write(`Generated tiles for ${map.mapId}: ${path.relative(repoRoot, outputBasePath)}.dzi\n`);
   }
 }
 
