@@ -1,11 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import OpenSeadragon from "openseadragon";
 import type { MapLandmark, MapLayerConfig, MapPin } from "../types";
-
-declare global {
-  interface Window {
-    OpenSeadragon?: any;
-  }
-}
 
 type MarkerScreenPosition = {
   id: number;
@@ -32,38 +27,6 @@ type TiledMapViewerProps = {
 };
 
 const DEFAULT_MAP_ERROR = "Map tile source is missing for this layer.";
-const OPENSEADRAGON_SCRIPT_URL =
-  "https://cdn.jsdelivr.net/npm/openseadragon@5.0/build/openseadragon/openseadragon.min.js";
-
-async function loadOpenSeadragonGlobal() {
-  if (window.OpenSeadragon) {
-    return window.OpenSeadragon;
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>("script[data-openseadragon='true']");
-    if (existing && window.OpenSeadragon) {
-      resolve();
-      return;
-    }
-
-    const script = existing || document.createElement("script");
-    script.src = OPENSEADRAGON_SCRIPT_URL;
-    script.async = true;
-    script.dataset.openseadragon = "true";
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load OpenSeadragon runtime"));
-    if (!existing) {
-      document.head.appendChild(script);
-    }
-  });
-
-  if (!window.OpenSeadragon) {
-    throw new Error("OpenSeadragon runtime is unavailable");
-  }
-
-  return window.OpenSeadragon;
-}
 
 const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(function TiledMapViewer(
   {
@@ -125,7 +88,6 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
       }
 
       setMapError("");
-      const OpenSeadragon = await loadOpenSeadragonGlobal();
       if (isCancelled || !viewerHostRef.current) return;
       const viewer = OpenSeadragon({
         element: viewerHostRef.current,
