@@ -31,7 +31,7 @@ async function generateTiles() {
     fs.mkdirSync(mapOutputDir, { recursive: true });
 
     await sharp(sourcePath)
-      .webp({ quality: 82 })
+      .jpeg({ quality: 82 })
       .tile({
         layout: "dz",
         container: "fs",

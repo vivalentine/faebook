@@ -28,6 +28,22 @@ type TiledMapViewerProps = {
 
 const DEFAULT_MAP_ERROR = "Map tile source is missing for this layer.";
 
+function buildInlineDziTileSource(layer: MapLayerConfig): any {
+  return {
+    Image: {
+      xmlns: "http://schemas.microsoft.com/deepzoom/2008",
+      Url: layer.tile_source.replace(/\.dzi$/i, "_files/"),
+      Format: "jpg",
+      Overlap: "1",
+      TileSize: "256",
+      Size: {
+        Width: String(layer.width),
+        Height: String(layer.height),
+      },
+    },
+  };
+}
+
 const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(function TiledMapViewer(
   {
     layer,
@@ -43,17 +59,10 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   ref,
 ) {
   const viewerHostRef = useRef<HTMLDivElement | null>(null);
-  const viewerRef = useRef<any | null>(null);
+  const viewerRef = useRef<OpenSeadragon.Viewer | null>(null);
   const [mapError, setMapError] = useState("");
   const [pinScreenPositions, setPinScreenPositions] = useState<MarkerScreenPosition[]>([]);
   const [landmarkScreenPositions, setLandmarkScreenPositions] = useState<MarkerScreenPosition[]>([]);
-
-  const imageAspectRatio = useMemo(() => {
-    if (!layer.width || !layer.height) {
-      return 1;
-    }
-    return layer.height / layer.width;
-  }, [layer.height, layer.width]);
 
   useImperativeHandle(ref, () => ({
     zoomIn() {
@@ -78,149 +87,159 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   useEffect(() => {
     let isCancelled = false;
 
-    async function mountViewer() {
-      const host = viewerHostRef.current;
-      if (!host) return;
+    const host = viewerHostRef.current;
+    if (!host) {
+      return;
+    }
 
-      if (!layer.tile_source) {
-        setMapError(DEFAULT_MAP_ERROR);
+    if (!layer.tile_source) {
+      setMapError(DEFAULT_MAP_ERROR);
+      return;
+    }
+
+    if (!layer.width || !layer.height) {
+      setMapError(`Map dimensions are missing for ${layer.label}.`);
+      return;
+    }
+
+    setMapError("");
+
+    if (isCancelled) {
+      return;
+    }
+
+    const viewer = OpenSeadragon({
+      element: host,
+      tileSources: [buildInlineDziTileSource(layer) as any],
+      prefixUrl: "/",
+      showNavigator: false,
+      showZoomControl: false,
+      showHomeControl: false,
+      showFullPageControl: false,
+      gestureSettingsMouse: {
+        clickToZoom: false,
+        dblClickToZoom: true,
+        pinchToZoom: true,
+        flickEnabled: true,
+      },
+      gestureSettingsTouch: {
+        clickToZoom: false,
+        dblClickToZoom: false,
+        pinchToZoom: true,
+        flickEnabled: true,
+      },
+      minZoomLevel: layer.min_zoom > 0 ? layer.min_zoom : 0.01,
+      maxZoomLevel: layer.max_zoom,
+      defaultZoomLevel: layer.default_zoom,
+      homeFillsViewer: false,
+      visibilityRatio: 1,
+      constrainDuringPan: true,
+      maxZoomPixelRatio: 2,
+    });
+
+    viewerRef.current = viewer;
+
+    const updateMarkerPositions = () => {
+      const viewport = viewer.viewport;
+      if (!viewport) return;
+
+      const nextPins = pins.map((pin) => {
+        const viewportPoint = viewport.imageToViewportCoordinates(pin.x * layer.width, pin.y * layer.height);
+        const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
+        return {
+          id: pin.id,
+          left: pixelPoint.x,
+          top: pixelPoint.y,
+        };
+      });
+
+      const nextLandmarks = landmarks.map((landmark) => {
+        const viewportPoint = viewport.imageToViewportCoordinates(
+          landmark.x * layer.width,
+          landmark.y * layer.height,
+        );
+        const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
+        return {
+          id: landmark.id,
+          left: pixelPoint.x,
+          top: pixelPoint.y,
+        };
+      });
+
+      setPinScreenPositions(nextPins);
+      setLandmarkScreenPositions(nextLandmarks);
+    };
+
+    const mapCanvasPointToNormalized = (eventPosition: { x: number; y: number }) => {
+      const viewportPoint = viewer.viewport.pointFromPixel(
+        new OpenSeadragon.Point(eventPosition.x, eventPosition.y),
+        true,
+      );
+      const imagePoint = viewer.viewport.viewportToImageCoordinates(viewportPoint);
+
+      return {
+        x: Math.max(0, Math.min(1, imagePoint.x / layer.width)),
+        y: Math.max(0, Math.min(1, imagePoint.y / layer.height)),
+      };
+    };
+
+    viewer.addHandler("open", () => {
+      viewer.viewport.goHome(true);
+      updateMarkerPositions();
+    });
+
+    viewer.addHandler("open-failed", () => {
+      setMapError(`Unable to open map tiles for ${layer.label}.`);
+    });
+
+    viewer.addHandler("tile-load-failed", () => {
+      setMapError(`Unable to load map tiles for ${layer.label}.`);
+    });
+
+    viewer.addHandler("canvas-click", (event: any) => {
+      if (!event.quick) {
         return;
       }
 
-      setMapError("");
-      if (isCancelled || !viewerHostRef.current) return;
-      const viewer = OpenSeadragon({
-        element: viewerHostRef.current,
-        tileSources: [layer.tile_source],
-        prefixUrl: "/",
-        showNavigator: false,
-        showZoomControl: false,
-        showHomeControl: false,
-        showFullPageControl: false,
-        gestureSettingsMouse: {
-          clickToZoom: false,
-          dblClickToZoom: true,
-          pinchToZoom: true,
-          flickEnabled: true,
-        },
-        gestureSettingsTouch: {
-          clickToZoom: false,
-          dblClickToZoom: false,
-          pinchToZoom: true,
-          flickEnabled: true,
-        },
-        minZoomLevel: layer.min_zoom > 0 ? layer.min_zoom : 0.01,
-        maxZoomLevel: layer.max_zoom,
-        defaultZoomLevel: layer.default_zoom,
-        homeFillsViewer: false,
-        visibilityRatio: 1,
-        constrainDuringPan: true,
-        maxZoomPixelRatio: 2,
-      });
+      if (!addMode && !landmarkAddMode) {
+        return;
+      }
 
-      viewerRef.current = viewer;
+      const point = mapCanvasPointToNormalized(event.position);
+      onMapPlacement(point);
+    });
 
-      const updateMarkerPositions = () => {
-        const viewport = viewer.viewport;
-        if (!viewport) return;
+    viewer.addHandler("canvas-drag", () => {
+      onViewerPanningChange?.(true);
+    });
 
-        const nextPins = pins.map((pin) => {
-          const viewportPoint = viewport.imageToViewportCoordinates(pin.x * layer.width, pin.y * layer.height);
-          const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
-          return {
-            id: pin.id,
-            left: pixelPoint.x,
-            top: pixelPoint.y,
-          };
-        });
+    viewer.addHandler("canvas-release", () => {
+      onViewerPanningChange?.(false);
+    });
 
-        const nextLandmarks = landmarks.map((landmark) => {
-          const viewportPoint = viewport.imageToViewportCoordinates(
-            landmark.x * layer.width,
-            landmark.y * layer.height,
-          );
-          const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
-          return {
-            id: landmark.id,
-            left: pixelPoint.x,
-            top: pixelPoint.y,
-          };
-        });
-
-        setPinScreenPositions(nextPins);
-        setLandmarkScreenPositions(nextLandmarks);
-      };
-
-      const mapCanvasPointToNormalized = (eventPosition: { x: number; y: number }) => {
-        const viewportPoint = viewer.viewport.pointFromPixel(
-          new OpenSeadragon.Point(eventPosition.x, eventPosition.y),
-          true,
-        );
-        const imagePoint = viewer.viewport.viewportToImageCoordinates(viewportPoint);
-
-        return {
-          x: Math.max(0, Math.min(1, imagePoint.x / layer.width)),
-          y: Math.max(0, Math.min(1, imagePoint.y / layer.height)),
-        };
-      };
-
-      viewer.addHandler("open", () => {
-        viewer.viewport.goHome(true);
-        updateMarkerPositions();
-      });
-
-      viewer.addHandler("canvas-click", (event: any) => {
-        if (!event.quick) {
-          return;
-        }
-
-        if (!addMode && !landmarkAddMode) {
-          return;
-        }
-
-        const point = mapCanvasPointToNormalized(event.position);
-        onMapPlacement(point);
-      });
-
-      viewer.addHandler("canvas-drag", () => {
-        onViewerPanningChange?.(true);
-      });
-      viewer.addHandler("canvas-release", () => {
-        onViewerPanningChange?.(false);
-      });
-      viewer.addHandler("animation", updateMarkerPositions);
-      viewer.addHandler("resize", updateMarkerPositions);
-      viewer.addHandler("viewport-change", updateMarkerPositions);
-
-      viewer.addOnceHandler("tile-load-failed", () => {
-        setMapError(`Unable to load map tiles for ${layer.label}.`);
-      });
-    }
-
-    void mountViewer();
+    viewer.addHandler("animation", updateMarkerPositions);
+    viewer.addHandler("resize", updateMarkerPositions);
+    viewer.addHandler("viewport-change", updateMarkerPositions);
 
     return () => {
       isCancelled = true;
-      if (viewerRef.current) {
-        viewerRef.current.destroy();
-        viewerRef.current = null;
-      }
+      viewer.destroy();
+      viewerRef.current = null;
       setPinScreenPositions([]);
       setLandmarkScreenPositions([]);
       onViewerPanningChange?.(false);
     };
   }, [
     addMode,
-    imageAspectRatio,
     landmarkAddMode,
     landmarks,
     layer.default_zoom,
+    layer.height,
     layer.label,
     layer.max_zoom,
     layer.min_zoom,
     layer.tile_source,
     layer.width,
-    layer.height,
     onMapPlacement,
     onViewerPanningChange,
     pins,
