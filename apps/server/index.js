@@ -24,6 +24,12 @@ const {
   getStagingSummary: getLocationImportStagingSummary,
   stageFixtures: stageLocationImportFixtures,
 } = require("./dm-location-import");
+const {
+  addStagedFile: addStagedWhisperImportFile,
+  clearStage: clearWhisperImportStage,
+  finalizeImport: finalizeWhisperImport,
+  getStagingSummary: getWhisperImportStagingSummary,
+} = require("./dm-whisper-import");
 const { runGlobalSearch, runGlobalSearchSuggestions } = require("./search");
 const {
   buildPortraitMetadata,
@@ -152,6 +158,21 @@ const uploadImageArray = multer({
     allowedExtensions: new Set([".png", ".webp", ".jpg", ".jpeg"]),
     allowedMimeTypes: new Set(["image/png", "image/webp", "image/jpeg"]),
     errorMessage: "Unsupported image file type",
+  }),
+});
+
+const uploadJsonSingle = multer({
+  storage: uploadMemoryStorage,
+  limits: { fileSize: MAX_MARKDOWN_UPLOAD_SIZE_BYTES, files: 1 },
+  fileFilter: createFileTypeFilter({
+    allowedExtensions: new Set([".json"]),
+    allowedMimeTypes: new Set([
+      "application/json",
+      "text/json",
+      "text/plain",
+      "application/octet-stream",
+    ]),
+    errorMessage: "Unsupported json file type",
   }),
 });
 
@@ -2829,6 +2850,37 @@ app.post("/api/dm/location-import/staging/clear", requireRole("dm"), (req, res) 
 
 app.post("/api/dm/location-import/finalize", requireRole("dm"), async (req, res) => {
   const results = await finalizeLocationImport(db, req.session.user.id);
+  res.json(results);
+});
+
+app.get("/api/dm/whisper-import/staging", requireRole("dm"), (req, res) => {
+  const summary = getWhisperImportStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post(
+  "/api/dm/whisper-import/staging/file",
+  requireRole("dm"),
+  uploadJsonSingle.single("file"),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "A .json file is required" });
+    }
+
+    addStagedWhisperImportFile(req.session.user.id, req.file);
+    const summary = getWhisperImportStagingSummary(db, req.session.user.id);
+    return res.json(summary);
+  }
+);
+
+app.post("/api/dm/whisper-import/staging/clear", requireRole("dm"), (req, res) => {
+  clearWhisperImportStage(req.session.user.id);
+  const summary = getWhisperImportStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post("/api/dm/whisper-import/finalize", requireRole("dm"), async (req, res) => {
+  const results = await finalizeWhisperImport(db, req.session.user.id);
   res.json(results);
 });
 
@@ -6509,6 +6561,10 @@ app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
       return res.status(400).json({ error: "Uploaded file is too large" });
+    }
+
+    if (error.code === "LIMIT_UNEXPECTED_FILE" && error.field) {
+      return res.status(400).json({ error: error.field });
     }
 
     return res.status(400).json({ error: "Invalid upload payload" });
