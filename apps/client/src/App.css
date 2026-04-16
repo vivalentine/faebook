@@ -176,9 +176,29 @@
 }
 
 .npc-reputation-heart {
-  background: rgba(202, 84, 136, 0.94);
-  box-shadow: 0 0 0 1px rgba(255, 177, 215, 0.3), 0 0 14px rgba(236, 118, 175, 0.65), 0 4px 10px rgba(0, 0, 0, 0.35);
+  position: relative;
+  border-color: rgba(255, 173, 213, 0.15);
+  background: transparent;
+  box-shadow: none;
+  color: #ffd7ea;
+  text-shadow: 0 1px 0 rgba(58, 16, 37, 0.75), 0 0 6px rgba(248, 154, 203, 0.55);
   animation: reputation-heartbeat 1.6s ease-in-out infinite;
+}
+
+.npc-reputation-heart::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 15px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(244, 130, 186, 0.56) 0%, rgba(244, 130, 186, 0) 72%);
+  filter: blur(1px);
+  z-index: -1;
+  pointer-events: none;
+  animation: reputation-heart-aura 1.6s ease-in-out infinite;
 }
 
 .npc-reputation-knife {
@@ -192,7 +212,19 @@
     transform: scale(1);
   }
   50% {
-    transform: scale(1.2);
+    transform: scale(1.06) translateY(-0.4px);
+  }
+}
+
+@keyframes reputation-heart-aura {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 0.82;
+    transform: translate(-50%, -50%) scale(1.18);
   }
 }
 
