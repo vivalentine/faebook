@@ -2326,7 +2326,7 @@
 }
 
 .wiki-link-wrap {
-  position: relative;
+  position: static;
   display: inline-flex;
 }
 
@@ -2342,20 +2342,24 @@
   text-decoration: dotted underline;
 }
 
+.wiki-preview-layer {
+  position: fixed;
+  z-index: 130;
+  pointer-events: none;
+}
+
 .wiki-preview-card {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 8px);
-  left: 0;
-  width: min(320px, 80vw);
-  border: 1px solid #493f64;
-  border-radius: 12px;
-  padding: 10px;
+  position: relative;
+  width: min(340px, calc(100vw - 28px));
+  border: 1px solid #63598d;
+  border-radius: 14px;
+  padding: 11px;
   background: linear-gradient(155deg, #181727 0%, #131421 100%);
-  box-shadow: 0 12px 28px rgba(7, 6, 16, 0.45);
+  box-shadow: 0 20px 36px rgba(6, 7, 17, 0.52), inset 0 1px 0 rgba(189, 166, 255, 0.1);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  pointer-events: auto;
 }
 
 .wiki-preview-header {
@@ -2408,7 +2412,31 @@
   line-height: 1.45;
 }
 
+.wiki-preview-card::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateY(-50%) rotate(45deg);
+  border: 1px solid #63598d;
+  background: #161524;
+}
+
+.wiki-preview-card.is-right::before {
+  left: -6px;
+  border-top: 0;
+  border-right: 0;
+}
+
+.wiki-preview-card.is-left::before {
+  right: -6px;
+  border-bottom: 0;
+  border-left: 0;
+}
+
 @media (hover: none) {
+  .wiki-preview-layer,
   .wiki-preview-card {
     display: none;
   }
