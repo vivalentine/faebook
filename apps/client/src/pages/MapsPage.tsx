@@ -128,12 +128,30 @@ export default function MapsPage() {
     () => visibleLandmarks.find((landmark) => landmark.id === selectedLandmarkId) || null,
     [visibleLandmarks, selectedLandmarkId],
   );
+  const locationsByLandmarkSlug = useMemo(() => {
+    const next: Record<string, LocationRecord> = {};
+    for (const location of Object.values(locationsBySlug)) {
+      if (!location.landmark_slug) continue;
+      next[location.landmark_slug] = location;
+    }
+    return next;
+  }, [locationsBySlug]);
   const selectedLandmarkLocation = useMemo(() => {
     if (!selectedLandmark) return null;
-    if (selectedLandmark.linked_location) return selectedLandmark.linked_location;
-    if (!selectedLandmark.linked_entity_slug) return null;
-    return locationsBySlug[selectedLandmark.linked_entity_slug] || null;
-  }, [locationsBySlug, selectedLandmark]);
+    const candidateSlugs = [selectedLandmark.slug, selectedLandmark.linked_entity_slug].filter(
+      Boolean,
+    ) as string[];
+
+    for (const candidateSlug of candidateSlugs) {
+      const locationBySlug = locationsBySlug[candidateSlug];
+      if (locationBySlug) return locationBySlug;
+
+      const locationByLandmarkSlug = locationsByLandmarkSlug[candidateSlug];
+      if (locationByLandmarkSlug) return locationByLandmarkSlug;
+    }
+
+    return null;
+  }, [locationsByLandmarkSlug, locationsBySlug, selectedLandmark]);
 
   const loadMaps = useCallback(async () => {
     setLoading(true);
@@ -542,6 +560,7 @@ export default function MapsPage() {
         landmarks={visibleLandmarks}
         selectedLandmark={selectedLandmark}
         selectedLandmarkLocation={selectedLandmarkLocation}
+        selectedLandmarkLinkedSummary={selectedLandmark?.linked_location || null}
         onCloseSelectedLandmark={() => setSelectedLandmarkId(null)}
         onMapPlacement={onMapPlacement}
         onLandmarkClick={(landmark) => {
