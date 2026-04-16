@@ -2519,6 +2519,25 @@
   margin: 0;
 }
 
+.whisper-feed-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.whisper-sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.whisper-sort-select {
+  width: auto;
+  min-width: 140px;
+}
+
 .whisper-list-item {
   gap: 10px;
 }
@@ -2751,6 +2770,15 @@
   .whisper-reader-actions .action-button,
   .whisper-reader-actions .secondary-link {
     width: 100%;
+  }
+
+  .whisper-feed-tools {
+    justify-content: stretch;
+  }
+
+  .whisper-sort-label {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .dashboard-inline-form {
