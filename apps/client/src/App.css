@@ -185,7 +185,8 @@
   filter: drop-shadow(0 0 7px rgba(248, 154, 203, 0.58))
     drop-shadow(0 0 13px rgba(227, 88, 152, 0.34));
   transform-origin: center;
-  animation: reputation-heartbeat 1.6s ease-in-out infinite;
+  animation: reputation-heartbeat 1.95s cubic-bezier(0.3, 0, 0.2, 1) infinite;
+  will-change: transform, filter;
 }
 
 .npc-reputation-heart::before {
@@ -204,10 +205,25 @@
     filter: drop-shadow(0 0 7px rgba(248, 154, 203, 0.54))
       drop-shadow(0 0 12px rgba(227, 88, 152, 0.3));
   }
-  50% {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 10px rgba(248, 154, 203, 0.68))
-      drop-shadow(0 0 16px rgba(227, 88, 152, 0.4));
+  18% {
+    transform: scale(1.016);
+    filter: drop-shadow(0 0 7.5px rgba(248, 154, 203, 0.56))
+      drop-shadow(0 0 13px rgba(227, 88, 152, 0.33));
+  }
+  38% {
+    transform: scale(1.056);
+    filter: drop-shadow(0 0 9.5px rgba(248, 154, 203, 0.64))
+      drop-shadow(0 0 15px rgba(227, 88, 152, 0.38));
+  }
+  56% {
+    transform: scale(1.074);
+    filter: drop-shadow(0 0 10px rgba(248, 154, 203, 0.67))
+      drop-shadow(0 0 15.5px rgba(227, 88, 152, 0.4));
+  }
+  76% {
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 8.4px rgba(248, 154, 203, 0.6))
+      drop-shadow(0 0 13.8px rgba(227, 88, 152, 0.35));
   }
 }
 
