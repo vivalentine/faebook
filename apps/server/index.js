@@ -3104,8 +3104,7 @@ app.put("/api/dm/campaign-date", requireRole("dm"), (req, res) => {
     req.session.user.id
   );
 
-  createAuditLog({
-    db,
+  createAuditLog(db, {
     actorUserId: req.session.user.id,
     actionType: "campaign_date_updated",
     objectType: "campaign_state",
