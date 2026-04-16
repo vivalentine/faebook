@@ -230,3 +230,26 @@ export function getHolidayNamesForPetal(bloomIndex: number, petal: number): stri
       petal <= holiday.petal_end,
   ).map((holiday) => holiday.name);
 }
+
+export function getHolidayChipLabel(holidayName: string): string {
+  switch (holidayName) {
+    case "Crown Unfurling":
+      return "Unfurling";
+    case "Feast of Sweet Accord":
+      return "Sweet Accord";
+    case "Solstice Festival":
+      return "Festival";
+    case "Solstice Day":
+      return "Solstice Day";
+    case "Solstice Masquerade":
+      return "Masquerade";
+    case "Night of Ten Thousand Reflections":
+      return "Reflections";
+    case "Dreaming Tide":
+      return "Dreaming Tide";
+    case "Last Lantern Vigil":
+      return "Lantern Vigil";
+    default:
+      return holidayName;
+  }
+}

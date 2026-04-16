@@ -1866,16 +1866,66 @@
 .summer-court-calendar-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
   color: #f1dfbb;
   font-size: 17px;
   letter-spacing: 0.02em;
 }
 
+.summer-court-calendar-title-wrap {
+  min-width: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .summer-court-calendar-head strong {
   font-weight: 700;
+}
+
+.summer-court-calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.summer-court-nav-button {
+  border: 1px solid rgba(140, 129, 178, 0.72);
+  background: rgba(35, 31, 54, 0.92);
+  color: #ece4ff;
+  border-radius: 999px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summer-court-nav-button:hover:not(:disabled) {
+  border-color: rgba(192, 173, 243, 0.86);
+  background: rgba(58, 48, 89, 0.9);
+}
+
+.summer-court-nav-button:disabled {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.summer-court-nav-button--today {
+  padding: 0 11px;
+  border-color: rgba(210, 179, 122, 0.72);
+  background: rgba(74, 57, 34, 0.72);
+  color: #fae9c4;
 }
 
 .summer-court-calendar-head-meta {
@@ -1902,7 +1952,7 @@
 }
 
 .summer-court-petal {
-  min-height: 48px;
+  min-height: 52px;
   border: 1px solid rgba(97, 89, 130, 0.72);
   border-radius: 13px;
   padding: 7px 4px 8px;
@@ -1963,6 +2013,8 @@
   background: rgba(145, 125, 196, 0.3);
   color: #f4ecff;
   border: 1px solid rgba(192, 170, 241, 0.34);
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .summer-court-petal.is-past .summer-court-chip {
@@ -2965,6 +3017,22 @@
     padding: 14px 12px;
   }
 
+  .summer-court-calendar-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .summer-court-calendar-title-wrap {
+    text-align: left;
+    align-items: flex-start;
+  }
+
+  .summer-court-calendar-nav {
+    align-self: flex-start;
+  }
+
   .summer-court-calendar-grid {
     gap: 6px 5px;
   }
@@ -2987,6 +3055,7 @@
   .summer-court-chip {
     font-size: 8px;
     padding: 2px 6px;
+    letter-spacing: 0.03em;
   }
 
   .chapters-layout {
