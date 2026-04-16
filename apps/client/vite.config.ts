@@ -28,5 +28,35 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       allowedHosts: [devHost, "localhost"],
     },
+    build: {
+      chunkSizeWarningLimit: 650,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) {
+              return undefined;
+            }
+
+            if (id.includes("openseadragon")) {
+              return "maps-vendor";
+            }
+
+            if (id.includes("react-router") || id.includes("react-router-dom")) {
+              return "router-vendor";
+            }
+
+            if (id.includes("react-dom") || id.includes("react")) {
+              return "react-vendor";
+            }
+
+            if (id.includes("@xyflow/react")) {
+              return "board-vendor";
+            }
+
+            return undefined;
+          },
+        },
+      },
+    },
   };
 });
