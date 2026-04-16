@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
 import TiledMapViewer, { type TiledMapViewerHandle } from "../components/TiledMapViewer";
 import { apiFetch } from "../lib/api";
@@ -541,6 +540,9 @@ export default function MapsPage() {
         landmarkAddMode={landmarkAddMode}
         pins={visiblePins}
         landmarks={visibleLandmarks}
+        selectedLandmark={selectedLandmark}
+        selectedLandmarkLocation={selectedLandmarkLocation}
+        onCloseSelectedLandmark={() => setSelectedLandmarkId(null)}
         onMapPlacement={onMapPlacement}
         onLandmarkClick={(landmark) => {
           setSelectedLandmarkId(landmark.id);
@@ -583,30 +585,6 @@ export default function MapsPage() {
           });
         }}
       />
-
-      {selectedLandmark ? (
-        <section className="maps-editor-card">
-          <div className="maps-editor-header">
-            <h2>{selectedLandmark.label}</h2>
-          </div>
-          {selectedLandmarkLocation?.ring ? (
-            <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
-          ) : null}
-          {selectedLandmarkLocation?.summary ? (
-            <p>{selectedLandmarkLocation.summary}</p>
-          ) : selectedLandmark.description ? (
-            <p>{selectedLandmark.description}</p>
-          ) : null}
-          <p className="map-landmark-popover-meta">
-            {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
-          </p>
-          {selectedLandmarkLocation?.slug ? (
-            <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
-              Open location
-            </Link>
-          ) : null}
-        </section>
-      ) : null}
 
       {editorState ? (
         <section className="maps-editor-card">
