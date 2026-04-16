@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import FaeSelect from "../components/FaeSelect";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
 import { apiFetch } from "../lib/api";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
@@ -65,6 +66,13 @@ export default function DocumentsPage() {
     const values = Array.from(new Set(documents.map((doc) => doc.document_type).filter(Boolean)));
     return values.sort((a, b) => a.localeCompare(b));
   }, [documents]);
+  const documentTypeOptions = useMemo(
+    () => [
+      { value: "all", label: "All categories" },
+      ...documentTypes.map((type) => ({ value: type, label: type })),
+    ],
+    [documentTypes],
+  );
 
   const filteredDocuments = useMemo(() => {
     if (filterType === "all") return documents;
@@ -226,14 +234,13 @@ export default function DocumentsPage() {
         <article className="state-card chapters-index-card documents-index-card">
           <div className="documents-index-header">
             <h2>Documents</h2>
-            <select className="text-input" value={filterType} onChange={(event) => setFilterType(event.target.value)}>
-              <option value="all">All categories</option>
-              {documentTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+            <FaeSelect
+              className="text-input"
+              value={filterType}
+              onChange={setFilterType}
+              options={documentTypeOptions}
+              ariaLabel="Filter documents by category"
+            />
           </div>
           {loading ? <p className="topbar-meta">Loading library…</p> : null}
           {!loading && filteredDocuments.length === 0 ? (

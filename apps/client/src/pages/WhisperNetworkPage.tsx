@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import {
   formatSummerCourtCommentDateTime,
@@ -459,17 +460,13 @@ export default function WhisperNetworkPage() {
             <div className="whisper-feed-tools">
               <label className="whisper-sort-label">
                 <span className="topbar-meta">Sort</span>
-                <select
+                <FaeSelect
+                  ariaLabel="Sort whispers"
                   className="text-input whisper-sort-select"
                   value={sortMode}
-                  onChange={(event) => setSortMode(event.target.value as WhisperSortMode)}
-                >
-                  {WHISPER_SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setSortMode(value as WhisperSortMode)}
+                  options={WHISPER_SORT_OPTIONS}
+                />
               </label>
               <p className="topbar-meta">{posts.length} whispers</p>
             </div>
