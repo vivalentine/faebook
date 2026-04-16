@@ -206,22 +206,22 @@
       drop-shadow(0 0 12px rgba(227, 88, 152, 0.3));
   }
   18% {
-    transform: scale(1.016);
+    transform: scale(1.022);
     filter: drop-shadow(0 0 7.5px rgba(248, 154, 203, 0.56))
       drop-shadow(0 0 13px rgba(227, 88, 152, 0.33));
   }
   38% {
-    transform: scale(1.056);
+    transform: scale(1.082);
     filter: drop-shadow(0 0 9.5px rgba(248, 154, 203, 0.64))
       drop-shadow(0 0 15px rgba(227, 88, 152, 0.38));
   }
   56% {
-    transform: scale(1.074);
+    transform: scale(1.128);
     filter: drop-shadow(0 0 10px rgba(248, 154, 203, 0.67))
       drop-shadow(0 0 15.5px rgba(227, 88, 152, 0.4));
   }
   76% {
-    transform: scale(1.03);
+    transform: scale(1.055);
     filter: drop-shadow(0 0 8.4px rgba(248, 154, 203, 0.6))
       drop-shadow(0 0 13.8px rgba(227, 88, 152, 0.35));
   }
