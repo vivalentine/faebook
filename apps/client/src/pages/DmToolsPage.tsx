@@ -28,6 +28,22 @@ type ImportPreview = {
   }>;
 };
 
+type LocationImportPreviewFile = {
+  filename: string;
+  parsed_name: string | null;
+  slug: string | null;
+  status: "create" | "update" | null;
+  state: string;
+  validation_issues: string[];
+  warnings: string[];
+  preview_snippet?: string;
+};
+
+type LocationImportPreview = {
+  staged_markdown_count: number;
+  files: LocationImportPreviewFile[];
+};
+
 type ImportLog = {
   id: number;
   filename: string;
@@ -55,6 +71,7 @@ type NpcCleanupItem = {
 
 export default function DmToolsPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [locationPreview, setLocationPreview] = useState<LocationImportPreview | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -72,14 +89,18 @@ export default function DmToolsPage() {
       setLoading(true);
       setError("");
 
-      const [previewResponse, logsResponse, cleanupResponse] = await Promise.all([
+      const [previewResponse, locationPreviewResponse, logsResponse, cleanupResponse] = await Promise.all([
         apiFetch("/api/dm/import/staging"),
+        apiFetch("/api/dm/location-import/staging"),
         apiFetch("/api/dm/import/logs"),
         apiFetch("/api/dm/npcs?include_archived=1"),
       ]);
 
       if (!previewResponse.ok) {
         throw new Error(`Failed loading staging preview: ${previewResponse.status}`);
+      }
+      if (!locationPreviewResponse.ok) {
+        throw new Error(`Failed loading location staging preview: ${locationPreviewResponse.status}`);
       }
 
       if (!logsResponse.ok) {
@@ -90,6 +111,7 @@ export default function DmToolsPage() {
       }
 
       setPreview(await previewResponse.json());
+      setLocationPreview(await locationPreviewResponse.json());
       setLogs(await logsResponse.json());
       setCleanupItems(await cleanupResponse.json());
     } catch (err) {
@@ -208,6 +230,99 @@ export default function DmToolsPage() {
     }
   }
 
+  async function uploadLocationFiles(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+
+      const formData = new FormData();
+      Array.from(fileList).forEach((file) => formData.append("files", file));
+
+      const response = await apiFetch("/api/dm/location-import/staging/markdown", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Upload failed: ${response.status}`);
+      }
+
+      setLocationPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadLocationFixtures() {
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+      const response = await apiFetch("/api/dm/location-import/staging/fixtures", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to load location fixtures: ${response.status}`);
+      }
+      setLocationPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearLocationStaging() {
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+      const response = await apiFetch("/api/dm/location-import/staging/clear", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to clear location staging: ${response.status}`);
+      }
+      setLocationPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finalizeLocationImport() {
+    if (!window.confirm("Finalize staged location import now?")) return;
+
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+
+      const response = await apiFetch("/api/dm/location-import/finalize", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Finalize failed: ${response.status}`);
+      }
+
+      const created = (data.results || []).filter((item: { result: string }) => item.result === "created").length;
+      const updated = (data.results || []).filter((item: { result: string }) => item.result === "updated").length;
+      const invalid = (data.results || []).filter((item: { result: string }) => item.result === "invalid").length;
+      setFinalizeResult(`Location import complete. Created: ${created}, Updated: ${updated}, Invalid: ${invalid}.`);
+
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function clearStaging() {
     try {
       setBusy(true);
@@ -285,6 +400,15 @@ export default function DmToolsPage() {
     };
   }, [preview]);
 
+  const locationSummary = useMemo(() => {
+    if (!locationPreview) return { create: 0, update: 0, invalid: 0 };
+    return {
+      create: locationPreview.files.filter((file) => file.status === "create").length,
+      update: locationPreview.files.filter((file) => file.status === "update").length,
+      invalid: locationPreview.files.filter((file) => file.validation_issues.length > 0).length,
+    };
+  }, [locationPreview]);
+
   if (loading) {
     return (
       <div className="app-shell">
@@ -304,6 +428,7 @@ export default function DmToolsPage() {
         <div className="topbar-meta topbar-meta-stack">
           <span>Markdown staged: {preview?.staged_markdown_count || 0}</span>
           <span>Portraits staged: {preview?.staged_portrait_count || 0}</span>
+          <span>Location markdown staged: {locationPreview?.staged_markdown_count || 0}</span>
         </div>
       </header>
 
@@ -432,6 +557,73 @@ export default function DmToolsPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="state-card">
+          <h2>Location Importer</h2>
+          <p>
+            Stage location markdown files, review create/update status, then finalize into the locations atlas table.
+          </p>
+
+          <div className="toolbar-grid">
+            <label className="toolbar-field">
+              <span>Upload location markdown (.md)</span>
+              <input
+                className="text-input"
+                type="file"
+                accept=".md,text/markdown"
+                multiple
+                onChange={(event) => {
+                  void uploadLocationFiles(event.target.files);
+                  event.currentTarget.value = "";
+                }}
+                disabled={busy}
+              />
+            </label>
+          </div>
+
+          <div className="note-actions">
+            <button className="action-button" type="button" onClick={() => void loadLocationFixtures()} disabled={busy}>
+              Use location fixtures
+            </button>
+            <button className="action-button secondary-link" type="button" onClick={() => void clearLocationStaging()} disabled={busy}>
+              Clear location staging
+            </button>
+            <button
+              className="action-button"
+              type="button"
+              onClick={() => void finalizeLocationImport()}
+              disabled={busy || (locationPreview?.files.length || 0) === 0}
+            >
+              Finalize location import
+            </button>
+          </div>
+
+          <p>
+            Create: {locationSummary.create} • Update: {locationSummary.update} • Invalid: {locationSummary.invalid}
+          </p>
+
+          {(locationPreview?.files || []).length === 0 ? (
+            <p>No staged location markdown files yet.</p>
+          ) : (
+            <div className="notes-list">
+              {(locationPreview?.files || []).map((item) => (
+                <article className="note-card" key={item.filename}>
+                  <div className="note-card-header">
+                    <strong>{item.filename}</strong>
+                    <span>{item.status || item.state}</span>
+                  </div>
+                  <p>Name: {item.parsed_name || "—"}</p>
+                  <p>Slug: {item.slug || "—"}</p>
+                  {item.preview_snippet ? <p>Preview: {item.preview_snippet}</p> : null}
+                  {item.validation_issues.length ? (
+                    <p>Validation issues: {item.validation_issues.join("; ")}</p>
+                  ) : null}
+                  {item.warnings.length ? <p>Warnings: {item.warnings.join("; ")}</p> : null}
+                </article>
+              ))}
+            </div>
           )}
         </section>
 
