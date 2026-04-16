@@ -10,7 +10,17 @@ import {
   toSummerCourtDateTimeOrNull,
   type SummerCourtDateTime,
 } from "../lib/summerCourtCalendar";
-import type { WhisperComment, WhisperPost } from "../types";
+import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
+
+const WHISPER_SORT_OPTIONS: Array<{ value: WhisperSortMode; label: string }> = [
+  { value: "trending", label: "Trending" },
+  { value: "recent", label: "Recent" },
+  { value: "views", label: "View count" },
+  { value: "likes", label: "Likes" },
+  { value: "comments", label: "Most commented" },
+];
+
+const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";
 
 type WhisperFeedResponse = {
   posts: WhisperPost[];
@@ -18,6 +28,7 @@ type WhisperFeedResponse = {
     limit: number;
     offset: number;
     total: number;
+    sort?: WhisperSortMode;
   };
 };
 
@@ -70,6 +81,7 @@ export default function WhisperNetworkPage() {
   const [posts, setPosts] = useState<WhisperPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sortMode, setSortMode] = useState<WhisperSortMode>(DEFAULT_WHISPER_SORT);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
   const [expandedPostIds, setExpandedPostIds] = useState<Record<number, boolean>>({});
@@ -100,20 +112,28 @@ export default function WhisperNetworkPage() {
     [posts, selectedPostId],
   );
 
-  async function loadFeed() {
+  async function loadFeed(options?: { preferredSelectedPostId?: number | null }) {
     try {
       setLoading(true);
       setError("");
-      const response = await apiFetch("/api/whisper/posts?limit=40&offset=0");
+      const response = await apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`);
       const data = (await response.json()) as WhisperFeedResponse | { error?: string };
       if (!response.ok) {
         throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
       }
       const loadedPosts = (data as WhisperFeedResponse).posts || [];
       setPosts(loadedPosts);
-      if (loadedPosts.length > 0) {
-        setSelectedPostId((current) => current ?? loadedPosts[0].id);
-      }
+      const preferredSelectedPostId = options?.preferredSelectedPostId ?? null;
+      const loadedPostIdSet = new Set(loadedPosts.map((post) => post.id));
+      setSelectedPostId((current) => {
+        if (preferredSelectedPostId && loadedPostIdSet.has(preferredSelectedPostId)) {
+          return preferredSelectedPostId;
+        }
+        if (current && loadedPostIdSet.has(current)) {
+          return current;
+        }
+        return loadedPosts[0]?.id ?? null;
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
       setPosts([]);
@@ -124,7 +144,7 @@ export default function WhisperNetworkPage() {
 
   useEffect(() => {
     void loadFeed();
-  }, []);
+  }, [sortMode]);
 
   async function loadPostDetails(postId: number) {
     try {
@@ -168,6 +188,7 @@ export default function WhisperNetworkPage() {
           post.id === postId ? { ...post, liked_by_me: liked, like_count: likeCount } : post,
         ),
       );
+      await loadFeed({ preferredSelectedPostId: postId });
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Failed to toggle like");
     }
@@ -201,6 +222,7 @@ export default function WhisperNetworkPage() {
           post.id === postId ? { ...post, comment_count: post.comment_count + 1 } : post,
         ),
       );
+      await loadFeed({ preferredSelectedPostId: postId });
     } catch (commentError) {
       setError(commentError instanceof Error ? commentError.message : "Failed to post comment");
     } finally {
@@ -284,15 +306,12 @@ export default function WhisperNetworkPage() {
       const savedPost = data as WhisperPost;
       setPosts((current) => {
         const others = current.filter((post) => post.id !== savedPost.id);
-        return [savedPost, ...others].sort((a, b) => {
-          const aTime = new Date(a.updated_at).getTime();
-          const bTime = new Date(b.updated_at).getTime();
-          return bTime - aTime;
-        });
+        return [savedPost, ...others];
       });
       setSelectedPostId(savedPost.id);
       resetPostForm();
       await loadPostDetails(savedPost.id);
+      await loadFeed({ preferredSelectedPostId: savedPost.id });
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save post");
     } finally {
@@ -352,6 +371,7 @@ export default function WhisperNetworkPage() {
             : post,
         ),
       );
+      await loadFeed({ preferredSelectedPostId: comment.post_id });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete comment");
     }
@@ -436,7 +456,23 @@ export default function WhisperNetworkPage() {
         <article className="state-card chapters-index-card whisper-feed-card">
           <div className="documents-index-header whisper-feed-header">
             <h2>Rumor Feed</h2>
-            <p className="topbar-meta">{posts.length} whispers</p>
+            <div className="whisper-feed-tools">
+              <label className="whisper-sort-label">
+                <span className="topbar-meta">Sort</span>
+                <select
+                  className="text-input whisper-sort-select"
+                  value={sortMode}
+                  onChange={(event) => setSortMode(event.target.value as WhisperSortMode)}
+                >
+                  {WHISPER_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="topbar-meta">{posts.length} whispers</p>
+            </div>
           </div>
           {loading ? <p className="topbar-meta">Gathering whispers…</p> : null}
           {!loading && posts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}

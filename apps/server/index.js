@@ -550,6 +550,68 @@ function mapWhisperCommentForClient(commentRow) {
   };
 }
 
+const WHISPER_POST_SORTS = Object.freeze({
+  trending: "trending",
+  recent: "recent",
+  views: "views",
+  likes: "likes",
+  comments: "comments",
+});
+
+const DEFAULT_WHISPER_POST_SORT = WHISPER_POST_SORTS.trending;
+
+const WHISPER_TRENDING_SCORE_SQL =
+  "(posts.view_count + (posts.like_count * 3) + (COUNT(DISTINCT comments.id) * 5))";
+
+function parseWhisperPostSort(rawSort) {
+  const normalized = String(rawSort || "").trim().toLowerCase();
+  if (!normalized) {
+    return DEFAULT_WHISPER_POST_SORT;
+  }
+  if (Object.values(WHISPER_POST_SORTS).includes(normalized)) {
+    return normalized;
+  }
+  return DEFAULT_WHISPER_POST_SORT;
+}
+
+function getWhisperPostOrderBySql(sort) {
+  const recentOrderSql = `
+    posts.crown_year DESC,
+    posts.bloom_index DESC,
+    posts.petal DESC,
+    posts.bell DESC,
+    posts.chime DESC,
+    posts.created_at DESC,
+    posts.id DESC
+  `;
+
+  if (sort === WHISPER_POST_SORTS.recent) {
+    return recentOrderSql;
+  }
+  if (sort === WHISPER_POST_SORTS.views) {
+    return `
+      posts.view_count DESC,
+      ${recentOrderSql}
+    `;
+  }
+  if (sort === WHISPER_POST_SORTS.likes) {
+    return `
+      posts.like_count DESC,
+      ${recentOrderSql}
+    `;
+  }
+  if (sort === WHISPER_POST_SORTS.comments) {
+    return `
+      COUNT(DISTINCT comments.id) DESC,
+      ${recentOrderSql}
+    `;
+  }
+  return `
+    ${WHISPER_TRENDING_SCORE_SQL} DESC,
+    ${recentOrderSql}
+  `;
+}
+
 function parseSummerCourtDateTimeInput(payload = {}) {
   const hasAnyField =
     payload.crown_year !== undefined ||
@@ -4444,6 +4506,8 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
   const sessionUser = req.session.user;
   const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit || "20"), 10) || 20, 1), 50);
   const offset = Math.max(Number.parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+  const sort = parseWhisperPostSort(req.query.sort);
+  const orderBySql = getWhisperPostOrderBySql(sort);
 
   const posts = db
     .prepare(
@@ -4471,7 +4535,7 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
           ON my_like.post_id = posts.id
          AND my_like.user_id = ?
         GROUP BY posts.id
-        ORDER BY posts.updated_at DESC, posts.id DESC
+        ORDER BY ${orderBySql}
         LIMIT ?
         OFFSET ?
       `
@@ -4493,6 +4557,7 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
       limit,
       offset,
       total: Number(totalRow?.total || 0),
+      sort,
     },
   });
 });
