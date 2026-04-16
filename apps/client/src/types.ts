@@ -316,6 +316,8 @@ export type WhisperPost = {
   updated_at: string;
 };
 
+export type WhisperSortMode = "trending" | "recent" | "views" | "likes" | "comments";
+
 export type WhisperComment = {
   id: number;
   post_id: number;
