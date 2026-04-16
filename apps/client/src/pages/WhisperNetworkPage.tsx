@@ -75,6 +75,47 @@ function getCommentTimestamp(comment: WhisperComment): string {
   return formatSummerCourtCommentDateTime(dt);
 }
 
+
+function getWhisperRecentSortTimestamp(post: WhisperPost): number {
+  const dt = getSummerCourtFromWhisperRecord(post);
+  if (dt) {
+    return dt.crown_year * 10_000_000 + dt.bloom_index * 100_000 + dt.petal * 1_000 + dt.bell * 60 + dt.chime;
+  }
+  const createdTime = Date.parse(post.created_at);
+  return Number.isFinite(createdTime) ? createdTime : 0;
+}
+
+function getWhisperTrendingScore(post: WhisperPost): number {
+  return post.view_count + post.like_count * 3 + post.comment_count * 5;
+}
+
+function sortWhisperPosts(posts: WhisperPost[], sortMode: WhisperSortMode): WhisperPost[] {
+  const sorted = [...posts];
+  sorted.sort((a, b) => {
+    if (sortMode === "recent") {
+      const diff = getWhisperRecentSortTimestamp(b) - getWhisperRecentSortTimestamp(a);
+      if (diff !== 0) return diff;
+    } else if (sortMode === "views") {
+      const diff = b.view_count - a.view_count;
+      if (diff !== 0) return diff;
+    } else if (sortMode === "likes") {
+      const diff = b.like_count - a.like_count;
+      if (diff !== 0) return diff;
+    } else if (sortMode === "comments") {
+      const diff = b.comment_count - a.comment_count;
+      if (diff !== 0) return diff;
+    } else {
+      const diff = getWhisperTrendingScore(b) - getWhisperTrendingScore(a);
+      if (diff !== 0) return diff;
+    }
+
+    const recentDiff = getWhisperRecentSortTimestamp(b) - getWhisperRecentSortTimestamp(a);
+    if (recentDiff !== 0) return recentDiff;
+    return b.id - a.id;
+  });
+  return sorted;
+}
+
 export default function WhisperNetworkPage() {
   const { user } = useAuth();
   const isDm = user?.role === "dm";
@@ -108,10 +149,33 @@ export default function WhisperNetworkPage() {
   const [commentChimeDraft, setCommentChimeDraft] = useState("");
   const [isSavingCommentTime, setIsSavingCommentTime] = useState(false);
 
+  const sortedPosts = useMemo(() => sortWhisperPosts(posts, sortMode), [posts, sortMode]);
+
   const activePost = useMemo(
-    () => posts.find((post) => post.id === selectedPostId) || null,
-    [posts, selectedPostId],
+    () => sortedPosts.find((post) => post.id === selectedPostId) || null,
+    [sortedPosts, selectedPostId],
   );
+
+  const whisperNetworkNodes = useMemo(() => {
+    if (sortedPosts.length === 0) return [];
+
+    const columns = sortedPosts.length <= 4 ? 2 : sortedPosts.length <= 9 ? 3 : 4;
+    return sortedPosts.map((post, index) => {
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      const jitterSeed = (post.id * 13 + index * 7 + sortMode.length * 17) % 5;
+      const jitter = (jitterSeed - 2) * 1.8;
+      const left = 10 + (column + 0.5) * (80 / columns) + jitter;
+      const top = 12 + row * 22 + (column % 2 === 0 ? 0 : 4);
+      return {
+        id: post.id,
+        rank: index + 1,
+        left: Math.max(6, Math.min(94, left)),
+        top: Math.max(10, Math.min(92, top)),
+        title: post.title,
+      };
+    });
+  }, [sortedPosts, sortMode]);
 
   async function loadFeed(options?: { preferredSelectedPostId?: number | null }) {
     try {
@@ -468,13 +532,13 @@ export default function WhisperNetworkPage() {
                   options={WHISPER_SORT_OPTIONS}
                 />
               </label>
-              <p className="topbar-meta">{posts.length} whispers</p>
+              <p className="topbar-meta">{sortedPosts.length} whispers</p>
             </div>
           </div>
           {loading ? <p className="topbar-meta">Gathering whispers…</p> : null}
-          {!loading && posts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}
+          {!loading && sortedPosts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}
           <ul className="chapter-list whisper-list">
-            {posts.map((post) => {
+            {sortedPosts.map((post) => {
               const isActive = post.id === selectedPostId;
               const isExpanded = Boolean(expandedPostIds[post.id]);
               return (
@@ -632,6 +696,28 @@ export default function WhisperNetworkPage() {
         </article>
 
         <article className="state-card chapter-reader-card whisper-reader-card">
+          <section className="whisper-network-view" aria-live="polite">
+            <div className="whisper-network-header">
+              <p className="topbar-meta">Network layout follows: {WHISPER_SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "Trending"}</p>
+            </div>
+            <div className="whisper-network-canvas" key={`network-${sortMode}-${sortedPosts.map((post) => post.id).join("-")}`}>
+              {whisperNetworkNodes.map((node) => (
+                <button
+                  key={node.id}
+                  type="button"
+                  className={`whisper-network-node ${node.id === selectedPostId ? "active" : ""}`.trim()}
+                  style={{ left: `${node.left}%`, top: `${node.top}%` }}
+                  onClick={() => {
+                    void openPost(node.id);
+                  }}
+                >
+                  <span className="whisper-network-rank">#{node.rank}</span>
+                  <span className="whisper-network-title">{node.title}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
           {activePost ? (
             <>
               <header className="chapter-reader-header">
