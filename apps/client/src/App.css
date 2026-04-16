@@ -3050,12 +3050,12 @@
 .whisper-feed-card-footer {
   width: 100%;
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
   align-items: flex-start;
 }
 
 .whisper-feed-card-footer .whisper-post-stats {
-  justify-content: flex-start;
+  justify-content: flex-end;
   width: auto;
   max-width: 100%;
 }
@@ -3491,7 +3491,7 @@
 
   .whisper-feed-card-footer .whisper-icon-button,
   .whisper-feed-card-footer .whisper-stat-pill {
-    justify-content: flex-start;
+    justify-content: center;
     flex: 0 0 auto;
     min-width: fit-content;
   }
