@@ -125,6 +125,7 @@ export default function WhisperNetworkPage() {
   const [error, setError] = useState("");
   const [sortMode, setSortMode] = useState<WhisperSortMode>(DEFAULT_WHISPER_SORT);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
+  const [isReaderOpen, setIsReaderOpen] = useState(false);
   const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
   const [expandedPostIds, setExpandedPostIds] = useState<Record<number, boolean>>({});
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<number, string>>({});
@@ -211,6 +212,17 @@ export default function WhisperNetworkPage() {
     void loadFeed();
   }, [sortMode]);
 
+  useEffect(() => {
+    if (!isReaderOpen) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsReaderOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isReaderOpen]);
+
   async function loadPostDetails(postId: number) {
     try {
       const response = await apiFetch(`/api/whisper/posts/${postId}`);
@@ -231,6 +243,11 @@ export default function WhisperNetworkPage() {
     if (!commentsByPostId[postId]) {
       await loadPostDetails(postId);
     }
+  }
+
+  async function openPostReader(postId: number) {
+    setIsReaderOpen(true);
+    await openPost(postId);
   }
 
   async function togglePostExpansion(postId: number) {
@@ -404,6 +421,7 @@ export default function WhisperNetworkPage() {
       });
       if (selectedPostId === post.id) {
         setSelectedPostId(null);
+        setIsReaderOpen(false);
       }
       if (editingPostId === post.id) {
         resetPostForm();
@@ -547,7 +565,7 @@ export default function WhisperNetworkPage() {
                     type="button"
                     className="whisper-post-button"
                     onClick={() => {
-                      void openPost(post.id);
+                      void openPostReader(post.id);
                     }}
                   >
                     <span className="chapter-list-meta">Anonymous rumor · {getPostFeedTimestamp(post)}</span>
@@ -708,7 +726,7 @@ export default function WhisperNetworkPage() {
                   className={`whisper-network-node ${node.id === selectedPostId ? "active" : ""}`.trim()}
                   style={{ left: `${node.left}%`, top: `${node.top}%` }}
                   onClick={() => {
-                    void openPost(node.id);
+                    void openPostReader(node.id);
                   }}
                 >
                   <span className="whisper-network-rank">#{node.rank}</span>
@@ -717,29 +735,35 @@ export default function WhisperNetworkPage() {
               ))}
             </div>
           </section>
-
-          {activePost ? (
-            <>
-              <header className="chapter-reader-header">
-                <p className="topbar-meta">Anonymous rumor · {getPostDetailTimestamp(activePost)}</p>
-                <h2>{activePost.title}</h2>
-                <p className="whisper-reader-body">{activePost.body}</p>
-                <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
-              </header>
-              <div className="whisper-reader-actions">
-                <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
-                  {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
-                </button>
-                <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(activePost.id)}>
-                  {expandedPostIds[activePost.id] ? "Hide thread" : "Open thread"}
-                </button>
-              </div>
-            </>
-          ) : (
-            <p className="topbar-meta">Pick a rumor to inspect the thread.</p>
-          )}
+          <p className="topbar-meta whisper-network-hint">
+            Select a rumor from the feed or network to open full details.
+          </p>
         </article>
       </div>
+
+      {isReaderOpen && activePost ? (
+        <div className="board-modal-overlay" role="presentation" onClick={() => setIsReaderOpen(false)}>
+          <div className="board-modal whisper-detail-modal" role="dialog" aria-modal="true" aria-label="Whisper details" onClick={(event) => event.stopPropagation()}>
+            <header className="chapter-reader-header whisper-detail-header">
+              <p className="topbar-meta">Anonymous rumor · {getPostDetailTimestamp(activePost)}</p>
+              <h2>{activePost.title}</h2>
+              <p className="whisper-reader-body">{activePost.body}</p>
+              <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
+            </header>
+            <div className="whisper-reader-actions whisper-detail-actions">
+              <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
+                {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
+              </button>
+              <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(activePost.id)}>
+                {expandedPostIds[activePost.id] ? "Hide thread in feed" : "Open thread in feed"}
+              </button>
+              <button type="button" className="secondary-link" onClick={() => setIsReaderOpen(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isDm ? (
         <article className="state-card chapter-editor-card whisper-editor-card">
