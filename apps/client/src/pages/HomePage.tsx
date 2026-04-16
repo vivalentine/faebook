@@ -10,6 +10,7 @@ import {
   getBloomName,
   getHolidayNamesForPetal,
   getPetalCycleNameFromPetal,
+  getPetalCycleShortLabel,
   toSummerCourtDateTimeOrNull,
 } from "../lib/summerCourtCalendar";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
@@ -328,8 +329,13 @@ export default function HomePage() {
                 </div>
                 <div className="summer-court-calendar-grid">
                   {PETAL_CYCLE.map((cycle) => (
-                    <div key={cycle.index} className="summer-court-calendar-col-head">
-                      {cycle.name}
+                    <div
+                      key={cycle.index}
+                      className="summer-court-calendar-col-head"
+                      title={cycle.name}
+                      aria-label={cycle.name}
+                    >
+                      {getPetalCycleShortLabel(cycle.index)}
                     </div>
                   ))}
                   {BLOOM_PETAL_ROWS.flatMap((rowIndex) =>

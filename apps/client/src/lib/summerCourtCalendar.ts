@@ -106,6 +106,11 @@ export function getPetalCycleName(cycleIndex: number): string {
   return cycle.name;
 }
 
+export function getPetalCycleShortLabel(cycleIndex: number): string {
+  const fullName = getPetalCycleName(cycleIndex);
+  return fullName.endsWith("petal") ? fullName.slice(0, -5) : fullName;
+}
+
 export function formatTimeHHMM(bell: number, chime: number): string {
   return `${String(bell).padStart(2, "0")}:${String(chime).padStart(2, "0")}`;
 }
