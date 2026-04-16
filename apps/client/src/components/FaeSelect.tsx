@@ -40,6 +40,8 @@ export default function FaeSelect({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLUListElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isMenuMounted, setIsMenuMounted] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
 
@@ -62,6 +64,8 @@ export default function FaeSelect({
 
   useEffect(() => {
     if (!open) return;
+    setIsClosing(false);
+    setIsMenuMounted(true);
     updateMenuPosition();
     const onWindowChange = () => updateMenuPosition();
     window.addEventListener("resize", onWindowChange);
@@ -71,6 +75,16 @@ export default function FaeSelect({
       window.removeEventListener("scroll", onWindowChange, true);
     };
   }, [open]);
+
+  useEffect(() => {
+    if (open || !isMenuMounted) return;
+    setIsClosing(true);
+    const timer = window.setTimeout(() => {
+      setIsClosing(false);
+      setIsMenuMounted(false);
+    }, 140);
+    return () => window.clearTimeout(timer);
+  }, [isMenuMounted, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -164,12 +178,12 @@ export default function FaeSelect({
           ▾
         </span>
       </button>
-      {open && menuPosition
+      {isMenuMounted && menuPosition
         ? createPortal(
             <ul
               ref={menuRef}
               id={listboxId}
-              className="fae-select-menu"
+              className={`fae-select-menu ${open && !isClosing ? "open" : ""} ${isClosing ? "closing" : ""}`.trim()}
               role="listbox"
               aria-labelledby={selectId}
               style={{
