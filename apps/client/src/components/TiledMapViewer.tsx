@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
-import type { MapLandmark, MapLayerConfig, MapPin } from "../types";
+import { Link } from "react-router-dom";
+import type { LocationRecord, MapLandmark, MapLayerConfig, MapPin } from "../types";
 
 type MarkerScreenPosition = {
   id: number;
@@ -20,6 +21,12 @@ type TiledMapViewerProps = {
   landmarkAddMode: boolean;
   pins: MapPin[];
   landmarks: MapLandmark[];
+  selectedLandmark: MapLandmark | null;
+  selectedLandmarkLocation:
+    | Pick<LocationRecord, "slug" | "name" | "ring" | "summary">
+    | LocationRecord
+    | null;
+  onCloseSelectedLandmark: () => void;
   onMapPlacement: (point: { x: number; y: number }) => void;
   onPinClick: (pin: MapPin) => void;
   onLandmarkClick: (landmark: MapLandmark) => void;
@@ -103,6 +110,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     landmarkAddMode,
     pins,
     landmarks,
+    selectedLandmark,
+    selectedLandmarkLocation,
+    onCloseSelectedLandmark,
     onMapPlacement,
     onPinClick,
     onLandmarkClick,
@@ -329,6 +339,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     }
     return map;
   }, [landmarkScreenPositions]);
+  const selectedLandmarkScreenPosition = selectedLandmark
+    ? landmarkScreenById.get(selectedLandmark.id) || null
+    : null;
 
   return (
     <section className={`maps-viewport-shell ${addMode ? "add-mode" : ""}`.trim()}>
@@ -377,6 +390,40 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
           );
         })}
       </div>
+
+      {selectedLandmark && selectedLandmarkScreenPosition ? (
+        <section
+          className="map-landmark-popover"
+          style={{
+            left: `${selectedLandmarkScreenPosition.left}px`,
+            top: `${selectedLandmarkScreenPosition.top}px`,
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <h3>{selectedLandmark.label}</h3>
+          {selectedLandmarkLocation?.ring ? (
+            <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
+          ) : null}
+          {selectedLandmarkLocation?.summary ? (
+            <p>{selectedLandmarkLocation.summary}</p>
+          ) : selectedLandmark.description ? (
+            <p>{selectedLandmark.description}</p>
+          ) : null}
+          <p className="map-landmark-popover-meta">
+            {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
+          </p>
+          {selectedLandmarkLocation?.slug ? (
+            <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
+              Open location
+            </Link>
+          ) : null}
+          <button className="secondary-link" type="button" onClick={onCloseSelectedLandmark}>
+            Close
+          </button>
+        </section>
+      ) : null}
 
       {mapError ? (
         <div className="maps-layer-error" role="alert">

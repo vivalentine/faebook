@@ -1022,7 +1022,7 @@
   border: 1px solid #4f5a89;
   background: rgba(18, 24, 38, 0.96);
   color: #eee8ff;
-  z-index: 3;
+  z-index: 12;
   pointer-events: auto;
 }
 
