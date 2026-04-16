@@ -267,7 +267,10 @@
 }
 
 .npc-card-body {
-  padding: 18px;
+  padding: 16px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .npc-card-header {
@@ -275,7 +278,7 @@
   justify-content: space-between;
   align-items: start;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .npc-card-header h2 {
@@ -339,6 +342,12 @@
   padding: 12px;
   border-radius: 12px;
   background: #242937;
+}
+
+.npc-card-body .meta-row,
+.npc-card-body .blurb,
+.npc-card-body .summary-box {
+  margin: 0;
 }
 
 .summary-label {

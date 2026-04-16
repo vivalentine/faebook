@@ -113,8 +113,8 @@ export default function NpcCard({
           </div>
         ) : null}
 
-        <div className="card-actions">
-          {mode === "dm" && onToggleVisibility ? (
+        {mode === "dm" && onToggleVisibility ? (
+          <div className="card-actions">
             <button
               className="action-button"
               data-no-card-nav="true"
@@ -130,8 +130,8 @@ export default function NpcCard({
                 ? "Hide from players"
                 : "Reveal to players"}
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </article>
   );
