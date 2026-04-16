@@ -2538,7 +2538,7 @@
 }
 
 .whisper-layout {
-  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
 }
 
 .whisper-feed-header {
@@ -2735,11 +2735,29 @@
   background: linear-gradient(180deg, #171729 0%, #111320 100%);
 }
 
+.whisper-network-hint {
+  margin: 0;
+}
+
 .whisper-reader-body {
   margin: 10px 0;
   white-space: pre-wrap;
   color: #ebe6f7;
   line-height: 1.6;
+}
+
+.whisper-detail-modal {
+  width: min(720px, 100%);
+  max-height: min(86vh, 820px);
+  overflow: auto;
+}
+
+.whisper-detail-header {
+  margin-bottom: 0;
+}
+
+.whisper-detail-actions {
+  justify-content: flex-end;
 }
 
 @media (max-width: 980px) {
@@ -2882,6 +2900,10 @@
   .whisper-network-node {
     max-width: 140px;
     padding: 7px 8px;
+  }
+
+  .whisper-detail-actions {
+    justify-content: stretch;
   }
 
   .dashboard-inline-form {
