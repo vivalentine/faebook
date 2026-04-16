@@ -58,6 +58,60 @@ type LocationImportPreview = {
   files: LocationImportPreviewFile[];
 };
 
+type WhisperImportPreviewComment = {
+  comment_key: string | null;
+  status: "create" | "update" | null;
+  validation_issues: string[];
+  warnings: string[];
+};
+
+type WhisperImportPreviewPost = {
+  title: string | null;
+  post_key: string | null;
+  status: "create" | "update" | null;
+  timestamp: {
+    crown_year: number | null;
+    bloom_index: number | null;
+    petal: number | null;
+    bell: number | null;
+    chime: number | null;
+  };
+  comment_count: number;
+  invalid_comment_count: number;
+  validation_issues: string[];
+  warnings: string[];
+  comments: WhisperImportPreviewComment[];
+};
+
+type WhisperImportPreviewFile = {
+  filename: string;
+  size: number;
+  uploaded_at: string;
+  source_label: string;
+  mode: string | null;
+  schema_version: number | null;
+  validation_issues: string[];
+  warnings: string[];
+  summary: {
+    create: number;
+    update: number;
+    invalid: number;
+    posts: number;
+  };
+  posts: WhisperImportPreviewPost[];
+};
+
+type WhisperImportPreview = {
+  staged_file_count: number;
+  totals: {
+    create: number;
+    update: number;
+    invalid: number;
+    warnings: number;
+  };
+  files: WhisperImportPreviewFile[];
+};
+
 type ImportLog = {
   id: number;
   filename: string;
@@ -86,6 +140,7 @@ type NpcCleanupItem = {
 export default function DmToolsPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [locationPreview, setLocationPreview] = useState<LocationImportPreview | null>(null);
+  const [whisperPreview, setWhisperPreview] = useState<WhisperImportPreview | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -109,9 +164,17 @@ export default function DmToolsPage() {
       setLoading(true);
       setError("");
 
-      const [previewResponse, locationPreviewResponse, logsResponse, cleanupResponse, campaignDateResponse] = await Promise.all([
+      const [
+        previewResponse,
+        locationPreviewResponse,
+        whisperPreviewResponse,
+        logsResponse,
+        cleanupResponse,
+        campaignDateResponse,
+      ] = await Promise.all([
         apiFetch("/api/dm/import/staging"),
         apiFetch("/api/dm/location-import/staging"),
+        apiFetch("/api/dm/whisper-import/staging"),
         apiFetch("/api/dm/import/logs"),
         apiFetch("/api/dm/npcs?include_archived=1"),
         apiFetch("/api/dm/campaign-date"),
@@ -122,6 +185,9 @@ export default function DmToolsPage() {
       }
       if (!locationPreviewResponse.ok) {
         throw new Error(`Failed loading location staging preview: ${locationPreviewResponse.status}`);
+      }
+      if (!whisperPreviewResponse.ok) {
+        throw new Error(`Failed loading whisper staging preview: ${whisperPreviewResponse.status}`);
       }
 
       if (!logsResponse.ok) {
@@ -136,6 +202,7 @@ export default function DmToolsPage() {
 
       setPreview(await previewResponse.json());
       setLocationPreview(await locationPreviewResponse.json());
+      setWhisperPreview(await whisperPreviewResponse.json());
       setLogs(await logsResponse.json());
       setCleanupItems(await cleanupResponse.json());
       const loadedCampaignDate = (await campaignDateResponse.json()) as CampaignDateState;
@@ -301,6 +368,91 @@ export default function DmToolsPage() {
         throw new Error(data.error || `Failed to load location fixtures: ${response.status}`);
       }
       setLocationPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadWhisperFile(fileList: FileList | null) {
+    if (!fileList || fileList.length === 0) return;
+    const file = fileList[0];
+
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await apiFetch("/api/dm/whisper-import/staging/file", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Upload failed: ${response.status}`);
+      }
+
+      setWhisperPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearWhisperStaging() {
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+      const response = await apiFetch("/api/dm/whisper-import/staging/clear", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || `Failed to clear whisper staging: ${response.status}`);
+      }
+      setWhisperPreview(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function finalizeWhisperImport() {
+    if (!window.confirm("Finalize staged whisper import now?")) return;
+
+    try {
+      setBusy(true);
+      setError("");
+      setFinalizeResult("");
+
+      const response = await apiFetch("/api/dm/whisper-import/finalize", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Finalize failed: ${response.status}`);
+      }
+
+      const created = (data.results || []).reduce(
+        (sum: number, item: { created?: number }) => sum + Number(item.created || 0),
+        0
+      );
+      const updated = (data.results || []).reduce(
+        (sum: number, item: { updated?: number }) => sum + Number(item.updated || 0),
+        0
+      );
+      const invalid = (data.results || []).reduce(
+        (sum: number, item: { invalid?: number }) => sum + Number(item.invalid || 0),
+        0
+      );
+      setFinalizeResult(`Whisper import complete. Created: ${created}, Updated: ${updated}, Invalid: ${invalid}.`);
+
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -489,6 +641,15 @@ export default function DmToolsPage() {
     };
   }, [locationPreview]);
 
+  const whisperSummary = useMemo(() => {
+    if (!whisperPreview) return { create: 0, update: 0, invalid: 0 };
+    return {
+      create: whisperPreview.totals.create,
+      update: whisperPreview.totals.update,
+      invalid: whisperPreview.totals.invalid,
+    };
+  }, [whisperPreview]);
+
   if (loading) {
     return (
       <div className="app-shell">
@@ -509,6 +670,7 @@ export default function DmToolsPage() {
           <span>Markdown staged: {preview?.staged_markdown_count || 0}</span>
           <span>Portraits staged: {preview?.staged_portrait_count || 0}</span>
           <span>Location markdown staged: {locationPreview?.staged_markdown_count || 0}</span>
+          <span>Whisper JSON staged: {whisperPreview?.staged_file_count || 0}</span>
         </div>
       </header>
 
@@ -714,6 +876,87 @@ export default function DmToolsPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="state-card">
+          <h2>Whisper Importer</h2>
+          <p>Stage Whisper Network JSON files, review upsert status, then finalize imported posts and comments.</p>
+
+          <div className="toolbar-grid">
+            <label className="toolbar-field">
+              <span>Upload whisper JSON (.json)</span>
+              <input
+                className="text-input"
+                type="file"
+                accept=".json,application/json,text/json"
+                onChange={(event) => {
+                  void uploadWhisperFile(event.target.files);
+                  event.currentTarget.value = "";
+                }}
+                disabled={busy}
+              />
+            </label>
+          </div>
+
+          <div className="note-actions">
+            <button className="action-button secondary-link" type="button" onClick={() => void clearWhisperStaging()} disabled={busy}>
+              Clear whisper staging
+            </button>
+            <button
+              className="action-button"
+              type="button"
+              onClick={() => void finalizeWhisperImport()}
+              disabled={busy || (whisperPreview?.files.length || 0) === 0}
+            >
+              Finalize whisper import
+            </button>
+          </div>
+
+          <p>
+            Create: {whisperSummary.create} • Update: {whisperSummary.update} • Invalid: {whisperSummary.invalid}
+          </p>
+
+          {(whisperPreview?.files || []).length === 0 ? (
+            <p>No staged whisper JSON files yet.</p>
+          ) : (
+            <div className="notes-list">
+              {(whisperPreview?.files || []).map((file) => (
+                <article className="note-card" key={`${file.filename}-${file.uploaded_at}`}>
+                  <div className="note-card-header">
+                    <strong>{file.filename}</strong>
+                    <span>
+                      create {file.summary.create} • update {file.summary.update} • invalid {file.summary.invalid}
+                    </span>
+                  </div>
+                  <p>Source label: {file.source_label}</p>
+                  <p>Schema: {file.schema_version ?? "—"} • Mode: {file.mode || "—"}</p>
+                  <p>Staged at: {new Date(file.uploaded_at).toLocaleString()}</p>
+                  {file.validation_issues.length ? <p>Validation issues: {file.validation_issues.join("; ")}</p> : null}
+                  {file.warnings.length ? <p>Warnings: {file.warnings.join("; ")}</p> : null}
+                  {(file.posts || []).map((post, postIndex) => (
+                    <div className="state-card small-card" key={`${file.filename}-${post.post_key || post.title || postIndex}`}>
+                      <div className="note-card-header">
+                        <strong>{post.title || "Untitled post"}</strong>
+                        <span>{post.status || "invalid"}</span>
+                      </div>
+                      <p>Post key: {post.post_key || "—"}</p>
+                      <p>
+                        Timestamp:{" "}
+                        {post.timestamp.crown_year !== null
+                          ? `Year ${post.timestamp.crown_year}, Bloom ${post.timestamp.bloom_index}, Petal ${post.timestamp.petal}, Bell ${post.timestamp.bell}, Chime ${post.timestamp.chime}`
+                          : "Unrecorded"}
+                      </p>
+                      <p>
+                        Comments: {post.comment_count} (invalid: {post.invalid_comment_count})
+                      </p>
+                      {post.validation_issues.length ? <p>Validation issues: {post.validation_issues.join("; ")}</p> : null}
+                      {post.warnings.length ? <p>Warnings: {post.warnings.join("; ")}</p> : null}
+                    </div>
+                  ))}
+                </article>
+              ))}
+            </div>
           )}
         </section>
 

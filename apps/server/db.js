@@ -213,6 +213,9 @@ db.exec(`
     petal INTEGER,
     bell INTEGER,
     chime INTEGER,
+    import_key TEXT,
+    source_label TEXT,
+    last_imported_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (author_user_id) REFERENCES users(id)
@@ -231,6 +234,9 @@ db.exec(`
     petal INTEGER,
     bell INTEGER,
     chime INTEGER,
+    import_key TEXT,
+    source_label TEXT,
+    last_imported_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (post_id) REFERENCES whisper_posts(id),
@@ -663,6 +669,34 @@ for (const columnName of ["crown_year", "bloom_index", "petal", "bell", "chime"]
     `);
   }
 }
+
+for (const columnName of ["import_key", "source_label", "last_imported_at"]) {
+  if (tableExists("whisper_posts") && !columnExists("whisper_posts", columnName)) {
+    db.exec(`
+      ALTER TABLE whisper_posts
+      ADD COLUMN ${columnName} TEXT
+    `);
+  }
+
+  if (tableExists("whisper_comments") && !columnExists("whisper_comments", columnName)) {
+    db.exec(`
+      ALTER TABLE whisper_comments
+      ADD COLUMN ${columnName} TEXT
+    `);
+  }
+}
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_posts_import_key_unique
+  ON whisper_posts(import_key)
+  WHERE import_key IS NOT NULL
+`);
+
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_comments_import_key_unique
+  ON whisper_comments(import_key)
+  WHERE import_key IS NOT NULL
+`);
 
 db.exec(`
   UPDATE session_recaps

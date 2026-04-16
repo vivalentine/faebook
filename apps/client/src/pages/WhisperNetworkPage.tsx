@@ -579,11 +579,6 @@ export default function WhisperNetworkPage() {
 
   return (
     <section className="whisper-page chapters-page">
-      <div className="page-heading">
-        <h1>Rumor Feed</h1>
-        <p className="topbar-meta">Anonymous rumors from the city’s shadowed alleys and moonlit taverns.</p>
-      </div>
-
       {error ? <p className="error-banner">{error}</p> : null}
 
       <div className="chapters-layout whisper-layout">
