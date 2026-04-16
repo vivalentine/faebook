@@ -33,9 +33,7 @@ export default function NpcCard({
               ? "💗"
               : reputation.card_indicator === "knife"
               ? "🔪"
-              : reputation.card_indicator === "neutral"
-              ? "○"
-              : "●"}
+              : null}
           </span>
         ) : null}
 
