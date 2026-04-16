@@ -2254,6 +2254,15 @@
   font-size: 12px;
 }
 
+.wiki-preview-meta[data-empty="true"] {
+  display: none;
+}
+
+.wiki-preview-meta-item {
+  display: inline-flex;
+  gap: 4px;
+}
+
 .wiki-preview-summary {
   color: #d9d2ee;
   font-size: 12px;
