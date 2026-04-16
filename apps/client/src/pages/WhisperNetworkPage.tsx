@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import FaeIcon from "../components/FaeIcon";
 import FaeSelect from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import {
@@ -594,13 +595,29 @@ export default function WhisperNetworkPage() {
                     <span className="chapter-list-meta">Anonymous rumor · {getPostFeedTimestamp(post)}</span>
                     <strong>{post.title}</strong>
                     <p className="whisper-list-excerpt">{post.body}</p>
-                    <span className={`whisper-post-stats ${hasFeedback ? "is-updated" : ""}`.trim()}>
-                      ❤️ {post.like_count} · 💬 {post.comment_count} · 👁 {post.view_count}
-                    </span>
                   </button>
+                  <div className={`whisper-post-stats whisper-post-inline-actions ${hasFeedback ? "is-updated" : ""}`.trim()}>
+                    <button
+                      type="button"
+                      className={`whisper-icon-button ${post.liked_by_me ? "is-liked" : ""}`.trim()}
+                      onClick={() => void toggleLike(post.id)}
+                      aria-label={post.liked_by_me ? "Unlike whisper" : "Like whisper"}
+                    >
+                      <FaeIcon icon="heart" filled={post.liked_by_me} />
+                      <span>{post.like_count}</span>
+                    </button>
+                    <span className="whisper-stat-pill" aria-label={`${post.comment_count} comments`}>
+                      <FaeIcon icon="message-circle" />
+                      <span>{post.comment_count}</span>
+                    </span>
+                    <span className="whisper-stat-pill" aria-label={`${post.view_count} views`}>
+                      <FaeIcon icon="eye" />
+                      <span>{post.view_count}</span>
+                    </span>
+                  </div>
                   <div className="whisper-post-inline-actions">
-                    <button type="button" className="secondary-link" onClick={() => void toggleLike(post.id)}>
-                      {post.liked_by_me ? "Unlike" : "Like"}
+                    <button type="button" className="secondary-link" onClick={() => void openPostReader(post.id)}>
+                      Open
                     </button>
                   </div>
                   {isDm ? (
@@ -623,17 +640,37 @@ export default function WhisperNetworkPage() {
       {isReaderOpen && activePost ? (
         <div className="board-modal-overlay" role="presentation" onClick={() => setIsReaderOpen(false)}>
           <div className="board-modal whisper-detail-modal" role="dialog" aria-modal="true" aria-label="Whisper details" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="whisper-modal-close" onClick={() => setIsReaderOpen(false)} aria-label="Close whisper details">
+              <FaeIcon icon="x" />
+            </button>
             <header className="chapter-reader-header whisper-detail-header whisper-detail-fixed">
               <p className="topbar-meta">Anonymous rumor · {getPostDetailTimestamp(activePost)}</p>
               <h2>{activePost.title}</h2>
               <p className="whisper-reader-body">{activePost.body}</p>
-              <p className={`whisper-post-stats ${feedbackPostIds[activePost.id] ? "is-updated" : ""}`.trim()}>
-                ❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}
-              </p>
-              <div className="whisper-detail-actions">
-                <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
-                  {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
+              <div
+                className={`whisper-post-stats whisper-detail-actions ${
+                  feedbackPostIds[activePost.id] ? "is-updated" : ""
+                }`.trim()}
+              >
+                <button
+                  type="button"
+                  className={`whisper-icon-button ${activePost.liked_by_me ? "is-liked" : ""}`.trim()}
+                  onClick={() => void toggleLike(activePost.id)}
+                  aria-label={activePost.liked_by_me ? "Unlike whisper" : "Like whisper"}
+                >
+                  <FaeIcon icon="heart" filled={activePost.liked_by_me} />
+                  <span>{activePost.like_count}</span>
                 </button>
+                <span className="whisper-stat-pill" aria-label={`${activePost.comment_count} comments`}>
+                  <FaeIcon icon="message-circle" />
+                  <span>{activePost.comment_count}</span>
+                </span>
+                <span className="whisper-stat-pill" aria-label={`${activePost.view_count} views`}>
+                  <FaeIcon icon="eye" />
+                  <span>{activePost.view_count}</span>
+                </span>
+              </div>
+              <div className="whisper-detail-actions">
                 {isDm ? (
                   <button type="button" className="secondary-link" onClick={() => startEditPost(activePost)}>
                     Edit whisper
@@ -644,9 +681,6 @@ export default function WhisperNetworkPage() {
                     Delete whisper
                   </button>
                 ) : null}
-                <button type="button" className="secondary-link" onClick={() => setIsReaderOpen(false)}>
-                  Close
-                </button>
               </div>
             </header>
             <div className="whisper-inline-comments whisper-detail-comments">

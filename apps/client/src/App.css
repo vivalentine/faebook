@@ -3027,6 +3027,10 @@
 .whisper-post-stats {
   color: #beafdc;
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .whisper-post-inline-actions,
@@ -3041,6 +3045,71 @@
 .whisper-detail-actions .secondary-link {
   width: auto;
   min-width: 120px;
+}
+
+.whisper-icon-button,
+.whisper-stat-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(143, 130, 180, 0.45);
+  background: rgba(50, 43, 72, 0.42);
+  color: #d5caee;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 11px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.whisper-icon-button {
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.whisper-icon-button:hover,
+.whisper-icon-button:focus-visible {
+  border-color: rgba(191, 163, 255, 0.8);
+  background: rgba(79, 63, 122, 0.66);
+  color: #f3ebff;
+}
+
+.whisper-icon-button.is-liked {
+  border-color: rgba(245, 140, 190, 0.82);
+  background: rgba(112, 45, 86, 0.62);
+  color: #ffd5eb;
+}
+
+.whisper-icon-button svg,
+.whisper-stat-pill svg,
+.whisper-modal-close svg {
+  width: 15px;
+  height: 15px;
+}
+
+.whisper-modal-close {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  border: 1px solid rgba(143, 130, 180, 0.45);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: rgba(38, 33, 55, 0.76);
+  color: #d7cdef;
+  cursor: pointer;
+}
+
+.whisper-modal-close:hover,
+.whisper-modal-close:focus-visible {
+  border-color: rgba(191, 163, 255, 0.85);
+  background: rgba(74, 58, 116, 0.8);
+  color: #f3ebff;
 }
 
 .whisper-admin-actions {
@@ -3111,10 +3180,12 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: relative;
 }
 
 .whisper-detail-header {
   margin-bottom: 0;
+  padding-left: 40px;
 }
 
 .whisper-detail-fixed {
@@ -3310,6 +3381,17 @@
   .whisper-detail-actions .action-button,
   .whisper-detail-actions .secondary-link {
     width: 100%;
+  }
+
+  .whisper-post-stats {
+    width: 100%;
+  }
+
+  .whisper-icon-button,
+  .whisper-stat-pill {
+    justify-content: center;
+    flex: 1 1 calc(33.3% - 8px);
+    min-width: 0;
   }
 
   .whisper-feed-tools {
