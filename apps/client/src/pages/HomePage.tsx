@@ -8,6 +8,7 @@ import {
   formatSummerCourtDate,
   formatTimeHHMM,
   getBloomName,
+  getHolidayChipLabel,
   getHolidayNamesForPetal,
   getPetalCycleNameFromPetal,
   getPetalCycleShortLabel,
@@ -43,6 +44,8 @@ export default function HomePage() {
   const [newSuspectName, setNewSuspectName] = useState("");
   const [newSuspectNote, setNewSuspectNote] = useState("");
   const [addingSuspect, setAddingSuspect] = useState(false);
+  const [viewedBloomIndex, setViewedBloomIndex] = useState<number>(1);
+  const [calendarMotionDirection, setCalendarMotionDirection] = useState<"forward" | "backward">("forward");
 
 
   const [recapChapterNumber, setRecapChapterNumber] = useState("");
@@ -88,6 +91,24 @@ export default function HomePage() {
     () => toSummerCourtDateTimeOrNull(dashboard?.campaign_date || undefined),
     [dashboard?.campaign_date],
   );
+
+  useEffect(() => {
+    if (campaignDate) {
+      setViewedBloomIndex(campaignDate.bloom_index);
+    }
+  }, [campaignDate]);
+
+  function updateViewedBloom(nextBloomIndex: number) {
+    setViewedBloomIndex((current) => {
+      const clamped = Math.max(1, Math.min(12, nextBloomIndex));
+      if (clamped === current) {
+        return current;
+      }
+
+      setCalendarMotionDirection(clamped > current ? "forward" : "backward");
+      return clamped;
+    });
+  }
 
   async function addSuspect() {
     if (!newSuspectName.trim()) {
@@ -320,14 +341,50 @@ export default function HomePage() {
           {campaignDate ? (
             <>
               <p className="topbar-meta">
-                {formatSummerCourtDate(campaignDate)} · {getPetalCycleNameFromPetal(campaignDate.petal)} ·{" "}
+                Today: {formatSummerCourtDate(campaignDate)} · {getPetalCycleNameFromPetal(campaignDate.petal)} ·{" "}
                 {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
               </p>
               <div className="summer-court-calendar">
                 <div className="summer-court-calendar-head">
-                  <strong>{getBloomName(campaignDate.bloom_index)} Bloom</strong>
+                  <div className="summer-court-calendar-nav" aria-label="Summer Court bloom navigation">
+                    <button
+                      type="button"
+                      className="summer-court-nav-button summer-court-nav-button--today"
+                      onClick={() => updateViewedBloom(campaignDate.bloom_index)}
+                      disabled={viewedBloomIndex === campaignDate.bloom_index}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      className="summer-court-nav-button"
+                      aria-label="View previous bloom"
+                      onClick={() => updateViewedBloom(viewedBloomIndex - 1)}
+                      disabled={viewedBloomIndex <= 1}
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      className="summer-court-nav-button"
+                      aria-label="View next bloom"
+                      onClick={() => updateViewedBloom(viewedBloomIndex + 1)}
+                      disabled={viewedBloomIndex >= 12}
+                    >
+                      →
+                    </button>
+                  </div>
+                  <div className="summer-court-calendar-title-wrap">
+                    <strong>{getBloomName(viewedBloomIndex)} Bloom</strong>
+                    <span className="summer-court-calendar-head-meta">
+                      Crown Year {campaignDate.crown_year} · Bloom {viewedBloomIndex} of 12
+                    </span>
+                  </div>
                 </div>
-                <div className="summer-court-calendar-grid">
+                <div
+                  key={`summer-bloom-${viewedBloomIndex}`}
+                  className={`summer-court-calendar-grid summer-court-calendar-grid--${calendarMotionDirection}`}
+                >
                   {PETAL_CYCLE.map((cycle) => (
                     <div
                       key={cycle.index}
@@ -341,9 +398,11 @@ export default function HomePage() {
                   {BLOOM_PETAL_ROWS.flatMap((rowIndex) =>
                     PETAL_CYCLE.map((cycle) => {
                       const petal = rowIndex * 7 + cycle.index;
-                      const isPastPetal = petal < campaignDate.petal;
-                      const isCurrentPetal = petal === campaignDate.petal;
-                      const holidayNames = getHolidayNamesForPetal(campaignDate.bloom_index, petal);
+                      const isPastBloom = viewedBloomIndex < campaignDate.bloom_index;
+                      const isCurrentBloom = viewedBloomIndex === campaignDate.bloom_index;
+                      const isPastPetal = isPastBloom || (isCurrentBloom && petal < campaignDate.petal);
+                      const isCurrentPetal = isCurrentBloom && petal === campaignDate.petal;
+                      const holidayNames = getHolidayNamesForPetal(viewedBloomIndex, petal);
                       const classNames = [
                         "summer-court-petal",
                         isPastPetal ? "is-past" : "",
@@ -356,12 +415,18 @@ export default function HomePage() {
                       return (
                         <div key={petal} className={classNames} title={holidayNames.join(" · ") || undefined}>
                           <span className="summer-court-petal-number">{petal}</span>
-                          {holidayNames.includes("Solstice Festival") ? (
-                            <span className="summer-court-chip">Festival</span>
-                          ) : null}
-                          {holidayNames.includes("Solstice Day") ? (
-                            <span className="summer-court-chip summer-court-chip--accent">Solstice Day</span>
-                          ) : null}
+                          {holidayNames.map((holidayName) => (
+                            <span
+                              key={holidayName}
+                              className={
+                                holidayName === "Solstice Day" || holidayName === "Solstice Masquerade"
+                                  ? "summer-court-chip summer-court-chip--accent"
+                                  : "summer-court-chip"
+                              }
+                            >
+                              {getHolidayChipLabel(holidayName)}
+                            </span>
+                          ))}
                         </div>
                       );
                     }),
