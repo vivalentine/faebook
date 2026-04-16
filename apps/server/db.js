@@ -450,6 +450,18 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id
   ON user_profiles(user_id);
+
+  CREATE TABLE IF NOT EXISTS campaign_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    crown_year INTEGER NOT NULL,
+    bloom_index INTEGER NOT NULL,
+    petal INTEGER NOT NULL,
+    bell INTEGER NOT NULL,
+    chime INTEGER NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+  );
 `);
 
 function tableExists(tableName) {
@@ -866,5 +878,26 @@ db.exec(`
     WHERE user_profiles.user_id = users.id
   )
 `);
+
+const campaignSeedNowDate = new Date();
+const campaignSeedNow = campaignSeedNowDate.toISOString();
+const campaignSeedBell = campaignSeedNowDate.getUTCHours();
+const campaignSeedChime = campaignSeedNowDate.getUTCMinutes();
+db.prepare(
+  `
+    INSERT INTO campaign_state (
+      id,
+      crown_year,
+      bloom_index,
+      petal,
+      bell,
+      chime,
+      updated_at,
+      updated_by_user_id
+    )
+    VALUES (1, 2026, 6, 18, ?, ?, ?, NULL)
+    ON CONFLICT(id) DO NOTHING
+  `
+).run(campaignSeedBell, campaignSeedChime, campaignSeedNow);
 
 module.exports = db;

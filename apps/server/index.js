@@ -635,6 +635,58 @@ function parseSummerCourtDateTimeInput(payload = {}) {
   return { hasAnyField, value, issues };
 }
 
+function getCampaignDateState() {
+  const row = db
+    .prepare(
+      `
+        SELECT crown_year, bloom_index, petal, bell, chime, updated_at
+        FROM campaign_state
+        WHERE id = 1
+      `
+    )
+    .get();
+
+  if (row) {
+    return row;
+  }
+
+  const now = new Date();
+  const fallback = {
+    crown_year: 2026,
+    bloom_index: 6,
+    petal: 18,
+    bell: now.getUTCHours(),
+    chime: now.getUTCMinutes(),
+    updated_at: now.toISOString(),
+  };
+
+  db.prepare(
+    `
+      INSERT INTO campaign_state (
+        id,
+        crown_year,
+        bloom_index,
+        petal,
+        bell,
+        chime,
+        updated_at,
+        updated_by_user_id
+      )
+      VALUES (1, ?, ?, ?, ?, ?, ?, NULL)
+      ON CONFLICT(id) DO NOTHING
+    `
+  ).run(
+    fallback.crown_year,
+    fallback.bloom_index,
+    fallback.petal,
+    fallback.bell,
+    fallback.chime,
+    fallback.updated_at
+  );
+
+  return fallback;
+}
+
 function getDefaultBoard() {
   return {
     nodes: [],
@@ -2976,6 +3028,101 @@ app.get("/api/dm/board-users", requireRole("dm"), (_req, res) => {
   res.json(rows);
 });
 
+app.get("/api/dm/campaign-date", requireRole("dm"), (_req, res) => {
+  return res.json(getCampaignDateState());
+});
+
+app.put("/api/dm/campaign-date", requireRole("dm"), (req, res) => {
+  const parsedBase = {
+    crown_year: Number.parseInt(String(req.body?.crown_year ?? ""), 10),
+    bloom_index: Number.parseInt(String(req.body?.bloom_index ?? ""), 10),
+    petal: Number.parseInt(String(req.body?.petal ?? ""), 10),
+  };
+
+  if (
+    !Number.isInteger(parsedBase.crown_year) ||
+    !Number.isInteger(parsedBase.bloom_index) ||
+    !Number.isInteger(parsedBase.petal)
+  ) {
+    return res
+      .status(400)
+      .json({ error: "crown_year, bloom_index, and petal are required integers" });
+  }
+
+  const existing = getCampaignDateState();
+  const bellRaw = req.body?.bell;
+  const chimeRaw = req.body?.chime;
+  const next = {
+    crown_year: parsedBase.crown_year,
+    bloom_index: parsedBase.bloom_index,
+    petal: parsedBase.petal,
+    bell:
+      bellRaw === undefined || bellRaw === null || String(bellRaw).trim() === ""
+        ? Number(existing.bell)
+        : Number.parseInt(String(bellRaw), 10),
+    chime:
+      chimeRaw === undefined || chimeRaw === null || String(chimeRaw).trim() === ""
+        ? Number(existing.chime)
+        : Number.parseInt(String(chimeRaw), 10),
+  };
+
+  const issues = validateSummerCourtDateTime(next);
+  if (issues.length) {
+    return res.status(400).json({ error: "Invalid Summer Court date", issues });
+  }
+
+  const updatedAt = new Date().toISOString();
+  db.prepare(
+    `
+      INSERT INTO campaign_state (
+        id,
+        crown_year,
+        bloom_index,
+        petal,
+        bell,
+        chime,
+        updated_at,
+        updated_by_user_id
+      )
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        crown_year = excluded.crown_year,
+        bloom_index = excluded.bloom_index,
+        petal = excluded.petal,
+        bell = excluded.bell,
+        chime = excluded.chime,
+        updated_at = excluded.updated_at,
+        updated_by_user_id = excluded.updated_by_user_id
+    `
+  ).run(
+    next.crown_year,
+    next.bloom_index,
+    next.petal,
+    next.bell,
+    next.chime,
+    updatedAt,
+    req.session.user.id
+  );
+
+  createAuditLog({
+    db,
+    actorUserId: req.session.user.id,
+    actionType: "campaign_date_updated",
+    objectType: "campaign_state",
+    objectId: "1",
+    message: `Updated campaign date to CY ${next.crown_year}, bloom ${next.bloom_index}, petal ${next.petal}, ${String(next.bell).padStart(2, "0")}:${String(next.chime).padStart(2, "0")}`,
+  });
+
+  return res.json({
+    crown_year: next.crown_year,
+    bloom_index: next.bloom_index,
+    petal: next.petal,
+    bell: next.bell,
+    chime: next.chime,
+    updated_at: updatedAt,
+  });
+});
+
 app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
   const sessionUser = req.session.user;
 
@@ -3045,6 +3192,7 @@ app.get("/api/dashboard", requireRole("player", "dm"), (req, res) => {
     suspects,
     personal_note: note ? mapDashboardNoteForClient(note) : null,
     latest_recap: latestRecap,
+    campaign_date: getCampaignDateState(),
     recent_personal_activity: recentActivity,
   };
 
@@ -4676,6 +4824,15 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
     return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
   }
 
+  const campaignDate = getCampaignDateState();
+  const whisperTimestamp = summerCourtInput.value || {
+    crown_year: Number(campaignDate.crown_year),
+    bloom_index: Number(campaignDate.bloom_index),
+    petal: Number(campaignDate.petal),
+    bell: Number(campaignDate.bell),
+    chime: Number(campaignDate.chime),
+  };
+
   const now = new Date().toISOString();
   const result = db
     .prepare(
@@ -4703,11 +4860,11 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
       body,
       likeCount,
       viewCount,
-      summerCourtInput.value?.crown_year ?? null,
-      summerCourtInput.value?.bloom_index ?? null,
-      summerCourtInput.value?.petal ?? null,
-      summerCourtInput.value?.bell ?? null,
-      summerCourtInput.value?.chime ?? null,
+      whisperTimestamp.crown_year,
+      whisperTimestamp.bloom_index,
+      whisperTimestamp.petal,
+      whisperTimestamp.bell,
+      whisperTimestamp.chime,
       now,
       now
     );
@@ -4919,6 +5076,15 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
     return res.status(404).json({ error: "Post not found" });
   }
 
+  const campaignDate = getCampaignDateState();
+  const whisperTimestamp = {
+    crown_year: Number(campaignDate.crown_year),
+    bloom_index: Number(campaignDate.bloom_index),
+    petal: Number(campaignDate.petal),
+    bell: Number(campaignDate.bell),
+    chime: Number(campaignDate.chime),
+  };
+
   const now = new Date().toISOString();
   const result = db
     .prepare(
@@ -4927,13 +5093,29 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
           post_id,
           author_user_id,
           body,
+          crown_year,
+          bloom_index,
+          petal,
+          bell,
+          chime,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(postId, sessionUser.id, body, now, now);
+    .run(
+      postId,
+      sessionUser.id,
+      body,
+      whisperTimestamp.crown_year,
+      whisperTimestamp.bloom_index,
+      whisperTimestamp.petal,
+      whisperTimestamp.bell,
+      whisperTimestamp.chime,
+      now,
+      now
+    );
 
   db.prepare(
     `
@@ -4948,11 +5130,11 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
       id: Number(result.lastInsertRowid),
       post_id: postId,
       body,
-      crown_year: null,
-      bloom_index: null,
-      petal: null,
-      bell: null,
-      chime: null,
+      crown_year: whisperTimestamp.crown_year,
+      bloom_index: whisperTimestamp.bloom_index,
+      petal: whisperTimestamp.petal,
+      bell: whisperTimestamp.bell,
+      chime: whisperTimestamp.chime,
       created_at: now,
       updated_at: now,
       can_moderate: sessionUser.role === "dm" ? 1 : 0,

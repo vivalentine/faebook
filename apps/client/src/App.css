@@ -1815,8 +1815,82 @@
   grid-column: span 4;
 }
 
+.dashboard-card--calendar {
+  grid-column: span 4;
+}
+
 .dashboard-card--suspects {
   grid-column: span 8;
+}
+
+.summer-court-calendar {
+  border: 1px solid #3a3552;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at top left, rgba(217, 177, 123, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(25, 24, 35, 0.96), rgba(18, 17, 26, 0.96));
+  padding: 10px;
+}
+
+.summer-court-calendar-head {
+  margin-bottom: 8px;
+  color: #f2dfbb;
+  letter-spacing: 0.02em;
+}
+
+.summer-court-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.summer-court-calendar-col-head {
+  font-size: 11px;
+  color: #bfb5d8;
+  text-align: center;
+}
+
+.summer-court-petal {
+  min-height: 34px;
+  border: 1px solid #403a5d;
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: rgba(58, 51, 87, 0.2);
+}
+
+.summer-court-petal.is-past {
+  opacity: 0.56;
+  text-decoration: line-through;
+}
+
+.summer-court-petal.is-current {
+  border-color: #f2d9a3;
+  background: rgba(196, 149, 74, 0.26);
+  box-shadow: inset 0 0 0 1px rgba(242, 217, 163, 0.42);
+}
+
+.summer-court-petal-number {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summer-court-chip {
+  font-size: 9px;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 3px 6px;
+  background: rgba(170, 146, 227, 0.3);
+  color: #f0e6ff;
+}
+
+.summer-court-chip--accent {
+  background: rgba(238, 194, 119, 0.38);
+  color: #fff1cc;
 }
 
 .dashboard-inline-form {
@@ -3288,6 +3362,10 @@ body {
 .dm-tools-page li {
   color: var(--text-secondary);
   margin-bottom: 6px;
+}
+
+.dm-tools-campaign-date-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 body.ui-density-compact .state-card,

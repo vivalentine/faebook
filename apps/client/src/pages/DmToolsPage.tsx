@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../lib/api";
+import {
+  BLOOMS,
+  formatSummerCourtDateTimeFull,
+  toSummerCourtDateTimeOrNull,
+} from "../lib/summerCourtCalendar";
+
+type CampaignDateState = {
+  crown_year: number;
+  bloom_index: number;
+  petal: number;
+  bell: number;
+  chime: number;
+  updated_at: string;
+};
 
 type ImportPreviewFile = {
   filename: string;
@@ -79,6 +93,12 @@ export default function DmToolsPage() {
   const [finalizeResult, setFinalizeResult] = useState("");
   const [backupResult, setBackupResult] = useState<BackupResult | null>(null);
   const [cleanupItems, setCleanupItems] = useState<NpcCleanupItem[]>([]);
+  const [campaignDate, setCampaignDate] = useState<CampaignDateState | null>(null);
+  const [campaignYearDraft, setCampaignYearDraft] = useState("");
+  const [campaignBloomDraft, setCampaignBloomDraft] = useState("6");
+  const [campaignPetalDraft, setCampaignPetalDraft] = useState("18");
+  const [campaignBellDraft, setCampaignBellDraft] = useState("");
+  const [campaignChimeDraft, setCampaignChimeDraft] = useState("");
 
   useEffect(() => {
     void refresh();
@@ -89,11 +109,12 @@ export default function DmToolsPage() {
       setLoading(true);
       setError("");
 
-      const [previewResponse, locationPreviewResponse, logsResponse, cleanupResponse] = await Promise.all([
+      const [previewResponse, locationPreviewResponse, logsResponse, cleanupResponse, campaignDateResponse] = await Promise.all([
         apiFetch("/api/dm/import/staging"),
         apiFetch("/api/dm/location-import/staging"),
         apiFetch("/api/dm/import/logs"),
         apiFetch("/api/dm/npcs?include_archived=1"),
+        apiFetch("/api/dm/campaign-date"),
       ]);
 
       if (!previewResponse.ok) {
@@ -109,11 +130,21 @@ export default function DmToolsPage() {
       if (!cleanupResponse.ok) {
         throw new Error(`Failed loading NPC cleanup list: ${cleanupResponse.status}`);
       }
+      if (!campaignDateResponse.ok) {
+        throw new Error(`Failed loading campaign date: ${campaignDateResponse.status}`);
+      }
 
       setPreview(await previewResponse.json());
       setLocationPreview(await locationPreviewResponse.json());
       setLogs(await logsResponse.json());
       setCleanupItems(await cleanupResponse.json());
+      const loadedCampaignDate = (await campaignDateResponse.json()) as CampaignDateState;
+      setCampaignDate(loadedCampaignDate);
+      setCampaignYearDraft(String(loadedCampaignDate.crown_year));
+      setCampaignBloomDraft(String(loadedCampaignDate.bloom_index));
+      setCampaignPetalDraft(String(loadedCampaignDate.petal));
+      setCampaignBellDraft(String(loadedCampaignDate.bell));
+      setCampaignChimeDraft(String(loadedCampaignDate.chime));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -391,6 +422,55 @@ export default function DmToolsPage() {
     }
   }
 
+  async function saveCampaignDate() {
+    const payload = {
+      crown_year: Number.parseInt(campaignYearDraft, 10),
+      bloom_index: Number.parseInt(campaignBloomDraft, 10),
+      petal: Number.parseInt(campaignPetalDraft, 10),
+      bell: campaignBellDraft.trim() ? Number.parseInt(campaignBellDraft, 10) : undefined,
+      chime: campaignChimeDraft.trim() ? Number.parseInt(campaignChimeDraft, 10) : undefined,
+    };
+
+    try {
+      setBusy(true);
+      setError("");
+      const response = await apiFetch("/api/dm/campaign-date", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json()) as CampaignDateState | { error?: string };
+
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || `Save failed: ${response.status}`);
+      }
+
+      const next = data as CampaignDateState;
+      setCampaignDate(next);
+      setCampaignYearDraft(String(next.crown_year));
+      setCampaignBloomDraft(String(next.bloom_index));
+      setCampaignPetalDraft(String(next.petal));
+      setCampaignBellDraft(String(next.bell));
+      setCampaignChimeDraft(String(next.chime));
+      setFinalizeResult("Campaign date updated.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const campaignPreview = toSummerCourtDateTimeOrNull({
+    crown_year: Number.parseInt(campaignYearDraft, 10),
+    bloom_index: Number.parseInt(campaignBloomDraft, 10),
+    petal: Number.parseInt(campaignPetalDraft, 10),
+    bell: campaignBellDraft.trim()
+      ? Number.parseInt(campaignBellDraft, 10)
+      : Number(campaignDate?.bell ?? 0),
+    chime: campaignChimeDraft.trim()
+      ? Number.parseInt(campaignChimeDraft, 10)
+      : Number(campaignDate?.chime ?? 0),
+  });
+
   const summary = useMemo(() => {
     if (!preview) return { create: 0, update: 0, invalid: 0 };
     return {
@@ -510,6 +590,83 @@ export default function DmToolsPage() {
               <code>{backupResult.path}</code>
             </p>
           ) : null}
+        </section>
+
+        <section className="state-card">
+          <h2>Campaign Date</h2>
+          <p>Set the current in-world Summer Court date for dashboard and timeline context.</p>
+          <div className="toolbar-grid dm-tools-campaign-date-grid">
+            <label className="toolbar-field">
+              <span>Crown Year</span>
+              <input
+                className="text-input"
+                type="number"
+                min={1}
+                value={campaignYearDraft}
+                onChange={(event) => setCampaignYearDraft(event.target.value)}
+              />
+            </label>
+            <label className="toolbar-field">
+              <span>Bloom</span>
+              <select
+                className="text-input"
+                value={campaignBloomDraft}
+                onChange={(event) => setCampaignBloomDraft(event.target.value)}
+              >
+                {BLOOMS.map((bloom) => (
+                  <option key={bloom.index} value={bloom.index}>
+                    {bloom.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="toolbar-field">
+              <span>Petal</span>
+              <input
+                className="text-input"
+                type="number"
+                min={1}
+                max={28}
+                value={campaignPetalDraft}
+                onChange={(event) => setCampaignPetalDraft(event.target.value)}
+              />
+            </label>
+            <label className="toolbar-field">
+              <span>Bell (optional)</span>
+              <input
+                className="text-input"
+                type="number"
+                min={0}
+                max={23}
+                placeholder={campaignDate ? String(campaignDate.bell) : "0"}
+                value={campaignBellDraft}
+                onChange={(event) => setCampaignBellDraft(event.target.value)}
+              />
+            </label>
+            <label className="toolbar-field">
+              <span>Chime (optional)</span>
+              <input
+                className="text-input"
+                type="number"
+                min={0}
+                max={59}
+                placeholder={campaignDate ? String(campaignDate.chime) : "0"}
+                value={campaignChimeDraft}
+                onChange={(event) => setCampaignChimeDraft(event.target.value)}
+              />
+            </label>
+          </div>
+          <p className="topbar-meta">
+            Preview: {campaignPreview ? formatSummerCourtDateTimeFull(campaignPreview) : "Enter a valid date"}
+          </p>
+          {campaignDate ? (
+            <p className="topbar-meta">Last updated: {new Date(campaignDate.updated_at).toLocaleString()}</p>
+          ) : null}
+          <div className="note-actions">
+            <button className="action-button" type="button" onClick={() => void saveCampaignDate()} disabled={busy || !campaignPreview}>
+              Save Campaign Date
+            </button>
+          </div>
         </section>
 
         <section className="state-card">
