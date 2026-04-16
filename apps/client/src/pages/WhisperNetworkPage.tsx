@@ -156,27 +156,6 @@ export default function WhisperNetworkPage() {
     [sortedPosts, selectedPostId],
   );
 
-  const whisperNetworkNodes = useMemo(() => {
-    if (sortedPosts.length === 0) return [];
-
-    const columns = sortedPosts.length <= 4 ? 2 : sortedPosts.length <= 9 ? 3 : 4;
-    return sortedPosts.map((post, index) => {
-      const row = Math.floor(index / columns);
-      const column = index % columns;
-      const jitterSeed = (post.id * 13 + index * 7 + sortMode.length * 17) % 5;
-      const jitter = (jitterSeed - 2) * 1.8;
-      const left = 10 + (column + 0.5) * (80 / columns) + jitter;
-      const top = 12 + row * 22 + (column % 2 === 0 ? 0 : 4);
-      return {
-        id: post.id,
-        rank: index + 1,
-        left: Math.max(6, Math.min(94, left)),
-        top: Math.max(10, Math.min(92, top)),
-        title: post.title,
-      };
-    });
-  }, [sortedPosts, sortMode]);
-
   async function loadFeed(options?: { preferredSelectedPostId?: number | null }) {
     try {
       setLoading(true);
@@ -523,7 +502,7 @@ export default function WhisperNetworkPage() {
   return (
     <section className="whisper-page chapters-page">
       <div className="page-heading">
-        <h1>Whisper Network</h1>
+        <h1>Rumor Feed</h1>
         <p className="topbar-meta">Anonymous rumors from the city’s shadowed alleys and moonlit taverns.</p>
       </div>
 
@@ -586,43 +565,34 @@ export default function WhisperNetworkPage() {
             })}
           </ul>
         </article>
-
-        <article className="state-card whisper-network-card">
-          <section className="whisper-network-view" aria-live="polite">
-            <div className="whisper-network-header">
-              <p className="topbar-meta">Network layout follows: {WHISPER_SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "Trending"}</p>
-            </div>
-            <div className="whisper-network-canvas" key={`network-${sortMode}-${sortedPosts.map((post) => post.id).join("-")}`}>
-              {whisperNetworkNodes.map((node) => (
-                <button
-                  key={node.id}
-                  type="button"
-                  className={`whisper-network-node ${node.id === selectedPostId ? "active" : ""}`.trim()}
-                  style={{ left: `${node.left}%`, top: `${node.top}%` }}
-                  onClick={() => {
-                    void openPostReader(node.id);
-                  }}
-                >
-                  <span className="whisper-network-rank">#{node.rank}</span>
-                  <span className="whisper-network-title">{node.title}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-          <p className="topbar-meta whisper-network-hint">
-            Select a rumor from the feed or network to open full details.
-          </p>
-        </article>
       </div>
 
       {isReaderOpen && activePost ? (
         <div className="board-modal-overlay" role="presentation" onClick={() => setIsReaderOpen(false)}>
           <div className="board-modal whisper-detail-modal" role="dialog" aria-modal="true" aria-label="Whisper details" onClick={(event) => event.stopPropagation()}>
-            <header className="chapter-reader-header whisper-detail-header">
+            <header className="chapter-reader-header whisper-detail-header whisper-detail-fixed">
               <p className="topbar-meta">Anonymous rumor · {getPostDetailTimestamp(activePost)}</p>
               <h2>{activePost.title}</h2>
               <p className="whisper-reader-body">{activePost.body}</p>
               <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
+              <div className="whisper-detail-actions">
+                <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
+                  {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
+                </button>
+                {isDm ? (
+                  <button type="button" className="secondary-link" onClick={() => startEditPost(activePost)}>
+                    Edit whisper
+                  </button>
+                ) : null}
+                {isDm ? (
+                  <button type="button" className="board-node-delete-button" onClick={() => void deletePost(activePost)}>
+                    Delete whisper
+                  </button>
+                ) : null}
+                <button type="button" className="secondary-link" onClick={() => setIsReaderOpen(false)}>
+                  Close
+                </button>
+              </div>
             </header>
             <div className="whisper-inline-comments whisper-detail-comments">
               <h3>Anonymous comments</h3>
@@ -736,24 +706,6 @@ export default function WhisperNetworkPage() {
                   {isSubmittingCommentByPostId[activePost.id] ? "Posting…" : "Post anonymous comment"}
                 </button>
               </div>
-            </div>
-            <div className="whisper-detail-actions">
-              <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
-                {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
-              </button>
-              {isDm ? (
-                <button type="button" className="secondary-link" onClick={() => startEditPost(activePost)}>
-                  Edit whisper
-                </button>
-              ) : null}
-              {isDm ? (
-                <button type="button" className="board-node-delete-button" onClick={() => void deletePost(activePost)}>
-                  Delete whisper
-                </button>
-              ) : null}
-              <button type="button" className="secondary-link" onClick={() => setIsReaderOpen(false)}>
-                Close
-              </button>
             </div>
           </div>
         </div>
