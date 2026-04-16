@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import FaeIcon, { type FaeIconName } from "./FaeIcon";
 import { apiFetch, apiUrl } from "../lib/api";
 import { getUserSettings } from "../lib/userSettings";
 import type { SearchSuggestion, SearchSuggestionsResponse, UserProfile } from "../types";
@@ -8,23 +9,24 @@ import type { SearchSuggestion, SearchSuggestionsResponse, UserProfile } from ".
 type NavItem = {
   label: string;
   to: string;
+  icon: FaeIconName;
   dmOnly?: boolean;
   playerOnly?: boolean;
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Home", to: "/" },
-  { label: "Search", to: "/search" },
-  { label: "Chapter Library", to: "/chapters" },
-  { label: "Documents", to: "/documents" },
-  { label: "Whisper Network", to: "/whisper-network" },
-  { label: "NPC Directory", to: "/directory" },
-  { label: "Investigation Board", to: "/board" },
-  { label: "Maps", to: "/maps" },
-  { label: "Player Journal", to: "/journal", playerOnly: true },
-  { label: "Locations", to: "/locations" },
-  { label: "Archive", to: "/archive", dmOnly: true },
-  { label: "DM Tools", to: "/dm-tools", dmOnly: true },
+  { label: "Home", to: "/", icon: "home" },
+  { label: "Search", to: "/search", icon: "search" },
+  { label: "Chapter Library", to: "/chapters", icon: "book-open" },
+  { label: "Documents", to: "/documents", icon: "file-text" },
+  { label: "Whisper Network", to: "/whisper-network", icon: "message-circle" },
+  { label: "NPC Directory", to: "/directory", icon: "users" },
+  { label: "Investigation Board", to: "/board", icon: "pinboard" },
+  { label: "Maps", to: "/maps", icon: "map" },
+  { label: "Player Journal", to: "/journal", icon: "journal", playerOnly: true },
+  { label: "Locations", to: "/locations", icon: "map-pin" },
+  { label: "Archive", to: "/archive", icon: "archive", dmOnly: true },
+  { label: "DM Tools", to: "/dm-tools", icon: "sliders", dmOnly: true },
 ];
 
 export default function AppShellLayout() {
@@ -253,7 +255,10 @@ export default function AppShellLayout() {
                 }
                 end={item.to === "/"}
               >
-                {item.label}
+                <span className="drawer-link-icon" aria-hidden="true">
+                  <FaeIcon icon={item.icon} />
+                </span>
+                <span className="drawer-link-label">{item.label}</span>
               </NavLink>
             ))}
           </nav>
