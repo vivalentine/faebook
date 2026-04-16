@@ -127,7 +127,6 @@ export default function WhisperNetworkPage() {
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
   const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
-  const [expandedPostIds, setExpandedPostIds] = useState<Record<number, boolean>>({});
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<number, string>>({});
   const [isSubmittingCommentByPostId, setIsSubmittingCommentByPostId] = useState<Record<number, boolean>>({});
 
@@ -247,11 +246,6 @@ export default function WhisperNetworkPage() {
 
   async function openPostReader(postId: number) {
     setIsReaderOpen(true);
-    await openPost(postId);
-  }
-
-  async function togglePostExpansion(postId: number) {
-    setExpandedPostIds((current) => ({ ...current, [postId]: !current[postId] }));
     await openPost(postId);
   }
 
@@ -558,7 +552,6 @@ export default function WhisperNetworkPage() {
           <ul className="chapter-list whisper-list">
             {sortedPosts.map((post) => {
               const isActive = post.id === selectedPostId;
-              const isExpanded = Boolean(expandedPostIds[post.id]);
               return (
                 <li key={post.id} className={`chapter-list-item whisper-list-item ${isActive ? "active" : ""}`.trim()}>
                   <button
@@ -577,9 +570,6 @@ export default function WhisperNetworkPage() {
                     <button type="button" className="secondary-link" onClick={() => void toggleLike(post.id)}>
                       {post.liked_by_me ? "Unlike" : "Like"}
                     </button>
-                    <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(post.id)}>
-                      {isExpanded ? "Hide comments" : "Show comments"}
-                    </button>
                   </div>
                   {isDm ? (
                     <div className="chapter-list-admin-actions whisper-admin-actions">
@@ -591,129 +581,13 @@ export default function WhisperNetworkPage() {
                       </button>
                     </div>
                   ) : null}
-
-                  {isExpanded ? (
-                    <div className="whisper-inline-comments">
-                      <h3>Anonymous Comments</h3>
-                      <ul className="whisper-comment-list">
-                        {(commentsByPostId[post.id] || []).map((comment) => (
-                          <li key={comment.id} className="whisper-comment-card">
-                            <div>
-                              <p className="whisper-comment-meta">Anonymous witness · {getCommentTimestamp(comment)}</p>
-                              <p>{comment.body}</p>
-                            </div>
-                            {isDm ? (
-                              <div className="whisper-post-inline-actions">
-                                <button
-                                  type="button"
-                                  className="secondary-link"
-                                  onClick={() => startEditCommentTime(comment)}
-                                >
-                                  Edit court time
-                                </button>
-                                <button
-                                  type="button"
-                                  className="board-node-delete-button"
-                                  onClick={() => void deleteComment(comment)}
-                                >
-                                  Moderate
-                                </button>
-                              </div>
-                            ) : null}
-                            {isDm && editingCommentId === comment.id ? (
-                              <div className="note-form whisper-comment-form">
-                                <input
-                                  className="text-input"
-                                  type="number"
-                                  min={1}
-                                  placeholder="Crown Year"
-                                  value={commentCrownYearDraft}
-                                  onChange={(event) => setCommentCrownYearDraft(event.target.value)}
-                                />
-                                <input
-                                  className="text-input"
-                                  type="number"
-                                  min={1}
-                                  max={12}
-                                  placeholder="Bloom"
-                                  value={commentBloomIndexDraft}
-                                  onChange={(event) => setCommentBloomIndexDraft(event.target.value)}
-                                />
-                                <input
-                                  className="text-input"
-                                  type="number"
-                                  min={1}
-                                  max={28}
-                                  placeholder="Petal"
-                                  value={commentPetalDraft}
-                                  onChange={(event) => setCommentPetalDraft(event.target.value)}
-                                />
-                                <input
-                                  className="text-input"
-                                  type="number"
-                                  min={0}
-                                  max={23}
-                                  placeholder="Bell"
-                                  value={commentBellDraft}
-                                  onChange={(event) => setCommentBellDraft(event.target.value)}
-                                />
-                                <input
-                                  className="text-input"
-                                  type="number"
-                                  min={0}
-                                  max={59}
-                                  placeholder="Chime"
-                                  value={commentChimeDraft}
-                                  onChange={(event) => setCommentChimeDraft(event.target.value)}
-                                />
-                                <div className="whisper-post-inline-actions">
-                                  <button
-                                    type="button"
-                                    className="action-button"
-                                    disabled={isSavingCommentTime}
-                                    onClick={() => void saveCommentTime(comment)}
-                                  >
-                                    {isSavingCommentTime ? "Saving…" : "Save"}
-                                  </button>
-                                  <button type="button" className="secondary-link" onClick={resetCommentTimeForm}>
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="note-form whisper-comment-form">
-                        <textarea
-                          className="text-area"
-                          rows={3}
-                          placeholder="Share a rumor anonymously…"
-                          value={commentDraftByPostId[post.id] || ""}
-                          onChange={(event) =>
-                            setCommentDraftByPostId((current) => ({ ...current, [post.id]: event.target.value }))
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="action-button"
-                          disabled={Boolean(isSubmittingCommentByPostId[post.id])}
-                          onClick={() => {
-                            void submitComment(post.id);
-                          }}
-                        >
-                          {isSubmittingCommentByPostId[post.id] ? "Posting…" : "Post anonymous comment"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
                 </li>
               );
             })}
           </ul>
         </article>
 
-        <article className="state-card chapter-reader-card whisper-reader-card">
+        <article className="state-card whisper-network-card">
           <section className="whisper-network-view" aria-live="polite">
             <div className="whisper-network-header">
               <p className="topbar-meta">Network layout follows: {WHISPER_SORT_OPTIONS.find((option) => option.value === sortMode)?.label ?? "Trending"}</p>
@@ -750,13 +624,133 @@ export default function WhisperNetworkPage() {
               <p className="whisper-reader-body">{activePost.body}</p>
               <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
             </header>
-            <div className="whisper-reader-actions whisper-detail-actions">
+            <div className="whisper-inline-comments whisper-detail-comments">
+              <h3>Anonymous comments</h3>
+              <ul className="whisper-comment-list">
+                {(commentsByPostId[activePost.id] || []).map((comment) => (
+                  <li key={comment.id} className="whisper-comment-card">
+                    <div>
+                      <p className="whisper-comment-meta">Anonymous witness · {getCommentTimestamp(comment)}</p>
+                      <p>{comment.body}</p>
+                    </div>
+                    {isDm ? (
+                      <div className="whisper-post-inline-actions">
+                        <button
+                          type="button"
+                          className="secondary-link"
+                          onClick={() => startEditCommentTime(comment)}
+                        >
+                          Edit court time
+                        </button>
+                        <button
+                          type="button"
+                          className="board-node-delete-button"
+                          onClick={() => void deleteComment(comment)}
+                        >
+                          Moderate
+                        </button>
+                      </div>
+                    ) : null}
+                    {isDm && editingCommentId === comment.id ? (
+                      <div className="note-form whisper-comment-form">
+                        <input
+                          className="text-input"
+                          type="number"
+                          min={1}
+                          placeholder="Crown Year"
+                          value={commentCrownYearDraft}
+                          onChange={(event) => setCommentCrownYearDraft(event.target.value)}
+                        />
+                        <input
+                          className="text-input"
+                          type="number"
+                          min={1}
+                          max={12}
+                          placeholder="Bloom"
+                          value={commentBloomIndexDraft}
+                          onChange={(event) => setCommentBloomIndexDraft(event.target.value)}
+                        />
+                        <input
+                          className="text-input"
+                          type="number"
+                          min={1}
+                          max={28}
+                          placeholder="Petal"
+                          value={commentPetalDraft}
+                          onChange={(event) => setCommentPetalDraft(event.target.value)}
+                        />
+                        <input
+                          className="text-input"
+                          type="number"
+                          min={0}
+                          max={23}
+                          placeholder="Bell"
+                          value={commentBellDraft}
+                          onChange={(event) => setCommentBellDraft(event.target.value)}
+                        />
+                        <input
+                          className="text-input"
+                          type="number"
+                          min={0}
+                          max={59}
+                          placeholder="Chime"
+                          value={commentChimeDraft}
+                          onChange={(event) => setCommentChimeDraft(event.target.value)}
+                        />
+                        <div className="whisper-post-inline-actions">
+                          <button
+                            type="button"
+                            className="action-button"
+                            disabled={isSavingCommentTime}
+                            onClick={() => void saveCommentTime(comment)}
+                          >
+                            {isSavingCommentTime ? "Saving…" : "Save"}
+                          </button>
+                          <button type="button" className="secondary-link" onClick={resetCommentTimeForm}>
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <div className="note-form whisper-comment-form">
+                <textarea
+                  className="text-area"
+                  rows={3}
+                  placeholder="Share a rumor anonymously…"
+                  value={commentDraftByPostId[activePost.id] || ""}
+                  onChange={(event) =>
+                    setCommentDraftByPostId((current) => ({ ...current, [activePost.id]: event.target.value }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="action-button"
+                  disabled={Boolean(isSubmittingCommentByPostId[activePost.id])}
+                  onClick={() => {
+                    void submitComment(activePost.id);
+                  }}
+                >
+                  {isSubmittingCommentByPostId[activePost.id] ? "Posting…" : "Post anonymous comment"}
+                </button>
+              </div>
+            </div>
+            <div className="whisper-detail-actions">
               <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
                 {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
               </button>
-              <button type="button" className="secondary-link" onClick={() => void togglePostExpansion(activePost.id)}>
-                {expandedPostIds[activePost.id] ? "Hide thread in feed" : "Open thread in feed"}
-              </button>
+              {isDm ? (
+                <button type="button" className="secondary-link" onClick={() => startEditPost(activePost)}>
+                  Edit whisper
+                </button>
+              ) : null}
+              {isDm ? (
+                <button type="button" className="board-node-delete-button" onClick={() => void deletePost(activePost)}>
+                  Delete whisper
+                </button>
+              ) : null}
               <button type="button" className="secondary-link" onClick={() => setIsReaderOpen(false)}>
                 Close
               </button>
