@@ -3786,6 +3786,7 @@ body {
 .dashboard-card,
 .dashboard-suspect-item,
 .search-result-item,
+.locations-card,
 .summer-court-petal,
 .summer-court-chip {
   transition:
@@ -3803,6 +3804,13 @@ body {
 .dashboard-suspect-item:hover {
   transform: translateY(-1px);
   border-color: rgba(150, 126, 222, 0.7);
+}
+
+.locations-card:hover,
+.locations-card:focus-visible {
+  transform: var(--motion-lift-translate);
+  border-color: rgba(146, 127, 206, 0.78);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(191, 165, 255, 0.1);
 }
 
 .summer-court-petal.is-current {
