@@ -2538,7 +2538,7 @@
 }
 
 .whisper-layout {
-  grid-template-columns: minmax(320px, 460px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .whisper-feed-header {
@@ -2667,78 +2667,6 @@
   align-self: flex-start;
 }
 
-
-
-.whisper-network-view {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.whisper-network-header p {
-  margin: 0;
-}
-
-.whisper-network-canvas {
-  position: relative;
-  min-height: 280px;
-  border-radius: 14px;
-  border: 1px solid #333855;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(135, 116, 190, 0.2), transparent 45%),
-    radial-gradient(circle at 82% 18%, rgba(89, 117, 177, 0.18), transparent 42%),
-    #121424;
-  overflow: hidden;
-}
-
-.whisper-network-node {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  border: 1px solid #474f78;
-  border-radius: 12px;
-  background: rgba(24, 29, 47, 0.92);
-  color: #efe9ff;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  max-width: 180px;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 8px 16px rgba(3, 5, 13, 0.32);
-}
-
-.whisper-network-node:hover {
-  border-color: #7f83c8;
-}
-
-.whisper-network-node.active {
-  border-color: #dbc8ff;
-  box-shadow: 0 10px 18px rgba(74, 51, 122, 0.44);
-}
-
-.whisper-network-rank {
-  font-size: 11px;
-  color: #c9bbeb;
-}
-
-.whisper-network-title {
-  font-size: 12px;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.whisper-network-card {
-  background: linear-gradient(180deg, #171729 0%, #111320 100%);
-}
-
-.whisper-network-hint {
-  margin: 0;
-}
-
 .whisper-reader-body {
   margin: 10px 0;
   white-space: pre-wrap;
@@ -2749,7 +2677,7 @@
 .whisper-detail-modal {
   width: min(720px, 100%);
   max-height: min(86vh, 820px);
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2759,14 +2687,21 @@
   margin-bottom: 0;
 }
 
+.whisper-detail-fixed {
+  flex: 0 0 auto;
+}
+
 .whisper-detail-actions {
   justify-content: flex-end;
 }
 
 .whisper-detail-comments {
   border-top: 1px solid #2f3147;
-  border-bottom: 1px solid #2f3147;
-  padding: 12px 0;
+  padding-top: 12px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 @media (max-width: 980px) {
@@ -2900,15 +2835,6 @@
   .whisper-sort-label {
     width: 100%;
     justify-content: space-between;
-  }
-
-  .whisper-network-canvas {
-    min-height: 240px;
-  }
-
-  .whisper-network-node {
-    max-width: 140px;
-    padding: 7px 8px;
   }
 
   .whisper-detail-actions {
