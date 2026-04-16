@@ -232,6 +232,14 @@ export type DashboardData = {
   suspects: DashboardSuspect[];
   personal_note: DashboardNote | null;
   latest_recap: SessionRecap | null;
+  campaign_date?: {
+    crown_year: number;
+    bloom_index: number;
+    petal: number;
+    bell: number;
+    chime: number;
+    updated_at: string;
+  } | null;
   recent_personal_activity: DashboardActivityItem[];
   player_board_links?: Array<{
     id: number;

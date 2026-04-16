@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import FaeSelect from "../components/FaeSelect";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
+import {
+  PETAL_CYCLE,
+  formatSummerCourtDate,
+  formatTimeHHMM,
+  getBloomName,
+  getHolidayNamesForPetal,
+  getPetalCycleNameFromPetal,
+  toSummerCourtDateTimeOrNull,
+} from "../lib/summerCourtCalendar";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
 import { apiFetch } from "../lib/api";
 import type { DashboardData, DashboardSuspect } from "../types";
@@ -22,6 +31,7 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 const SUSPECT_STATUSES: DashboardSuspect["status"][] = ["active", "unknown", "cleared"];
+const BLOOM_PETAL_ROWS = [0, 1, 2, 3];
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -72,6 +82,11 @@ export default function HomePage() {
   const sortedSuspects = useMemo(() => {
     return [...(dashboard?.suspects || [])].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
   }, [dashboard?.suspects]);
+
+  const campaignDate = useMemo(
+    () => toSummerCourtDateTimeOrNull(dashboard?.campaign_date || undefined),
+    [dashboard?.campaign_date],
+  );
 
   async function addSuspect() {
     if (!newSuspectName.trim()) {
@@ -404,6 +419,60 @@ export default function HomePage() {
         </article>
 
         <div className="dashboard-column dashboard-column--investigation">
+          <article className="state-card dashboard-card dashboard-card--calendar">
+            <h2>Summer Court Calendar</h2>
+            {campaignDate ? (
+              <>
+                <p className="topbar-meta">
+                  {formatSummerCourtDate(campaignDate)} · {getPetalCycleNameFromPetal(campaignDate.petal)} ·{" "}
+                  {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
+                </p>
+                <div className="summer-court-calendar">
+                  <div className="summer-court-calendar-head">
+                    <strong>{getBloomName(campaignDate.bloom_index)} Bloom</strong>
+                  </div>
+                  <div className="summer-court-calendar-grid">
+                    {PETAL_CYCLE.map((cycle) => (
+                      <div key={cycle.index} className="summer-court-calendar-col-head">
+                        {cycle.name}
+                      </div>
+                    ))}
+                    {BLOOM_PETAL_ROWS.flatMap((rowIndex) =>
+                      PETAL_CYCLE.map((cycle) => {
+                        const petal = rowIndex * 7 + cycle.index;
+                        const isPastPetal = petal < campaignDate.petal;
+                        const isCurrentPetal = petal === campaignDate.petal;
+                        const holidayNames = getHolidayNamesForPetal(campaignDate.bloom_index, petal);
+                        const classNames = [
+                          "summer-court-petal",
+                          isPastPetal ? "is-past" : "",
+                          isCurrentPetal ? "is-current" : "",
+                          holidayNames.length ? "is-holiday" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
+
+                        return (
+                          <div key={petal} className={classNames} title={holidayNames.join(" · ") || undefined}>
+                            <span className="summer-court-petal-number">{petal}</span>
+                            {holidayNames.includes("Solstice Festival") ? (
+                              <span className="summer-court-chip">Festival</span>
+                            ) : null}
+                            {holidayNames.includes("Solstice Day") ? (
+                              <span className="summer-court-chip summer-court-chip--accent">Solstice Day</span>
+                            ) : null}
+                          </div>
+                        );
+                      }),
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="topbar-meta">Campaign date not set yet.</p>
+            )}
+          </article>
+
           <article className="state-card dashboard-card dashboard-card--npcs">
             <h2>Recently Unlocked NPCs</h2>
             {dashboard.recently_unlocked_npcs.length ? (

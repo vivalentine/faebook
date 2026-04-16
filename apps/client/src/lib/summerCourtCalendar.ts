@@ -42,6 +42,24 @@ export type SummerCourtDateTime = {
   chime: number;
 };
 
+export type SummerCourtHoliday = {
+  name: string;
+  bloom_index: number;
+  petal_start: number;
+  petal_end: number;
+};
+
+export const SUMMER_COURT_HOLIDAYS: SummerCourtHoliday[] = [
+  { name: "Crown Unfurling", bloom_index: 1, petal_start: 1, petal_end: 1 },
+  { name: "Feast of Sweet Accord", bloom_index: 3, petal_start: 14, petal_end: 14 },
+  { name: "Solstice Festival", bloom_index: 6, petal_start: 13, petal_end: 17 },
+  { name: "Solstice Day", bloom_index: 6, petal_start: 15, petal_end: 15 },
+  { name: "Solstice Masquerade", bloom_index: 6, petal_start: 15, petal_end: 15 },
+  { name: "Night of Ten Thousand Reflections", bloom_index: 8, petal_start: 21, petal_end: 21 },
+  { name: "Dreaming Tide", bloom_index: 10, petal_start: 14, petal_end: 14 },
+  { name: "Last Lantern Vigil", bloom_index: 12, petal_start: 28, petal_end: 28 },
+];
+
 export function getDayOfYear(bloomIndex: number, petal: number): number {
   return (bloomIndex - 1) * 28 + petal;
 }
@@ -141,6 +159,12 @@ export function formatSummerCourtDateTimeStandard(dt: SummerCourtDateTime): stri
   return `${bloomName} Bloom, ${petalOrdinal} Petal, ${time}`;
 }
 
+export function formatSummerCourtDate(dt: SummerCourtDateTime): string {
+  const bloomName = getBloomName(dt.bloom_index);
+  const petalOrdinal = formatPetalOrdinal(dt.petal);
+  return `Crown Year ${dt.crown_year}, ${bloomName} Bloom, ${petalOrdinal} Petal`;
+}
+
 export function formatSummerCourtCommentDateTime(dt: SummerCourtDateTime): string {
   const petalCycleName = getPetalCycleNameFromPetal(dt.petal);
   const time = formatTimeHHMM(dt.bell, dt.chime);
@@ -191,4 +215,13 @@ export function deriveSummerCourtFromIso(isoValue: string | null | undefined): S
     bell: date.getUTCHours(),
     chime: date.getUTCMinutes(),
   };
+}
+
+export function getHolidayNamesForPetal(bloomIndex: number, petal: number): string[] {
+  return SUMMER_COURT_HOLIDAYS.filter(
+    (holiday) =>
+      holiday.bloom_index === bloomIndex &&
+      petal >= holiday.petal_start &&
+      petal <= holiday.petal_end,
+  ).map((holiday) => holiday.name);
 }
