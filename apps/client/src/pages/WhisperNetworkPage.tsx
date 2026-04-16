@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import FaeIcon from "../components/FaeIcon";
-import FaeSelect from "../components/FaeSelect";
+import FaeSelect, { type FaeSelectOption } from "../components/FaeSelect";
 import { apiFetch } from "../lib/api";
 import {
   formatSummerCourtCommentDateTime,
@@ -14,12 +14,12 @@ import {
 } from "../lib/summerCourtCalendar";
 import type { DashboardData, WhisperComment, WhisperPost, WhisperSortMode } from "../types";
 
-const WHISPER_SORT_OPTIONS: Array<{ value: WhisperSortMode; label: string }> = [
-  { value: "trending", label: "Trending" },
-  { value: "recent", label: "Recent" },
-  { value: "views", label: "View count" },
-  { value: "likes", label: "Likes" },
-  { value: "comments", label: "Most commented" },
+const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> = [
+  { value: "trending", label: "Trending", icon: "flame" },
+  { value: "recent", label: "Recent", icon: "clock" },
+  { value: "views", label: "View count", icon: "eye" },
+  { value: "likes", label: "Likes", icon: "heart" },
+  { value: "comments", label: "Most commented", icon: "chat-bubble" },
 ];
 
 const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";

@@ -3814,9 +3814,37 @@ body {
 }
 
 .fae-select-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fae-select-value-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fae-select-option-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.fae-select-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fae-select-option-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  color: currentColor;
+  opacity: 0.96;
 }
 
 .fae-select-caret {
@@ -3855,6 +3883,8 @@ body {
   padding: 10px 12px;
   color: var(--text-primary);
   cursor: pointer;
+  display: flex;
+  align-items: center;
   transition:
     background-color var(--motion-duration-fast) var(--motion-ease-standard),
     box-shadow var(--motion-duration-fast) var(--motion-ease-standard),

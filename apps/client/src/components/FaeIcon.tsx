@@ -11,6 +11,9 @@ export type FaeIconName =
   | "map-pin"
   | "archive"
   | "sliders"
+  | "flame"
+  | "clock"
+  | "chat-bubble"
   | "heart"
   | "eye"
   | "x";
@@ -97,6 +100,17 @@ function FaeIconPath({ icon, filled = false }: { icon: FaeIconName; filled?: boo
           <circle cx="11" cy="18" r="1.8" />
         </>
       );
+    case "flame":
+      return <path d="M12.1 3.2c1.8 2.1 3.5 4 3.5 6.7a3.8 3.8 0 1 1-7.6 0c0-1.8.9-3.3 2.2-4.8.2 1.4.9 2.2 1.9 2.7 0-1.4.5-2.9 2-4.6ZM12 20.6a5.9 5.9 0 0 0 5.9-5.9c0-2.8-1.4-4.8-3.7-7.5-.3 2.1-1.3 3.4-2.8 4.2-1.4.8-2.1 2-2.1 3.4a2.7 2.7 0 1 0 5.4 0" />;
+    case "clock":
+      return (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.8v4.5l3.2 2" />
+        </>
+      );
+    case "chat-bubble":
+      return <path d="M4 5.8h16v10.4H8l-4 3.2V5.8Z" />;
     case "heart":
       return filled ? (
         <path d="m12 20.6-1.2-1c-3.9-3.2-6.5-5.4-6.5-8.2A4.3 4.3 0 0 1 8.7 7a4.8 4.8 0 0 1 3.3 1.4A4.8 4.8 0 0 1 15.3 7a4.3 4.3 0 0 1 4.4 4.4c0 2.8-2.6 5-6.5 8.2z" />

@@ -1,9 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
+import FaeIcon, { type FaeIconName } from "./FaeIcon";
 
 export type FaeSelectOption = {
   value: string;
   label: string;
+  icon?: FaeIconName;
   disabled?: boolean;
 };
 
@@ -173,7 +175,10 @@ export default function FaeSelect({
         }}
         onKeyDown={onTriggerKeyDown}
       >
-        <span className="fae-select-value">{selectedOption?.label ?? placeholder}</span>
+        <span className="fae-select-value">
+          {selectedOption?.icon ? <FaeIcon className="fae-select-option-icon" icon={selectedOption.icon} /> : null}
+          <span className="fae-select-value-text">{selectedOption?.label ?? placeholder}</span>
+        </span>
         <span className="fae-select-caret" aria-hidden="true">
           ▾
         </span>
@@ -211,7 +216,10 @@ export default function FaeSelect({
                     onMouseEnter={() => setHighlightedIndex(index)}
                     onClick={() => selectIndex(index)}
                   >
-                    {option.label}
+                    <span className="fae-select-option-content">
+                      {option.icon ? <FaeIcon className="fae-select-option-icon" icon={option.icon} /> : null}
+                      <span className="fae-select-option-label">{option.label}</span>
+                    </span>
                   </li>
                 );
               })}
