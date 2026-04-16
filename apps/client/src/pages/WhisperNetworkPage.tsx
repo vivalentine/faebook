@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import FaeIcon from "../components/FaeIcon";
 import FaeSelect from "../components/FaeSelect";
@@ -24,6 +24,7 @@ const WHISPER_SORT_OPTIONS: Array<{ value: WhisperSortMode; label: string }> = [
 
 const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";
 const WHISPER_FEEDBACK_MS = 820;
+const WHISPER_HEART_ANIMATION_MS = 520;
 
 type WhisperFeedResponse = {
   posts: WhisperPost[];
@@ -151,6 +152,8 @@ export default function WhisperNetworkPage() {
   const [commentBellDraft, setCommentBellDraft] = useState("");
   const [commentChimeDraft, setCommentChimeDraft] = useState("");
   const [isSavingCommentTime, setIsSavingCommentTime] = useState(false);
+  const [heartAnimationByPostId, setHeartAnimationByPostId] = useState<Record<number, "like" | "unlike" | null>>({});
+  const heartAnimationTimersRef = useRef<Record<number, number>>({});
   const [campaignDateTime, setCampaignDateTime] = useState<SummerCourtDateTime | null>(null);
 
   const sortedPosts = useMemo(() => sortWhisperPosts(posts, sortMode), [posts, sortMode]);
@@ -227,6 +230,27 @@ export default function WhisperNetworkPage() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isReaderOpen]);
 
+  useEffect(
+    () => () => {
+      Object.values(heartAnimationTimersRef.current).forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    },
+    [],
+  );
+
+  function triggerHeartAnimation(postId: number, state: "like" | "unlike") {
+    const currentTimer = heartAnimationTimersRef.current[postId];
+    if (currentTimer) {
+      window.clearTimeout(currentTimer);
+    }
+    setHeartAnimationByPostId((current) => ({ ...current, [postId]: state }));
+    heartAnimationTimersRef.current[postId] = window.setTimeout(() => {
+      setHeartAnimationByPostId((current) => ({ ...current, [postId]: null }));
+      delete heartAnimationTimersRef.current[postId];
+    }, WHISPER_HEART_ANIMATION_MS);
+  }
+
   async function loadPostDetails(postId: number) {
     try {
       const response = await apiFetch(`/api/whisper/posts/${postId}`);
@@ -264,6 +288,7 @@ export default function WhisperNetworkPage() {
 
       const liked = Boolean(data.liked);
       const likeCount = Number(data.like_count || 0);
+      triggerHeartAnimation(postId, liked ? "like" : "unlike");
       setPosts((current) =>
         current.map((post) =>
           post.id === postId ? { ...post, liked_by_me: liked, like_count: likeCount } : post,
@@ -599,7 +624,13 @@ export default function WhisperNetworkPage() {
                   <div className={`whisper-post-stats whisper-post-inline-actions ${hasFeedback ? "is-updated" : ""}`.trim()}>
                     <button
                       type="button"
-                      className={`whisper-icon-button ${post.liked_by_me ? "is-liked" : ""}`.trim()}
+                      className={`whisper-icon-button ${post.liked_by_me ? "is-liked" : ""} ${
+                        heartAnimationByPostId[post.id] === "like"
+                          ? "heart-animate-like"
+                          : heartAnimationByPostId[post.id] === "unlike"
+                            ? "heart-animate-unlike"
+                            : ""
+                      }`.trim()}
                       onClick={() => void toggleLike(post.id)}
                       aria-label={post.liked_by_me ? "Unlike whisper" : "Like whisper"}
                     >
@@ -654,7 +685,13 @@ export default function WhisperNetworkPage() {
               >
                 <button
                   type="button"
-                  className={`whisper-icon-button ${activePost.liked_by_me ? "is-liked" : ""}`.trim()}
+                  className={`whisper-icon-button ${activePost.liked_by_me ? "is-liked" : ""} ${
+                    heartAnimationByPostId[activePost.id] === "like"
+                      ? "heart-animate-like"
+                      : heartAnimationByPostId[activePost.id] === "unlike"
+                        ? "heart-animate-unlike"
+                        : ""
+                  }`.trim()}
                   onClick={() => void toggleLike(activePost.id)}
                   aria-label={activePost.liked_by_me ? "Unlike whisper" : "Like whisper"}
                 >
