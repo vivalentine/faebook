@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import OpenSeadragon from "openseadragon";
 import { Link } from "react-router-dom";
+import PlayerLandmarkLocationCard from "./PlayerLandmarkLocationCard";
 import type { LocationRecord, MapLandmark, MapLayerConfig, MapPin } from "../types";
 
 type MarkerScreenPosition = {
@@ -22,10 +23,8 @@ type TiledMapViewerProps = {
   pins: MapPin[];
   landmarks: MapLandmark[];
   selectedLandmark: MapLandmark | null;
-  selectedLandmarkLocation:
-    | Pick<LocationRecord, "slug" | "name" | "ring" | "summary">
-    | LocationRecord
-    | null;
+  selectedLandmarkLocation: LocationRecord | null;
+  selectedLandmarkLinkedSummary: Pick<LocationRecord, "slug" | "name" | "ring" | "summary"> | null;
   onCloseSelectedLandmark: () => void;
   onMapPlacement: (point: { x: number; y: number }) => void;
   onPinClick: (pin: MapPin) => void;
@@ -112,6 +111,7 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     landmarks,
     selectedLandmark,
     selectedLandmarkLocation,
+    selectedLandmarkLinkedSummary,
     onCloseSelectedLandmark,
     onMapPlacement,
     onPinClick,
@@ -402,26 +402,36 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
             event.stopPropagation();
           }}
         >
-          <h3>{selectedLandmark.label}</h3>
-          {selectedLandmarkLocation?.ring ? (
-            <p className="map-landmark-popover-meta">{selectedLandmarkLocation.ring}</p>
-          ) : null}
-          {selectedLandmarkLocation?.summary ? (
-            <p>{selectedLandmarkLocation.summary}</p>
-          ) : selectedLandmark.description ? (
-            <p>{selectedLandmark.description}</p>
-          ) : null}
-          <p className="map-landmark-popover-meta">
-            {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
-          </p>
-          {selectedLandmarkLocation?.slug ? (
-            <Link className="secondary-link" to={`/locations/${selectedLandmarkLocation.slug}`}>
-              Open location
-            </Link>
-          ) : null}
-          <button className="secondary-link" type="button" onClick={onCloseSelectedLandmark}>
-            Close
-          </button>
+          {selectedLandmarkLocation ? (
+            <PlayerLandmarkLocationCard
+              location={selectedLandmarkLocation}
+              landmark={selectedLandmark}
+              onClose={onCloseSelectedLandmark}
+            />
+          ) : (
+            <>
+              <h3>{selectedLandmark.label}</h3>
+              {selectedLandmarkLinkedSummary?.ring ? (
+                <p className="map-landmark-popover-meta">{selectedLandmarkLinkedSummary.ring}</p>
+              ) : null}
+              {selectedLandmarkLinkedSummary?.summary ? (
+                <p>{selectedLandmarkLinkedSummary.summary}</p>
+              ) : selectedLandmark.description ? (
+                <p>{selectedLandmark.description}</p>
+              ) : null}
+              <p className="map-landmark-popover-meta">
+                {selectedLandmark.visibility_scope === "dm_only" ? "DM-only" : "Public"}
+              </p>
+              {selectedLandmarkLinkedSummary?.slug ? (
+                <Link className="secondary-link" to={`/locations/${selectedLandmarkLinkedSummary.slug}`}>
+                  Open location
+                </Link>
+              ) : null}
+              <button className="secondary-link" type="button" onClick={onCloseSelectedLandmark}>
+                Close
+              </button>
+            </>
+          )}
         </section>
       ) : null}
 
