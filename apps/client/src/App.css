@@ -171,19 +171,19 @@
 
 .npc-reputation-heart,
 .npc-reputation-knife {
-  width: 24px;
-  height: 24px;
-  font-size: 15px;
+  width: 25px;
+  height: 25px;
+  font-size: 16px;
 }
 
 .npc-reputation-heart {
   border: 0;
   background: transparent;
   box-shadow: none;
-  color: #ffd7ea;
+  color: #ffd9ec;
   text-shadow: 0 1px 0 rgba(58, 16, 37, 0.72);
-  filter: drop-shadow(0 0 6px rgba(248, 154, 203, 0.5))
-    drop-shadow(0 0 10px rgba(227, 88, 152, 0.28));
+  filter: drop-shadow(0 0 7px rgba(248, 154, 203, 0.58))
+    drop-shadow(0 0 13px rgba(227, 88, 152, 0.34));
   transform-origin: center;
   animation: reputation-heartbeat 1.6s ease-in-out infinite;
 }
@@ -201,13 +201,13 @@
   0%,
   100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 6px rgba(248, 154, 203, 0.46))
-      drop-shadow(0 0 10px rgba(227, 88, 152, 0.24));
+    filter: drop-shadow(0 0 7px rgba(248, 154, 203, 0.54))
+      drop-shadow(0 0 12px rgba(227, 88, 152, 0.3));
   }
   50% {
-    transform: scale(1.06);
-    filter: drop-shadow(0 0 8px rgba(248, 154, 203, 0.6))
-      drop-shadow(0 0 14px rgba(227, 88, 152, 0.34));
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 10px rgba(248, 154, 203, 0.68))
+      drop-shadow(0 0 16px rgba(227, 88, 152, 0.4));
   }
 }
 
