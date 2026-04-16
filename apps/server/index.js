@@ -27,6 +27,7 @@ const {
   replaceNpcPortrait,
   SUPPORTED_EXTENSIONS,
 } = require("./portrait-assets");
+const { validateSummerCourtDateTime } = require("./summer-court-calendar");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -512,6 +513,11 @@ function mapWhisperPostForClient(postRow) {
     like_count: Number(postRow.like_count || 0),
     comment_count: Number(postRow.comment_count || 0),
     view_count: Number(postRow.view_count || 0),
+    crown_year: postRow.crown_year ?? null,
+    bloom_index: postRow.bloom_index ?? null,
+    petal: postRow.petal ?? null,
+    bell: postRow.bell ?? null,
+    chime: postRow.chime ?? null,
     created_at: postRow.created_at,
     updated_at: postRow.updated_at,
     liked_by_me: Number(postRow.liked_by_me || 0) === 1,
@@ -526,10 +532,38 @@ function mapWhisperCommentForClient(commentRow) {
     id: commentRow.id,
     post_id: commentRow.post_id,
     body: commentRow.body,
+    crown_year: commentRow.crown_year ?? null,
+    bloom_index: commentRow.bloom_index ?? null,
+    petal: commentRow.petal ?? null,
+    bell: commentRow.bell ?? null,
+    chime: commentRow.chime ?? null,
     created_at: commentRow.created_at,
     updated_at: commentRow.updated_at,
     can_moderate: Number(commentRow.can_moderate || 0) === 1,
   };
+}
+
+function parseSummerCourtDateTimeInput(payload = {}) {
+  const hasAnyField =
+    payload.crown_year !== undefined ||
+    payload.bloom_index !== undefined ||
+    payload.petal !== undefined ||
+    payload.bell !== undefined ||
+    payload.chime !== undefined;
+
+  if (!hasAnyField) {
+    return { hasAnyField, value: null, issues: [] };
+  }
+
+  const value = {
+    crown_year: Number.parseInt(String(payload.crown_year ?? ""), 10),
+    bloom_index: Number.parseInt(String(payload.bloom_index ?? ""), 10),
+    petal: Number.parseInt(String(payload.petal ?? ""), 10),
+    bell: Number.parseInt(String(payload.bell ?? ""), 10),
+    chime: Number.parseInt(String(payload.chime ?? ""), 10),
+  };
+  const issues = validateSummerCourtDateTime(value);
+  return { hasAnyField, value, issues };
 }
 
 function getDefaultBoard() {
@@ -4378,16 +4412,19 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
           posts.id,
           posts.title,
           posts.body,
+          posts.like_count,
           posts.view_count,
+          posts.crown_year,
+          posts.bloom_index,
+          posts.petal,
+          posts.bell,
+          posts.chime,
           posts.created_at,
           posts.updated_at,
-          COUNT(DISTINCT likes.id) AS like_count,
           COUNT(DISTINCT comments.id) AS comment_count,
           CASE WHEN my_like.id IS NULL THEN 0 ELSE 1 END AS liked_by_me,
           CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
         FROM whisper_posts AS posts
-        LEFT JOIN whisper_likes AS likes
-          ON likes.post_id = posts.id
         LEFT JOIN whisper_comments AS comments
           ON comments.post_id = posts.id
         LEFT JOIN whisper_likes AS my_like
@@ -4460,16 +4497,19 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
           posts.id,
           posts.title,
           posts.body,
+          posts.like_count,
           posts.view_count,
+          posts.crown_year,
+          posts.bloom_index,
+          posts.petal,
+          posts.bell,
+          posts.chime,
           posts.created_at,
           posts.updated_at,
-          COUNT(DISTINCT likes.id) AS like_count,
           COUNT(DISTINCT comments.id) AS comment_count,
           CASE WHEN my_like.id IS NULL THEN 0 ELSE 1 END AS liked_by_me,
           CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
         FROM whisper_posts AS posts
-        LEFT JOIN whisper_likes AS likes
-          ON likes.post_id = posts.id
         LEFT JOIN whisper_comments AS comments
           ON comments.post_id = posts.id
         LEFT JOIN whisper_likes AS my_like
@@ -4492,6 +4532,11 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
           comments.id,
           comments.post_id,
           comments.body,
+          comments.crown_year,
+          comments.bloom_index,
+          comments.petal,
+          comments.bell,
+          comments.chime,
           comments.created_at,
           comments.updated_at,
           CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
@@ -4513,10 +4558,17 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
   const title = String(req.body?.title || "").trim();
   const body = String(req.body?.body || "").trim();
   const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
+  const parsedLikeCount = Number.parseInt(String(req.body?.like_count ?? "0"), 10);
   const viewCount = Number.isInteger(parsedViewCount) && parsedViewCount >= 0 ? parsedViewCount : 0;
+  const likeCount = Number.isInteger(parsedLikeCount) && parsedLikeCount >= 0 ? parsedLikeCount : 0;
+  const summerCourtInput = parseSummerCourtDateTimeInput(req.body || {});
 
   if (!title || !body) {
     return res.status(400).json({ error: "Title and body are required" });
+  }
+
+  if (summerCourtInput.issues.length > 0) {
+    return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
   }
 
   const now = new Date().toISOString();
@@ -4527,14 +4579,33 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
           author_user_id,
           title,
           body,
+          like_count,
           view_count,
+          crown_year,
+          bloom_index,
+          petal,
+          bell,
+          chime,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(sessionUser.id, title, body, viewCount, now, now);
+    .run(
+      sessionUser.id,
+      title,
+      body,
+      likeCount,
+      viewCount,
+      summerCourtInput.value?.crown_year ?? null,
+      summerCourtInput.value?.bloom_index ?? null,
+      summerCourtInput.value?.petal ?? null,
+      summerCourtInput.value?.bell ?? null,
+      summerCourtInput.value?.chime ?? null,
+      now,
+      now
+    );
 
   const postId = Number(result.lastInsertRowid);
   createAuditLog(db, {
@@ -4552,10 +4623,15 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
           id,
           title,
           body,
+          like_count,
           view_count,
+          crown_year,
+          bloom_index,
+          petal,
+          bell,
+          chime,
           created_at,
           updated_at,
-          0 AS like_count,
           0 AS comment_count,
           0 AS liked_by_me,
           1 AS can_moderate
@@ -4574,6 +4650,8 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
   const title = String(req.body?.title || "").trim();
   const body = String(req.body?.body || "").trim();
   const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
+  const parsedLikeCount = Number.parseInt(String(req.body?.like_count ?? "0"), 10);
+  const summerCourtInput = parseSummerCourtDateTimeInput(req.body || {});
 
   if (!Number.isInteger(postId) || postId <= 0) {
     return res.status(400).json({ error: "Invalid post id" });
@@ -4586,6 +4664,12 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
   if (!Number.isInteger(parsedViewCount) || parsedViewCount < 0) {
     return res.status(400).json({ error: "view_count must be a non-negative integer" });
   }
+  if (!Number.isInteger(parsedLikeCount) || parsedLikeCount < 0) {
+    return res.status(400).json({ error: "like_count must be a non-negative integer" });
+  }
+  if (summerCourtInput.issues.length > 0) {
+    return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
+  }
 
   const now = new Date().toISOString();
   const updateResult = db
@@ -4594,12 +4678,30 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
         UPDATE whisper_posts
         SET title = ?,
             body = ?,
+            like_count = ?,
             view_count = ?,
+            crown_year = ?,
+            bloom_index = ?,
+            petal = ?,
+            bell = ?,
+            chime = ?,
             updated_at = ?
         WHERE id = ?
       `
     )
-    .run(title, body, parsedViewCount, now, postId);
+    .run(
+      title,
+      body,
+      parsedLikeCount,
+      parsedViewCount,
+      summerCourtInput.value?.crown_year ?? null,
+      summerCourtInput.value?.bloom_index ?? null,
+      summerCourtInput.value?.petal ?? null,
+      summerCourtInput.value?.bell ?? null,
+      summerCourtInput.value?.chime ?? null,
+      now,
+      postId
+    );
 
   if (updateResult.changes === 0) {
     return res.status(404).json({ error: "Post not found" });
@@ -4620,16 +4722,19 @@ app.patch("/api/whisper/posts/:id", requireRole("dm"), (req, res) => {
           posts.id,
           posts.title,
           posts.body,
+          posts.like_count,
           posts.view_count,
+          posts.crown_year,
+          posts.bloom_index,
+          posts.petal,
+          posts.bell,
+          posts.chime,
           posts.created_at,
           posts.updated_at,
-          COUNT(DISTINCT likes.id) AS like_count,
           COUNT(DISTINCT comments.id) AS comment_count,
           0 AS liked_by_me,
           1 AS can_moderate
         FROM whisper_posts AS posts
-        LEFT JOIN whisper_likes AS likes
-          ON likes.post_id = posts.id
         LEFT JOIN whisper_comments AS comments
           ON comments.post_id = posts.id
         WHERE posts.id = ?
@@ -4738,6 +4843,11 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
       id: Number(result.lastInsertRowid),
       post_id: postId,
       body,
+      crown_year: null,
+      bloom_index: null,
+      petal: null,
+      bell: null,
+      chime: null,
       created_at: now,
       updated_at: now,
       can_moderate: sessionUser.role === "dm" ? 1 : 0,
@@ -4777,6 +4887,72 @@ app.delete("/api/whisper/comments/:id", requireRole("dm"), (req, res) => {
   ).run(now, comment.post_id);
 
   return res.json({ ok: true });
+});
+
+app.patch("/api/whisper/comments/:id", requireRole("dm"), (req, res) => {
+  const commentId = Number(req.params.id);
+  const summerCourtInput = parseSummerCourtDateTimeInput(req.body || {});
+
+  if (!Number.isInteger(commentId) || commentId <= 0) {
+    return res.status(400).json({ error: "Invalid comment id" });
+  }
+  if (summerCourtInput.issues.length > 0) {
+    return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
+  }
+  if (!summerCourtInput.hasAnyField) {
+    return res.status(400).json({ error: "Summer Court date/time fields are required" });
+  }
+
+  const now = new Date().toISOString();
+  const updateResult = db
+    .prepare(
+      `
+        UPDATE whisper_comments
+        SET crown_year = ?,
+            bloom_index = ?,
+            petal = ?,
+            bell = ?,
+            chime = ?,
+            updated_at = ?
+        WHERE id = ?
+      `
+    )
+    .run(
+      summerCourtInput.value?.crown_year ?? null,
+      summerCourtInput.value?.bloom_index ?? null,
+      summerCourtInput.value?.petal ?? null,
+      summerCourtInput.value?.bell ?? null,
+      summerCourtInput.value?.chime ?? null,
+      now,
+      commentId
+    );
+
+  if (updateResult.changes === 0) {
+    return res.status(404).json({ error: "Comment not found" });
+  }
+
+  const updated = db
+    .prepare(
+      `
+        SELECT
+          id,
+          post_id,
+          body,
+          crown_year,
+          bloom_index,
+          petal,
+          bell,
+          chime,
+          created_at,
+          updated_at,
+          1 AS can_moderate
+        FROM whisper_comments
+        WHERE id = ?
+      `
+    )
+    .get(commentId);
+
+  return res.json(mapWhisperCommentForClient(updated));
 });
 
 app.post("/api/whisper/posts/:id/likes", requireRole("player", "dm"), (req, res) => {
@@ -4821,6 +4997,13 @@ app.post("/api/whisper/posts/:id/likes", requireRole("player", "dm"), (req, res)
         WHERE id = ?
       `
     ).run(existing.id);
+    db.prepare(
+      `
+        UPDATE whisper_posts
+        SET like_count = MAX(0, like_count - 1)
+        WHERE id = ?
+      `
+    ).run(postId);
   } else {
     db.prepare(
       `
@@ -4833,14 +5016,21 @@ app.post("/api/whisper/posts/:id/likes", requireRole("player", "dm"), (req, res)
       `
     ).run(postId, sessionUser.id, now);
     liked = true;
+    db.prepare(
+      `
+        UPDATE whisper_posts
+        SET like_count = like_count + 1
+        WHERE id = ?
+      `
+    ).run(postId);
   }
 
   const totals = db
     .prepare(
       `
-        SELECT COUNT(*) AS like_count
-        FROM whisper_likes
-        WHERE post_id = ?
+        SELECT like_count
+        FROM whisper_posts
+        WHERE id = ?
       `
     )
     .get(postId);
