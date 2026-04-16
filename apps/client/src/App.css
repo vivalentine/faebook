@@ -2600,15 +2600,15 @@
 }
 
 .whisper-post-inline-actions,
-.whisper-reader-actions {
+.whisper-detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .whisper-post-inline-actions .secondary-link,
-.whisper-reader-actions .action-button,
-.whisper-reader-actions .secondary-link {
+.whisper-detail-actions .action-button,
+.whisper-detail-actions .secondary-link {
   width: auto;
   min-width: 120px;
 }
@@ -2731,7 +2731,7 @@
   text-overflow: ellipsis;
 }
 
-.whisper-reader-card {
+.whisper-network-card {
   background: linear-gradient(180deg, #171729 0%, #111320 100%);
 }
 
@@ -2750,6 +2750,9 @@
   width: min(720px, 100%);
   max-height: min(86vh, 820px);
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .whisper-detail-header {
@@ -2758,6 +2761,12 @@
 
 .whisper-detail-actions {
   justify-content: flex-end;
+}
+
+.whisper-detail-comments {
+  border-top: 1px solid #2f3147;
+  border-bottom: 1px solid #2f3147;
+  padding: 12px 0;
 }
 
 @media (max-width: 980px) {
@@ -2879,8 +2888,8 @@
 
   .whisper-post-inline-actions .secondary-link,
   .whisper-comment-form .action-button,
-  .whisper-reader-actions .action-button,
-  .whisper-reader-actions .secondary-link {
+  .whisper-detail-actions .action-button,
+  .whisper-detail-actions .secondary-link {
     width: 100%;
   }
 
