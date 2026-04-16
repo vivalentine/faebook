@@ -44,9 +44,32 @@ export default function LocationDetailPage() {
     };
   }, [slug]);
 
-  const metadata = useMemo(() => {
-    if (!location) return [] as string[];
-    return [location.ring, location.court, location.faction, location.district].filter(Boolean) as string[];
+  const metadataChips = useMemo(() => {
+    if (!location) return [] as Array<{ key: string; label?: string; value: string }>;
+
+    const chips: Array<{ key: string; label?: string; value: string }> = [];
+
+    if (location.ring) {
+      chips.push({ key: `ring-${location.ring}`, label: "Ring", value: location.ring });
+    }
+    if (location.court) {
+      chips.push({ key: `court-${location.court}`, label: "Court", value: location.court });
+    }
+    if (location.district) {
+      chips.push({ key: `district-${location.district}`, label: "District", value: location.district });
+    }
+    if (location.map_id) {
+      chips.push({ key: `map-${location.map_id}`, label: "Map", value: location.map_id });
+    }
+    if (location.landmark_slug) {
+      chips.push({ key: `landmark-${location.landmark_slug}`, label: "Landmark", value: location.landmark_slug });
+    }
+
+    for (const tag of location.tags) {
+      chips.push({ key: `tag-${tag}`, label: "Tag", value: tag });
+    }
+
+    return chips;
   }, [location]);
 
   if (loading) {
@@ -70,16 +93,16 @@ export default function LocationDetailPage() {
         <p className="topbar-meta">{location.summary || "No summary available."}</p>
       </section>
       <section className="state-card">
-        <div className="chapter-chip-row">
-          {metadata.map((value) => (
-            <span key={value} className="chapter-chip">{value}</span>
-          ))}
-          {location.map_id ? <span className="chapter-chip">Map: {location.map_id}</span> : null}
-          {location.landmark_slug ? <span className="chapter-chip">Landmark: {location.landmark_slug}</span> : null}
-          {location.tags.map((tag) => (
-            <span key={tag} className="chapter-chip">#{tag}</span>
-          ))}
-        </div>
+        {metadataChips.length > 0 ? (
+          <div className="chapter-chip-row" aria-label="Location metadata">
+            {metadataChips.map((chip) => (
+              <span key={chip.key} className="chapter-chip">
+                {chip.label ? <strong>{chip.label}:</strong> : null}
+                <span>{chip.value}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="dashboard-markdown documents-reader-markdown">
           {renderRecapMarkdown(location.body_markdown || location.summary || "", { entityIndex })}
         </div>
