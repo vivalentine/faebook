@@ -2361,6 +2361,36 @@
   background: #3a3218;
 }
 
+.chapter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chapter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #48406b;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: #e7ddff;
+  background: linear-gradient(180deg, rgba(57, 50, 87, 0.88), rgba(42, 38, 65, 0.9));
+}
+
+.chapter-chip strong {
+  color: #c7b5f3;
+  font-weight: 700;
+}
+
+.chapter-chip span {
+  color: #efe8ff;
+  overflow-wrap: anywhere;
+}
+
 .chapter-list-admin-actions {
   display: flex;
   justify-content: space-between;
