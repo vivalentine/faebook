@@ -621,30 +621,32 @@ export default function WhisperNetworkPage() {
                     <strong>{post.title}</strong>
                     <p className="whisper-list-excerpt">{post.body}</p>
                   </button>
-                  <div className={`whisper-post-stats whisper-post-inline-actions ${hasFeedback ? "is-updated" : ""}`.trim()}>
-                    <button
-                      type="button"
-                      className={`whisper-icon-button ${post.liked_by_me ? "is-liked" : ""} ${
-                        heartAnimationByPostId[post.id] === "like"
-                          ? "heart-animate-like"
-                          : heartAnimationByPostId[post.id] === "unlike"
-                            ? "heart-animate-unlike"
-                            : ""
-                      }`.trim()}
-                      onClick={() => void toggleLike(post.id)}
-                      aria-label={post.liked_by_me ? "Unlike whisper" : "Like whisper"}
-                    >
-                      <FaeIcon icon="heart" filled={post.liked_by_me} />
-                      <span>{post.like_count}</span>
-                    </button>
-                    <span className="whisper-stat-pill" aria-label={`${post.comment_count} comments`}>
-                      <FaeIcon icon="message-circle" />
-                      <span>{post.comment_count}</span>
-                    </span>
-                    <span className="whisper-stat-pill" aria-label={`${post.view_count} views`}>
-                      <FaeIcon icon="eye" />
-                      <span>{post.view_count}</span>
-                    </span>
+                  <div className="whisper-feed-card-footer">
+                    <div className={`whisper-post-stats whisper-post-inline-actions ${hasFeedback ? "is-updated" : ""}`.trim()}>
+                      <button
+                        type="button"
+                        className={`whisper-icon-button ${post.liked_by_me ? "is-liked" : ""} ${
+                          heartAnimationByPostId[post.id] === "like"
+                            ? "heart-animate-like"
+                            : heartAnimationByPostId[post.id] === "unlike"
+                              ? "heart-animate-unlike"
+                              : ""
+                        }`.trim()}
+                        onClick={() => void toggleLike(post.id)}
+                        aria-label={post.liked_by_me ? "Unlike whisper" : "Like whisper"}
+                      >
+                        <FaeIcon icon="heart" filled={post.liked_by_me} />
+                        <span>{post.like_count}</span>
+                      </button>
+                      <span className="whisper-stat-pill" aria-label={`${post.comment_count} comments`}>
+                        <FaeIcon icon="message-circle" />
+                        <span>{post.comment_count}</span>
+                      </span>
+                      <span className="whisper-stat-pill" aria-label={`${post.view_count} views`}>
+                        <FaeIcon icon="eye" />
+                        <span>{post.view_count}</span>
+                      </span>
+                    </div>
                   </div>
                   {isDm ? (
                     <div className="chapter-list-admin-actions whisper-admin-actions">

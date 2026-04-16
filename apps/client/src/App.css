@@ -3047,6 +3047,19 @@
   min-width: 120px;
 }
 
+.whisper-feed-card-footer {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.whisper-feed-card-footer .whisper-post-stats {
+  justify-content: flex-start;
+  width: auto;
+  max-width: 100%;
+}
+
 .whisper-icon-button,
 .whisper-stat-pill {
   border-radius: 999px;
@@ -3468,11 +3481,19 @@
     width: 100%;
   }
 
-  .whisper-icon-button,
-  .whisper-stat-pill {
-    justify-content: center;
-    flex: 1 1 calc(33.3% - 8px);
-    min-width: 0;
+  .whisper-detail-actions.whisper-post-stats {
+    width: 100%;
+  }
+
+  .whisper-feed-card-footer .whisper-post-stats {
+    width: auto;
+  }
+
+  .whisper-feed-card-footer .whisper-icon-button,
+  .whisper-feed-card-footer .whisper-stat-pill {
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    min-width: fit-content;
   }
 
   .whisper-feed-tools {
