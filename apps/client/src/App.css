@@ -129,6 +129,7 @@
   top: 10px;
   right: 10px;
   z-index: 2;
+  overflow: visible;
   width: 20px;
   height: 20px;
   border-radius: 999px;
@@ -176,29 +177,19 @@
 }
 
 .npc-reputation-heart {
-  position: relative;
-  border-color: rgba(255, 173, 213, 0.15);
+  border: 0;
   background: transparent;
   box-shadow: none;
   color: #ffd7ea;
-  text-shadow: 0 1px 0 rgba(58, 16, 37, 0.75), 0 0 6px rgba(248, 154, 203, 0.55);
+  text-shadow: 0 1px 0 rgba(58, 16, 37, 0.72);
+  filter: drop-shadow(0 0 6px rgba(248, 154, 203, 0.5))
+    drop-shadow(0 0 10px rgba(227, 88, 152, 0.28));
+  transform-origin: center;
   animation: reputation-heartbeat 1.6s ease-in-out infinite;
 }
 
 .npc-reputation-heart::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 56%;
-  width: 15px;
-  height: 11px;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: radial-gradient(ellipse at center, rgba(244, 130, 186, 0.56) 0%, rgba(244, 130, 186, 0) 72%);
-  filter: blur(1px);
-  z-index: -1;
-  pointer-events: none;
-  animation: reputation-heart-aura 1.6s ease-in-out infinite;
+  content: none;
 }
 
 .npc-reputation-knife {
@@ -210,21 +201,13 @@
   0%,
   100% {
     transform: scale(1);
+    filter: drop-shadow(0 0 6px rgba(248, 154, 203, 0.46))
+      drop-shadow(0 0 10px rgba(227, 88, 152, 0.24));
   }
   50% {
-    transform: scale(1.06) translateY(-0.4px);
-  }
-}
-
-@keyframes reputation-heart-aura {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: translate(-50%, -50%) scale(0.92);
-  }
-  50% {
-    opacity: 0.82;
-    transform: translate(-50%, -50%) scale(1.18);
+    transform: scale(1.06);
+    filter: drop-shadow(0 0 8px rgba(248, 154, 203, 0.6))
+      drop-shadow(0 0 14px rgba(227, 88, 152, 0.34));
   }
 }
 
