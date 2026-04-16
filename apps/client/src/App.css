@@ -3553,6 +3553,205 @@ body {
   animation: ui-fade-pop-in var(--motion-duration-base) var(--motion-ease-standard);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Second polish pass: readers, whispers, maps, and board interaction layers. */
+/* -------------------------------------------------------------------------- */
+
+.chapter-list-item,
+.chapter-list-link,
+.chapter-status,
+.chapter-reader-card,
+.chapter-reader-header,
+.chapter-reader-nav,
+.documents-reader-card,
+.documents-index-card,
+.whisper-list-item,
+.whisper-post-button,
+.whisper-comment-card,
+.whisper-detail-modal,
+.whisper-inline-comments,
+.maps-editor-card,
+.map-pin,
+.map-landmark,
+.map-landmark-popover,
+.map-location-card,
+.board-floating-controls,
+.board-icon-group,
+.board-inline-field,
+.board-popover,
+.board-node,
+.board-edge-label-shell,
+.board-modal,
+.board-modal-overlay {
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-base) var(--motion-ease-standard),
+    opacity var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.chapter-list-item {
+  position: relative;
+}
+
+.chapter-list-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(180deg, rgba(150, 125, 232, 0.14), rgba(85, 111, 189, 0.08));
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.chapter-list-item:hover {
+  transform: var(--motion-lift-translate);
+  border-color: rgba(146, 127, 206, 0.78);
+  box-shadow: 0 12px 24px rgba(6, 10, 20, 0.34);
+}
+
+.chapter-list-item:hover::before,
+.chapter-list-item.active::before {
+  opacity: 1;
+}
+
+.chapter-list-item.active {
+  border-color: #8372bc;
+  box-shadow: 0 14px 28px rgba(8, 10, 20, 0.35), inset 0 1px 0 rgba(197, 172, 255, 0.14);
+}
+
+.chapter-list-link strong {
+  transition: color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.chapter-list-item:hover .chapter-list-link strong,
+.chapter-list-item.active .chapter-list-link strong {
+  color: #f6f0ff;
+}
+
+.chapter-reader-card,
+.documents-reader-card {
+  animation: ui-fade-pop-in var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.chapter-reader-header {
+  border-bottom-color: rgba(117, 105, 168, 0.46);
+}
+
+.chapter-reader-nav {
+  border-top-color: rgba(109, 100, 151, 0.44);
+}
+
+.chapter-reader-nav .secondary-link {
+  min-width: 164px;
+  justify-content: center;
+}
+
+.whisper-list-item {
+  border-color: #393959;
+}
+
+.whisper-list-item:hover {
+  border-color: rgba(154, 127, 217, 0.76);
+  transform: translateY(-1px);
+}
+
+.whisper-post-button strong {
+  transition: color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.whisper-post-button:hover strong,
+.whisper-list-item.active .whisper-post-button strong {
+  color: #f5eeff;
+}
+
+.whisper-post-stats {
+  transition:
+    color var(--motion-duration-fast) var(--motion-ease-standard),
+    transform var(--motion-duration-fast) var(--motion-ease-standard),
+    text-shadow var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.whisper-list-item.is-updated {
+  border-color: rgba(164, 124, 255, 0.84);
+  box-shadow: 0 0 0 1px rgba(166, 127, 255, 0.22), 0 16px 28px rgba(10, 10, 21, 0.34);
+}
+
+.whisper-post-stats.is-updated {
+  color: #eedbff;
+  transform: translateY(-1px);
+  text-shadow: 0 0 12px rgba(177, 126, 255, 0.5);
+}
+
+.whisper-comment-card:hover {
+  border-color: rgba(128, 138, 194, 0.78);
+  transform: translateY(-1px);
+}
+
+.whisper-detail-modal {
+  box-shadow: 0 24px 48px rgba(3, 4, 10, 0.62), inset 0 1px 0 rgba(191, 167, 255, 0.11);
+}
+
+.maps-action,
+.board-icon-button {
+  transition:
+    transform var(--motion-duration-fast) var(--motion-ease-standard),
+    filter var(--motion-duration-fast) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-fast) var(--motion-ease-standard),
+    border-color var(--motion-duration-fast) var(--motion-ease-standard),
+    background-color var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.maps-action:hover,
+.board-icon-button:hover {
+  transform: var(--motion-lift-translate);
+  box-shadow: 0 10px 20px rgba(7, 9, 18, 0.32);
+}
+
+.map-pin:hover,
+.map-landmark:hover {
+  transform: translate(-50%, calc(-100% - 1px));
+  box-shadow: 0 12px 22px rgba(3, 5, 12, 0.4);
+}
+
+.map-landmark-popover {
+  box-shadow: 0 20px 34px rgba(4, 7, 15, 0.46), inset 0 1px 0 rgba(165, 177, 232, 0.11);
+  animation: ui-fade-pop-in var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.maps-editor-card {
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(189, 170, 255, 0.09);
+}
+
+.board-floating-controls {
+  gap: 9px;
+}
+
+.board-popover {
+  animation: ui-fade-slide-in var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.board-node:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 24px rgba(0, 0, 0, 0.3);
+}
+
+.board-edge-label-shell:focus-within {
+  box-shadow: 0 8px 16px rgba(4, 8, 17, 0.34), 0 0 0 2px rgba(189, 157, 99, 0.32);
+}
+
+.board-modal-overlay {
+  backdrop-filter: blur(2px);
+}
+
+.board-modal,
+.whisper-detail-modal,
+.map-landmark-popover {
+  border-color: #63598d;
+}
+
 .maps-viewport-shell {
   border-color: #424863;
   background:

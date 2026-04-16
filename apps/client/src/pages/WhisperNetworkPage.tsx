@@ -22,6 +22,7 @@ const WHISPER_SORT_OPTIONS: Array<{ value: WhisperSortMode; label: string }> = [
 ];
 
 const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";
+const WHISPER_FEEDBACK_MS = 820;
 
 type WhisperFeedResponse = {
   posts: WhisperPost[];
@@ -129,6 +130,7 @@ export default function WhisperNetworkPage() {
   const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<number, string>>({});
   const [isSubmittingCommentByPostId, setIsSubmittingCommentByPostId] = useState<Record<number, boolean>>({});
+  const [feedbackPostIds, setFeedbackPostIds] = useState<Record<number, true>>({});
 
   const [postTitleDraft, setPostTitleDraft] = useState("");
   const [postBodyDraft, setPostBodyDraft] = useState("");
@@ -156,6 +158,18 @@ export default function WhisperNetworkPage() {
     () => sortedPosts.find((post) => post.id === selectedPostId) || null,
     [sortedPosts, selectedPostId],
   );
+
+  function triggerPostFeedback(postId: number) {
+    setFeedbackPostIds((current) => ({ ...current, [postId]: true }));
+    window.setTimeout(() => {
+      setFeedbackPostIds((current) => {
+        if (!current[postId]) return current;
+        const next = { ...current };
+        delete next[postId];
+        return next;
+      });
+    }, WHISPER_FEEDBACK_MS);
+  }
 
   async function loadFeed(options?: { preferredSelectedPostId?: number | null }) {
     try {
@@ -254,6 +268,7 @@ export default function WhisperNetworkPage() {
           post.id === postId ? { ...post, liked_by_me: liked, like_count: likeCount } : post,
         ),
       );
+      triggerPostFeedback(postId);
       await loadFeed({ preferredSelectedPostId: postId });
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Failed to toggle like");
@@ -288,6 +303,7 @@ export default function WhisperNetworkPage() {
           post.id === postId ? { ...post, comment_count: post.comment_count + 1 } : post,
         ),
       );
+      triggerPostFeedback(postId);
       await loadFeed({ preferredSelectedPostId: postId });
     } catch (commentError) {
       setError(commentError instanceof Error ? commentError.message : "Failed to post comment");
@@ -560,8 +576,14 @@ export default function WhisperNetworkPage() {
           <ul className="chapter-list whisper-list">
             {sortedPosts.map((post) => {
               const isActive = post.id === selectedPostId;
+              const hasFeedback = Boolean(feedbackPostIds[post.id]);
               return (
-                <li key={post.id} className={`chapter-list-item whisper-list-item ${isActive ? "active" : ""}`.trim()}>
+                <li
+                  key={post.id}
+                  className={`chapter-list-item whisper-list-item ${isActive ? "active" : ""} ${
+                    hasFeedback ? "is-updated" : ""
+                  }`.trim()}
+                >
                   <button
                     type="button"
                     className="whisper-post-button"
@@ -572,7 +594,9 @@ export default function WhisperNetworkPage() {
                     <span className="chapter-list-meta">Anonymous rumor · {getPostFeedTimestamp(post)}</span>
                     <strong>{post.title}</strong>
                     <p className="whisper-list-excerpt">{post.body}</p>
-                    <span className="whisper-post-stats">❤️ {post.like_count} · 💬 {post.comment_count} · 👁 {post.view_count}</span>
+                    <span className={`whisper-post-stats ${hasFeedback ? "is-updated" : ""}`.trim()}>
+                      ❤️ {post.like_count} · 💬 {post.comment_count} · 👁 {post.view_count}
+                    </span>
                   </button>
                   <div className="whisper-post-inline-actions">
                     <button type="button" className="secondary-link" onClick={() => void toggleLike(post.id)}>
@@ -603,7 +627,9 @@ export default function WhisperNetworkPage() {
               <p className="topbar-meta">Anonymous rumor · {getPostDetailTimestamp(activePost)}</p>
               <h2>{activePost.title}</h2>
               <p className="whisper-reader-body">{activePost.body}</p>
-              <p className="whisper-post-stats">❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}</p>
+              <p className={`whisper-post-stats ${feedbackPostIds[activePost.id] ? "is-updated" : ""}`.trim()}>
+                ❤️ {activePost.like_count} · 💬 {activePost.comment_count} · 👁 {activePost.view_count}
+              </p>
               <div className="whisper-detail-actions">
                 <button type="button" className="action-button" onClick={() => void toggleLike(activePost.id)}>
                   {activePost.liked_by_me ? "Unlike this whisper" : "Like this whisper"}
