@@ -116,6 +116,28 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
 }
 
+.npc-card-clickable {
+  position: relative;
+  cursor: pointer;
+}
+
+.npc-card-clickable::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, rgba(150, 125, 232, 0.14), rgba(85, 111, 189, 0.08));
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.npc-card-clickable > * {
+  position: relative;
+  z-index: 1;
+}
+
 .npc-image-wrap,
 .detail-image-wrap {
   position: relative;
@@ -2856,6 +2878,7 @@
 }
 
 .locations-card {
+  position: relative;
   display: block;
   border: 1px solid #313957;
   border-radius: 12px;
@@ -2863,6 +2886,24 @@
   background: rgba(18, 23, 36, 0.72);
   color: inherit;
   text-decoration: none;
+  overflow: hidden;
+}
+
+.locations-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  background: linear-gradient(180deg, rgba(150, 125, 232, 0.14), rgba(85, 111, 189, 0.08));
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.locations-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .locations-card h3 {
@@ -3802,6 +3843,7 @@ body {
 .dashboard-card,
 .dashboard-suspect-item,
 .search-result-item,
+.npc-card-clickable,
 .locations-card,
 .summer-court-petal,
 .summer-court-chip {
@@ -3822,11 +3864,28 @@ body {
   border-color: rgba(150, 126, 222, 0.7);
 }
 
+.npc-card-clickable:hover,
+.npc-card-clickable:focus-visible {
+  transform: var(--motion-lift-translate);
+  border-color: rgba(146, 127, 206, 0.78);
+  box-shadow: 0 12px 24px rgba(6, 10, 20, 0.34);
+}
+
+.npc-card-clickable:hover::before,
+.npc-card-clickable:focus-visible::before {
+  opacity: 1;
+}
+
 .locations-card:hover,
 .locations-card:focus-visible {
   transform: var(--motion-lift-translate);
   border-color: rgba(146, 127, 206, 0.78);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(191, 165, 255, 0.1);
+  box-shadow: 0 12px 24px rgba(6, 10, 20, 0.34);
+}
+
+.locations-card:hover::before,
+.locations-card:focus-visible::before {
+  opacity: 1;
 }
 
 .summer-court-petal.is-current {

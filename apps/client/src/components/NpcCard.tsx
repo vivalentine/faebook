@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { apiUrl } from "../lib/api";
 import { getFallbackReputation, getReputationIndicatorClassName } from "../lib/npcReputation";
 import type { Npc } from "../types";
@@ -16,12 +16,46 @@ export default function NpcCard({
   onToggleVisibility,
   savingSlug = "",
 }: Props) {
+  const navigate = useNavigate();
   const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
   const detailsHref = `/directory/${npc.slug}`;
   const reputation = npc.reputation || getFallbackReputation();
 
+  function shouldIgnoreCardNavigation(target: EventTarget | null) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    return Boolean(target.closest("a, button, input, textarea, select, label, [data-no-card-nav='true']"));
+  }
+
+  function handleCardNavigate() {
+    navigate(detailsHref);
+  }
+
   return (
-    <article className="npc-card">
+    <article
+      className="npc-card npc-card-clickable"
+      role="link"
+      tabIndex={0}
+      aria-label={`Open ${npc.name}`}
+      onClick={(event) => {
+        if (shouldIgnoreCardNavigation(event.target)) {
+          return;
+        }
+        handleCardNavigate();
+      }}
+      onKeyDown={(event) => {
+        if (shouldIgnoreCardNavigation(event.target)) {
+          return;
+        }
+
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleCardNavigate();
+        }
+      }}
+    >
       <div className="npc-image-wrap">
         {mode === "player" ? (
           <span
@@ -80,14 +114,14 @@ export default function NpcCard({
         ) : null}
 
         <div className="card-actions">
-          <Link className="action-button secondary-link" to={detailsHref}>
-            Open page
-          </Link>
-
           {mode === "dm" && onToggleVisibility ? (
             <button
               className="action-button"
-              onClick={() => onToggleVisibility(npc)}
+              data-no-card-nav="true"
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleVisibility(npc);
+              }}
               disabled={savingSlug === npc.slug}
             >
               {savingSlug === npc.slug
