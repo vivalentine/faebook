@@ -646,11 +646,6 @@ export default function WhisperNetworkPage() {
                       <span>{post.view_count}</span>
                     </span>
                   </div>
-                  <div className="whisper-post-inline-actions">
-                    <button type="button" className="secondary-link" onClick={() => void openPostReader(post.id)}>
-                      Open
-                    </button>
-                  </div>
                   {isDm ? (
                     <div className="chapter-list-admin-actions whisper-admin-actions">
                       <button type="button" className="secondary-link" onClick={() => startEditPost(post)}>
