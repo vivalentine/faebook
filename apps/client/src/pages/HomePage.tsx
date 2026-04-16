@@ -326,6 +326,7 @@ export default function HomePage() {
               <div className="summer-court-calendar">
                 <div className="summer-court-calendar-head">
                   <strong>{getBloomName(campaignDate.bloom_index)} Bloom</strong>
+                  <span className="summer-court-calendar-head-meta">Petals 1–28</span>
                 </div>
                 <div className="summer-court-calendar-grid">
                   {PETAL_CYCLE.map((cycle) => (
