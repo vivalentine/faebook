@@ -1941,6 +1941,14 @@
   gap: 8px;
 }
 
+.summer-court-calendar-grid--forward {
+  animation: ui-calendar-bloom-forward var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.summer-court-calendar-grid--backward {
+  animation: ui-calendar-bloom-backward var(--motion-duration-base) var(--motion-ease-standard);
+}
+
 .summer-court-calendar-col-head {
   padding: 2px 4px 7px;
   font-size: 12px;
@@ -3259,6 +3267,28 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes ui-calendar-bloom-forward {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ui-calendar-bloom-backward {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

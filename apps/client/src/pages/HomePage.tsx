@@ -45,6 +45,7 @@ export default function HomePage() {
   const [newSuspectNote, setNewSuspectNote] = useState("");
   const [addingSuspect, setAddingSuspect] = useState(false);
   const [viewedBloomIndex, setViewedBloomIndex] = useState<number>(1);
+  const [calendarMotionDirection, setCalendarMotionDirection] = useState<"forward" | "backward">("forward");
 
 
   const [recapChapterNumber, setRecapChapterNumber] = useState("");
@@ -96,6 +97,18 @@ export default function HomePage() {
       setViewedBloomIndex(campaignDate.bloom_index);
     }
   }, [campaignDate]);
+
+  function updateViewedBloom(nextBloomIndex: number) {
+    setViewedBloomIndex((current) => {
+      const clamped = Math.max(1, Math.min(12, nextBloomIndex));
+      if (clamped === current) {
+        return current;
+      }
+
+      setCalendarMotionDirection(clamped > current ? "forward" : "backward");
+      return clamped;
+    });
+  }
 
   async function addSuspect() {
     if (!newSuspectName.trim()) {
@@ -337,7 +350,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       className="summer-court-nav-button summer-court-nav-button--today"
-                      onClick={() => setViewedBloomIndex(campaignDate.bloom_index)}
+                      onClick={() => updateViewedBloom(campaignDate.bloom_index)}
                       disabled={viewedBloomIndex === campaignDate.bloom_index}
                     >
                       Today
@@ -346,7 +359,7 @@ export default function HomePage() {
                       type="button"
                       className="summer-court-nav-button"
                       aria-label="View previous bloom"
-                      onClick={() => setViewedBloomIndex((current) => Math.max(1, current - 1))}
+                      onClick={() => updateViewedBloom(viewedBloomIndex - 1)}
                       disabled={viewedBloomIndex <= 1}
                     >
                       ←
@@ -355,7 +368,7 @@ export default function HomePage() {
                       type="button"
                       className="summer-court-nav-button"
                       aria-label="View next bloom"
-                      onClick={() => setViewedBloomIndex((current) => Math.min(12, current + 1))}
+                      onClick={() => updateViewedBloom(viewedBloomIndex + 1)}
                       disabled={viewedBloomIndex >= 12}
                     >
                       →
@@ -368,7 +381,10 @@ export default function HomePage() {
                     </span>
                   </div>
                 </div>
-                <div className="summer-court-calendar-grid">
+                <div
+                  key={`summer-bloom-${viewedBloomIndex}`}
+                  className={`summer-court-calendar-grid summer-court-calendar-grid--${calendarMotionDirection}`}
+                >
                   {PETAL_CYCLE.map((cycle) => (
                     <div
                       key={cycle.index}
