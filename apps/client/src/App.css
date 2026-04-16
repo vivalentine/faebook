@@ -2019,8 +2019,8 @@
 
 .summer-court-petal.is-past {
   border-color: rgba(90, 82, 120, 0.52);
-  background: rgba(38, 34, 56, 0.3);
-  box-shadow: inset 0 0 0 1px rgba(132, 124, 170, 0.12);
+  background: rgba(30, 27, 44, 0.48);
+  box-shadow: inset 0 0 0 1px rgba(124, 116, 160, 0.17);
 }
 
 .summer-court-petal.is-current {
@@ -2043,17 +2043,28 @@
 }
 
 .summer-court-petal-number {
+  position: relative;
+  display: inline-block;
   font-size: 14px;
   font-weight: 700;
   color: #ede8f9;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.18em;
 }
 
 .summer-court-petal.is-past .summer-court-petal-number {
-  color: #aea7c1;
-  text-decoration-line: line-through;
-  text-decoration-color: rgba(196, 186, 224, 0.62);
+  color: #a19ab8;
+}
+
+.summer-court-petal.is-past .summer-court-petal-number::after {
+  content: "";
+  position: absolute;
+  left: -9%;
+  right: -9%;
+  top: 54%;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(230, 221, 255, 0.88);
+  box-shadow: 0 0 0 1px rgba(36, 32, 52, 0.44);
+  transform: translateY(-50%);
 }
 
 .summer-court-chip {
@@ -2071,7 +2082,7 @@
 }
 
 .summer-court-petal.is-past .summer-court-chip {
-  color: #d8cee9;
+  color: #dfd6f0;
   border-color: rgba(161, 145, 205, 0.28);
   background: rgba(114, 100, 156, 0.24);
 }
@@ -3103,6 +3114,12 @@
 
   .summer-court-petal-number {
     font-size: 13px;
+  }
+
+  .summer-court-petal.is-past .summer-court-petal-number::after {
+    left: -8%;
+    right: -8%;
+    height: 1.75px;
   }
 
   .summer-court-chip {
