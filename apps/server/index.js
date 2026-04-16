@@ -17,6 +17,13 @@ const {
   finalizeImport,
   stageFixtures,
 } = require("./dm-npc-import");
+const {
+  addStagedMarkdownFiles: addStagedLocationMarkdownFiles,
+  clearStage: clearLocationImportStage,
+  finalizeImport: finalizeLocationImport,
+  getStagingSummary: getLocationImportStagingSummary,
+  stageFixtures: stageLocationImportFixtures,
+} = require("./dm-location-import");
 const { runGlobalSearch, runGlobalSearchSuggestions } = require("./search");
 const {
   buildPortraitMetadata,
@@ -2675,6 +2682,39 @@ app.post("/api/dm/import/staging/clear", requireRole("dm"), (req, res) => {
 
 app.post("/api/dm/import/finalize", requireRole("dm"), async (req, res) => {
   const results = await finalizeImport(db, req.session.user.id);
+  res.json(results);
+});
+
+app.get("/api/dm/location-import/staging", requireRole("dm"), (req, res) => {
+  const summary = getLocationImportStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post(
+  "/api/dm/location-import/staging/markdown",
+  requireRole("dm"),
+  uploadMarkdownArray.array("files"),
+  (req, res) => {
+    addStagedLocationMarkdownFiles(req.session.user.id, req.files || []);
+    const summary = getLocationImportStagingSummary(db, req.session.user.id);
+    res.json(summary);
+  }
+);
+
+app.post("/api/dm/location-import/staging/fixtures", requireRole("dm"), (req, res) => {
+  stageLocationImportFixtures(req.session.user.id);
+  const summary = getLocationImportStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post("/api/dm/location-import/staging/clear", requireRole("dm"), (req, res) => {
+  clearLocationImportStage(req.session.user.id);
+  const summary = getLocationImportStagingSummary(db, req.session.user.id);
+  res.json(summary);
+});
+
+app.post("/api/dm/location-import/finalize", requireRole("dm"), async (req, res) => {
+  const results = await finalizeLocationImport(db, req.session.user.id);
   res.json(results);
 });
 
