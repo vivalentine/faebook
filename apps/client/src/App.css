@@ -2972,7 +2972,17 @@
 }
 
 .whisper-feed-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
   margin-bottom: 10px;
+}
+
+.whisper-feed-header h2 {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .whisper-feed-header p {
@@ -2980,17 +2990,17 @@
 }
 
 .whisper-feed-tools {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .whisper-sort-label {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .whisper-sort-select {
@@ -3497,12 +3507,18 @@
   }
 
   .whisper-feed-tools {
-    justify-content: stretch;
+    justify-items: end;
   }
 
   .whisper-sort-label {
-    width: 100%;
-    justify-content: space-between;
+    width: auto;
+    justify-content: flex-end;
+    white-space: nowrap;
+  }
+
+  .whisper-feed-header {
+    flex-direction: row;
+    align-items: flex-start;
   }
 
   .whisper-detail-actions {

@@ -175,10 +175,13 @@ export default function WhisperNetworkPage() {
     }, WHISPER_FEEDBACK_MS);
   }
 
-  async function loadFeed(options?: { preferredSelectedPostId?: number | null }) {
+  async function loadFeed(options?: { preferredSelectedPostId?: number | null; silent?: boolean }) {
+    const silent = Boolean(options?.silent);
     try {
-      setLoading(true);
-      setError("");
+      if (!silent) {
+        setLoading(true);
+        setError("");
+      }
       const [feedResponse, dashboardResponse] = await Promise.all([
         apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`),
         apiFetch("/api/dashboard"),
@@ -208,10 +211,14 @@ export default function WhisperNetworkPage() {
         return loadedPosts[0]?.id ?? null;
       });
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
-      setPosts([]);
+      if (!silent) {
+        setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
+        setPosts([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
@@ -295,7 +302,7 @@ export default function WhisperNetworkPage() {
         ),
       );
       triggerPostFeedback(postId);
-      await loadFeed({ preferredSelectedPostId: postId });
+      void loadFeed({ preferredSelectedPostId: postId, silent: true });
     } catch (likeError) {
       setError(likeError instanceof Error ? likeError.message : "Failed to toggle like");
     }
