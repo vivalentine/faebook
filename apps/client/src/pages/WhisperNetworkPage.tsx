@@ -11,7 +11,7 @@ import {
   toSummerCourtDateTimeOrNull,
   type SummerCourtDateTime,
 } from "../lib/summerCourtCalendar";
-import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
+import type { DashboardData, WhisperComment, WhisperPost, WhisperSortMode } from "../types";
 
 const WHISPER_SORT_OPTIONS: Array<{ value: WhisperSortMode; label: string }> = [
   { value: "trending", label: "Trending" },
@@ -148,6 +148,7 @@ export default function WhisperNetworkPage() {
   const [commentBellDraft, setCommentBellDraft] = useState("");
   const [commentChimeDraft, setCommentChimeDraft] = useState("");
   const [isSavingCommentTime, setIsSavingCommentTime] = useState(false);
+  const [campaignDateTime, setCampaignDateTime] = useState<SummerCourtDateTime | null>(null);
 
   const sortedPosts = useMemo(() => sortWhisperPosts(posts, sortMode), [posts, sortMode]);
 
@@ -160,11 +161,21 @@ export default function WhisperNetworkPage() {
     try {
       setLoading(true);
       setError("");
-      const response = await apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`);
-      const data = (await response.json()) as WhisperFeedResponse | { error?: string };
-      if (!response.ok) {
+      const [feedResponse, dashboardResponse] = await Promise.all([
+        apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`),
+        apiFetch("/api/dashboard"),
+      ]);
+      const data = (await feedResponse.json()) as WhisperFeedResponse | { error?: string };
+      const dashboardData = (await dashboardResponse.json()) as DashboardData | { error?: string };
+      if (!feedResponse.ok) {
         throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
       }
+      if (!dashboardResponse.ok) {
+        throw new Error((dashboardData as { error?: string }).error || "Failed to load campaign date");
+      }
+
+      setCampaignDateTime(toSummerCourtDateTimeOrNull((dashboardData as DashboardData).campaign_date || undefined));
+
       const loadedPosts = (data as WhisperFeedResponse).posts || [];
       setPosts(loadedPosts);
       const preferredSelectedPostId = options?.preferredSelectedPostId ?? null;
@@ -304,12 +315,30 @@ export default function WhisperNetworkPage() {
     setPostBodyDraft("");
     setPostLikeCountDraft("0");
     setPostViewCountDraft("0");
-    setPostCrownYearDraft("");
-    setPostBloomIndexDraft("");
-    setPostPetalDraft("");
-    setPostBellDraft("");
-    setPostChimeDraft("");
+    setPostCrownYearDraft(campaignDateTime ? String(campaignDateTime.crown_year) : "");
+    setPostBloomIndexDraft(campaignDateTime ? String(campaignDateTime.bloom_index) : "");
+    setPostPetalDraft(campaignDateTime ? String(campaignDateTime.petal) : "");
+    setPostBellDraft(campaignDateTime ? String(campaignDateTime.bell) : "");
+    setPostChimeDraft(campaignDateTime ? String(campaignDateTime.chime) : "");
   }
+
+  useEffect(() => {
+    if (!campaignDateTime || editingPostId) return;
+    if (postCrownYearDraft || postBloomIndexDraft || postPetalDraft || postBellDraft || postChimeDraft) return;
+    setPostCrownYearDraft(String(campaignDateTime.crown_year));
+    setPostBloomIndexDraft(String(campaignDateTime.bloom_index));
+    setPostPetalDraft(String(campaignDateTime.petal));
+    setPostBellDraft(String(campaignDateTime.bell));
+    setPostChimeDraft(String(campaignDateTime.chime));
+  }, [
+    campaignDateTime,
+    editingPostId,
+    postBellDraft,
+    postBloomIndexDraft,
+    postChimeDraft,
+    postCrownYearDraft,
+    postPetalDraft,
+  ]);
 
   async function savePost() {
     const title = postTitleDraft.trim();
@@ -335,7 +364,7 @@ export default function WhisperNetworkPage() {
       setError("View count must be a non-negative integer.");
       return;
     }
-    if (!summerCourtDateTime) {
+    if (editingPostId && !summerCourtDateTime) {
       setError("Summer Court date/time is required and must be valid.");
       return;
     }
@@ -350,7 +379,7 @@ export default function WhisperNetworkPage() {
           body,
           like_count: parsedLikeCount,
           view_count: parsedViewCount,
-          ...summerCourtDateTime,
+          ...(summerCourtDateTime || {}),
         }),
       });
       const data = (await response.json()) as WhisperPost | { error?: string };
@@ -497,7 +526,7 @@ export default function WhisperNetworkPage() {
     petal: Number.parseInt(postPetalDraft, 10),
     bell: Number.parseInt(postBellDraft, 10),
     chime: Number.parseInt(postChimeDraft, 10),
-  });
+  }) || (!editingPostId ? campaignDateTime : null);
 
   return (
     <section className="whisper-page chapters-page">
@@ -803,6 +832,9 @@ export default function WhisperNetworkPage() {
               ? formatSummerCourtDateTimeFull(postPreviewDate)
               : "Summer Court preview unavailable until all fields are valid."}
           </p>
+          {!editingPostId && postPreviewDate ? (
+            <p className="topbar-meta">Using current campaign time for new whispers.</p>
+          ) : null}
           {postPreviewDate ? (
             <p className="topbar-meta">
               Phase {getPhaseIndexFromPetal(postPreviewDate.petal)} · {getBellPeriodName(postPreviewDate.bell)}

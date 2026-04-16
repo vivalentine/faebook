@@ -4824,6 +4824,15 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
     return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
   }
 
+  const campaignDate = getCampaignDateState();
+  const whisperTimestamp = summerCourtInput.value || {
+    crown_year: Number(campaignDate.crown_year),
+    bloom_index: Number(campaignDate.bloom_index),
+    petal: Number(campaignDate.petal),
+    bell: Number(campaignDate.bell),
+    chime: Number(campaignDate.chime),
+  };
+
   const now = new Date().toISOString();
   const result = db
     .prepare(
@@ -4851,11 +4860,11 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
       body,
       likeCount,
       viewCount,
-      summerCourtInput.value?.crown_year ?? null,
-      summerCourtInput.value?.bloom_index ?? null,
-      summerCourtInput.value?.petal ?? null,
-      summerCourtInput.value?.bell ?? null,
-      summerCourtInput.value?.chime ?? null,
+      whisperTimestamp.crown_year,
+      whisperTimestamp.bloom_index,
+      whisperTimestamp.petal,
+      whisperTimestamp.bell,
+      whisperTimestamp.chime,
       now,
       now
     );
@@ -5067,6 +5076,15 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
     return res.status(404).json({ error: "Post not found" });
   }
 
+  const campaignDate = getCampaignDateState();
+  const whisperTimestamp = {
+    crown_year: Number(campaignDate.crown_year),
+    bloom_index: Number(campaignDate.bloom_index),
+    petal: Number(campaignDate.petal),
+    bell: Number(campaignDate.bell),
+    chime: Number(campaignDate.chime),
+  };
+
   const now = new Date().toISOString();
   const result = db
     .prepare(
@@ -5075,13 +5093,29 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
           post_id,
           author_user_id,
           body,
+          crown_year,
+          bloom_index,
+          petal,
+          bell,
+          chime,
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     )
-    .run(postId, sessionUser.id, body, now, now);
+    .run(
+      postId,
+      sessionUser.id,
+      body,
+      whisperTimestamp.crown_year,
+      whisperTimestamp.bloom_index,
+      whisperTimestamp.petal,
+      whisperTimestamp.bell,
+      whisperTimestamp.chime,
+      now,
+      now
+    );
 
   db.prepare(
     `
@@ -5096,11 +5130,11 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
       id: Number(result.lastInsertRowid),
       post_id: postId,
       body,
-      crown_year: null,
-      bloom_index: null,
-      petal: null,
-      bell: null,
-      chime: null,
+      crown_year: whisperTimestamp.crown_year,
+      bloom_index: whisperTimestamp.bloom_index,
+      petal: whisperTimestamp.petal,
+      bell: whisperTimestamp.bell,
+      chime: whisperTimestamp.chime,
       created_at: now,
       updated_at: now,
       can_moderate: sessionUser.role === "dm" ? 1 : 0,
