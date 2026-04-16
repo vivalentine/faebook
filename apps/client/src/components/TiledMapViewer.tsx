@@ -27,6 +27,11 @@ type TiledMapViewerProps = {
 };
 
 const DEFAULT_MAP_ERROR = "Map tile source is missing for this layer.";
+const DEFAULT_RENDERER_ERROR = "Unable to initialize the map renderer on this device.";
+
+type OpenSeadragonInitOptions = OpenSeadragon.Options & {
+  drawer?: Array<"canvas" | "html" | "webgl">;
+};
 
 function buildInlineDziTileSource(layer: MapLayerConfig): any {
   return {
@@ -42,6 +47,53 @@ function buildInlineDziTileSource(layer: MapLayerConfig): any {
       },
     },
   };
+}
+
+function buildViewerOptions(
+  host: HTMLDivElement,
+  layer: MapLayerConfig,
+  rendererMode: "drawer_canvas_first" | "use_canvas_legacy",
+): OpenSeadragonInitOptions {
+  return {
+    element: host,
+    tileSources: [buildInlineDziTileSource(layer) as any],
+    prefixUrl: "/",
+    showNavigator: false,
+    showZoomControl: false,
+    showHomeControl: false,
+    showFullPageControl: false,
+    gestureSettingsMouse: {
+      clickToZoom: false,
+      dblClickToZoom: true,
+      pinchToZoom: true,
+      flickEnabled: true,
+    },
+    gestureSettingsTouch: {
+      clickToZoom: false,
+      dblClickToZoom: false,
+      pinchToZoom: true,
+      flickEnabled: true,
+    },
+    minZoomLevel: layer.min_zoom > 0 ? layer.min_zoom : 0.01,
+    maxZoomLevel: layer.max_zoom,
+    defaultZoomLevel: layer.default_zoom,
+    homeFillsViewer: false,
+    visibilityRatio: 1,
+    constrainDuringPan: true,
+    maxZoomPixelRatio: 2,
+    ...(rendererMode === "drawer_canvas_first"
+      ? { drawer: ["canvas", "html"] }
+      : { useCanvas: true }),
+  };
+}
+
+function createViewer(host: HTMLDivElement, layer: MapLayerConfig): OpenSeadragon.Viewer {
+  try {
+    return OpenSeadragon(buildViewerOptions(host, layer, "drawer_canvas_first"));
+  } catch {
+    host.innerHTML = "";
+    return OpenSeadragon(buildViewerOptions(host, layer, "use_canvas_legacy"));
+  }
 }
 
 const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(function TiledMapViewer(
@@ -150,34 +202,13 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
 
     setMapError("");
 
-    const viewer = OpenSeadragon({
-      element: host,
-      tileSources: [buildInlineDziTileSource(layer) as any],
-      prefixUrl: "/",
-      showNavigator: false,
-      showZoomControl: false,
-      showHomeControl: false,
-      showFullPageControl: false,
-      gestureSettingsMouse: {
-        clickToZoom: false,
-        dblClickToZoom: true,
-        pinchToZoom: true,
-        flickEnabled: true,
-      },
-      gestureSettingsTouch: {
-        clickToZoom: false,
-        dblClickToZoom: false,
-        pinchToZoom: true,
-        flickEnabled: true,
-      },
-      minZoomLevel: layer.min_zoom > 0 ? layer.min_zoom : 0.01,
-      maxZoomLevel: layer.max_zoom,
-      defaultZoomLevel: layer.default_zoom,
-      homeFillsViewer: false,
-      visibilityRatio: 1,
-      constrainDuringPan: true,
-      maxZoomPixelRatio: 2,
-    });
+    let viewer: OpenSeadragon.Viewer;
+    try {
+      viewer = createViewer(host, layer);
+    } catch {
+      setMapError(`${DEFAULT_RENDERER_ERROR} (${layer.label})`);
+      return;
+    }
 
     viewerRef.current = viewer;
 
