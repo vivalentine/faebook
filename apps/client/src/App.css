@@ -2102,6 +2102,145 @@
   text-transform: uppercase;
 }
 
+.summer-court-focus-strip {
+  border: 1px solid rgba(102, 92, 138, 0.56);
+  border-radius: 13px;
+  padding: 10px 11px;
+  background: linear-gradient(180deg, rgba(49, 43, 75, 0.7), rgba(34, 30, 52, 0.74));
+  margin-bottom: 12px;
+}
+
+.summer-court-focus-strip-title {
+  margin: 0 0 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: #c8bcdd;
+  font-weight: 600;
+}
+
+.summer-court-focus-strip-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.summer-court-focus-strip-values span {
+  font-size: 12px;
+  color: #f4ecff;
+  border: 1px solid rgba(155, 141, 196, 0.44);
+  background: rgba(35, 30, 54, 0.7);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.summer-court-nearby {
+  margin-bottom: 12px;
+}
+
+.summer-court-nearby-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.summer-court-nearby-title {
+  margin: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #c7bddc;
+}
+
+.summer-court-nearby-meta {
+  font-size: 11px;
+  color: #a8a0be;
+}
+
+.summer-court-nearby-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.summer-court-nearby-petal {
+  border: 1px solid rgba(99, 89, 133, 0.62);
+  border-radius: 11px;
+  background: rgba(43, 38, 63, 0.38);
+  padding: 7px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 50px;
+}
+
+.summer-court-nearby-petal.is-past {
+  border-color: rgba(81, 76, 109, 0.42);
+  background: rgba(27, 24, 40, 0.58);
+}
+
+.summer-court-nearby-petal.is-holiday {
+  border-color: rgba(144, 124, 194, 0.76);
+}
+
+.summer-court-nearby-petal.is-current {
+  border-color: rgba(240, 213, 151, 0.9);
+  background: linear-gradient(180deg, rgba(144, 110, 60, 0.54), rgba(93, 67, 37, 0.42));
+  box-shadow:
+    inset 0 0 0 1px rgba(247, 227, 178, 0.62),
+    0 0 11px rgba(217, 178, 99, 0.26);
+}
+
+.summer-court-nearby-petal-number-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.summer-court-nearby-petal-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ede8f9;
+}
+
+.summer-court-nearby-petal.is-past .summer-court-nearby-petal-number {
+  color: #a9a0bf;
+}
+
+.summer-court-nearby-petal-cycle {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c7bcde;
+  line-height: 1;
+}
+
+.summer-court-expand-toggle {
+  border: 1px solid rgba(122, 111, 161, 0.66);
+  background: rgba(31, 28, 47, 0.92);
+  color: #ddd3f3;
+  border-radius: 11px;
+  min-height: 34px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.summer-court-expand-toggle:hover:not(:disabled) {
+  border-color: rgba(167, 151, 212, 0.82);
+  background: rgba(50, 43, 74, 0.92);
+}
+
 .summer-court-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -3513,8 +3652,68 @@
     margin-right: auto;
   }
 
+  .summer-court-focus-strip {
+    padding: 9px 9px;
+    margin-bottom: 10px;
+  }
+
+  .summer-court-focus-strip-title {
+    font-size: 9px;
+    margin-bottom: 5px;
+  }
+
+  .summer-court-focus-strip-values {
+    gap: 5px 6px;
+  }
+
+  .summer-court-focus-strip-values span {
+    font-size: 11px;
+    padding: 2px 7px;
+  }
+
+  .summer-court-nearby {
+    margin-bottom: 10px;
+  }
+
+  .summer-court-nearby-title {
+    font-size: 10px;
+  }
+
+  .summer-court-nearby-meta {
+    font-size: 10px;
+  }
+
+  .summer-court-nearby-strip {
+    gap: 5px;
+  }
+
+  .summer-court-nearby-petal {
+    border-radius: 10px;
+    min-height: 46px;
+    padding: 6px 4px;
+    gap: 3px;
+  }
+
+  .summer-court-nearby-petal-number {
+    font-size: 12px;
+  }
+
+  .summer-court-nearby-petal-cycle {
+    font-size: 9px;
+    letter-spacing: 0.05em;
+  }
+
+  .summer-court-expand-toggle {
+    display: inline-flex;
+  }
+
   .summer-court-calendar-grid {
     gap: 6px 5px;
+    display: none;
+  }
+
+  .summer-court-calendar-grid.is-expanded {
+    display: grid;
   }
 
   .summer-court-calendar-col-head {
