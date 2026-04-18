@@ -35,6 +35,27 @@ function formatDateTime(value: string | null | undefined) {
 const SUSPECT_STATUSES: DashboardSuspect["status"][] = ["active", "unknown", "cleared"];
 const BLOOM_PETAL_ROWS = [0, 1, 2, 3];
 
+function buildCalendarPetalClassNames({
+  baseClassName,
+  isPast,
+  isCurrent,
+  isHoliday,
+}: {
+  baseClassName: string;
+  isPast: boolean;
+  isCurrent: boolean;
+  isHoliday: boolean;
+}) {
+  return [
+    baseClassName,
+    isCurrent ? "is-current" : isPast ? "is-past" : isHoliday ? "is-holiday" : "",
+    isHoliday ? "has-holiday" : "",
+    isPast && isHoliday ? "is-past-holiday" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export default function HomePage() {
   const { user } = useAuth();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
@@ -436,14 +457,12 @@ export default function HomePage() {
                       const isCurrentBloom = viewedBloomIndex === campaignDate.bloom_index;
                       const isPastPetal = isPastBloom || (isCurrentBloom && entry.petal < campaignDate.petal);
                       const isCurrentPetal = isCurrentBloom && entry.petal === campaignDate.petal;
-                      const classNames = [
-                        "summer-court-nearby-petal",
-                        isPastPetal ? "is-past" : "",
-                        isCurrentPetal ? "is-current" : "",
-                        entry.holidayNames.length ? "is-holiday" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ");
+                      const classNames = buildCalendarPetalClassNames({
+                        baseClassName: "summer-court-nearby-petal",
+                        isPast: isPastPetal,
+                        isCurrent: isCurrentPetal,
+                        isHoliday: entry.holidayNames.length > 0,
+                      });
 
                       return (
                         <div key={`nearby-${entry.petal}`} className={classNames} role="listitem" title={entry.holidayNames.join(" · ") || undefined}>
@@ -498,14 +517,12 @@ export default function HomePage() {
                       const isPastPetal = isPastBloom || (isCurrentBloom && petal < campaignDate.petal);
                       const isCurrentPetal = isCurrentBloom && petal === campaignDate.petal;
                       const holidayNames = getHolidayNamesForPetal(viewedBloomIndex, petal);
-                      const classNames = [
-                        "summer-court-petal",
-                        isPastPetal ? "is-past" : "",
-                        isCurrentPetal ? "is-current" : "",
-                        holidayNames.length ? "is-holiday" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ");
+                      const classNames = buildCalendarPetalClassNames({
+                        baseClassName: "summer-court-petal",
+                        isPast: isPastPetal,
+                        isCurrent: isCurrentPetal,
+                        isHoliday: holidayNames.length > 0,
+                      });
 
                       return (
                         <div key={petal} className={classNames} title={holidayNames.join(" · ") || undefined}>
