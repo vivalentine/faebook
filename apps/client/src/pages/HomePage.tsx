@@ -91,6 +91,18 @@ export default function HomePage() {
     () => toSummerCourtDateTimeOrNull(dashboard?.campaign_date || undefined),
     [dashboard?.campaign_date],
   );
+  const viewedBloomHolidayEntries = useMemo(
+    () =>
+      Array.from({ length: 28 }, (_, index) => {
+        const petal = index + 1;
+        const holidayNames = getHolidayNamesForPetal(viewedBloomIndex, petal);
+        return {
+          petal,
+          holidayNames,
+        };
+      }).filter((entry) => entry.holidayNames.length > 0),
+    [viewedBloomIndex],
+  );
 
   useEffect(() => {
     if (campaignDate) {
@@ -340,12 +352,21 @@ export default function HomePage() {
           <h2>Summer Court Calendar</h2>
           {campaignDate ? (
             <>
-              <p className="topbar-meta">
-                Today: {formatSummerCourtDate(campaignDate)} · {getPetalCycleNameFromPetal(campaignDate.petal)} ·{" "}
-                {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
-              </p>
+              <div className="summer-court-current-summary" aria-label="Current Summer Court date">
+                <p className="summer-court-current-summary-date">{formatSummerCourtDate(campaignDate)}</p>
+                <p className="summer-court-current-summary-meta">
+                  {getPetalCycleNameFromPetal(campaignDate.petal)} · {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
+                </p>
+              </div>
               <div className="summer-court-calendar">
                 <div className="summer-court-calendar-head">
+                  <div className="summer-court-calendar-title-wrap">
+                    <span className="summer-court-calendar-kicker">Bloom View</span>
+                    <strong>{getBloomName(viewedBloomIndex)} Bloom</strong>
+                    <span className="summer-court-calendar-head-meta">
+                      Crown Year {campaignDate.crown_year} · Bloom {viewedBloomIndex} of 12
+                    </span>
+                  </div>
                   <div className="summer-court-calendar-nav" aria-label="Summer Court bloom navigation">
                     <button
                       type="button"
@@ -373,12 +394,6 @@ export default function HomePage() {
                     >
                       →
                     </button>
-                  </div>
-                  <div className="summer-court-calendar-title-wrap">
-                    <strong>{getBloomName(viewedBloomIndex)} Bloom</strong>
-                    <span className="summer-court-calendar-head-meta">
-                      Crown Year {campaignDate.crown_year} · Bloom {viewedBloomIndex} of 12
-                    </span>
                   </div>
                 </div>
                 <div
@@ -414,7 +429,19 @@ export default function HomePage() {
 
                       return (
                         <div key={petal} className={classNames} title={holidayNames.join(" · ") || undefined}>
-                          <span className="summer-court-petal-number">{petal}</span>
+                          <span className="summer-court-petal-number-wrap">
+                            <span className="summer-court-petal-number">{petal}</span>
+                            {holidayNames.length ? (
+                              <span
+                                className={
+                                  holidayNames.includes("Solstice Day") || holidayNames.includes("Solstice Masquerade")
+                                    ? "summer-court-petal-holiday-dot summer-court-petal-holiday-dot--accent"
+                                    : "summer-court-petal-holiday-dot"
+                                }
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                          </span>
                           {holidayNames.map((holidayName) => (
                             <span
                               key={holidayName}
@@ -430,6 +457,25 @@ export default function HomePage() {
                         </div>
                       );
                     }),
+                  )}
+                </div>
+                <div className="summer-court-calendar-events" aria-live="polite">
+                  {viewedBloomHolidayEntries.length ? (
+                    <>
+                      <p className="summer-court-calendar-events-title">Bloom events</p>
+                      <ul className="summer-court-calendar-events-list">
+                        {viewedBloomHolidayEntries.map((entry) => (
+                          <li key={`${viewedBloomIndex}-${entry.petal}`}>
+                            <span className="summer-court-calendar-events-petal">Petal {entry.petal}</span>
+                            <span className="summer-court-calendar-events-names">
+                              {entry.holidayNames.map((holidayName) => getHolidayChipLabel(holidayName)).join(" · ")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="summer-court-calendar-events-empty">No festival markers in this bloom.</p>
                   )}
                 </div>
               </div>
