@@ -423,7 +423,7 @@ export default function HomePage() {
                     <span>{formatTimeHHMM(campaignDate.bell, campaignDate.chime)}</span>
                   </div>
                 </div>
-                <div className="summer-court-nearby">
+                <div className="summer-court-nearby summer-court-nearby--mobile">
                   <div className="summer-court-nearby-header">
                     <p className="summer-court-nearby-title">Nearby petals</p>
                     <span className="summer-court-nearby-meta">
@@ -561,7 +561,7 @@ export default function HomePage() {
               </div>
             </>
           ) : (
-            <p className="topbar-meta">Campaign date not set yet.</p>
+            <p className="topbar-meta summer-court-calendar-fallback">Campaign date not set yet.</p>
           )}
         </article>
 
