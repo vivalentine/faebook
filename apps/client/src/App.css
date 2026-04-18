@@ -3117,6 +3117,18 @@
   width: 180px;
 }
 
+.documents-card-excerpt {
+  display: -webkit-box;
+  margin-top: 6px;
+  color: #cfc7df;
+  line-height: 1.45;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+
 .documents-reader-card {
   background: linear-gradient(180deg, #171729 0%, #131321 100%);
 }
