@@ -46,6 +46,7 @@ export default function HomePage() {
   const [addingSuspect, setAddingSuspect] = useState(false);
   const [viewedBloomIndex, setViewedBloomIndex] = useState<number>(1);
   const [calendarMotionDirection, setCalendarMotionDirection] = useState<"forward" | "backward">("forward");
+  const [isFullBloomExpanded, setIsFullBloomExpanded] = useState(false);
 
 
   const [recapChapterNumber, setRecapChapterNumber] = useState("");
@@ -91,6 +92,35 @@ export default function HomePage() {
     () => toSummerCourtDateTimeOrNull(dashboard?.campaign_date || undefined),
     [dashboard?.campaign_date],
   );
+  const viewedBloomHolidayEntries = useMemo(
+    () =>
+      Array.from({ length: 28 }, (_, index) => {
+        const petal = index + 1;
+        const holidayNames = getHolidayNamesForPetal(viewedBloomIndex, petal);
+        return {
+          petal,
+          holidayNames,
+        };
+      }).filter((entry) => entry.holidayNames.length > 0),
+    [viewedBloomIndex],
+  );
+  const nearbyPetalEntries = useMemo(() => {
+    if (!campaignDate) {
+      return [];
+    }
+
+    const stripSize = 7;
+    const centeredStart = Math.max(1, campaignDate.petal - Math.floor(stripSize / 2));
+    const startPetal = Math.min(28 - stripSize + 1, centeredStart);
+
+    return Array.from({ length: stripSize }, (_, index) => {
+      const petal = startPetal + index;
+      return {
+        petal,
+        holidayNames: getHolidayNamesForPetal(viewedBloomIndex, petal),
+      };
+    });
+  }, [campaignDate, viewedBloomIndex]);
 
   useEffect(() => {
     if (campaignDate) {
@@ -340,12 +370,21 @@ export default function HomePage() {
           <h2>Summer Court Calendar</h2>
           {campaignDate ? (
             <>
-              <p className="topbar-meta">
-                Today: {formatSummerCourtDate(campaignDate)} · {getPetalCycleNameFromPetal(campaignDate.petal)} ·{" "}
-                {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
-              </p>
+              <div className="summer-court-current-summary" aria-label="Current Summer Court date">
+                <p className="summer-court-current-summary-date">{formatSummerCourtDate(campaignDate)}</p>
+                <p className="summer-court-current-summary-meta">
+                  {getPetalCycleNameFromPetal(campaignDate.petal)} · {formatTimeHHMM(campaignDate.bell, campaignDate.chime)}
+                </p>
+              </div>
               <div className="summer-court-calendar">
                 <div className="summer-court-calendar-head">
+                  <div className="summer-court-calendar-title-wrap">
+                    <span className="summer-court-calendar-kicker">Bloom View</span>
+                    <strong>{getBloomName(viewedBloomIndex)} Bloom</strong>
+                    <span className="summer-court-calendar-head-meta">
+                      Crown Year {campaignDate.crown_year} · Bloom {viewedBloomIndex} of 12
+                    </span>
+                  </div>
                   <div className="summer-court-calendar-nav" aria-label="Summer Court bloom navigation">
                     <button
                       type="button"
@@ -374,16 +413,72 @@ export default function HomePage() {
                       →
                     </button>
                   </div>
-                  <div className="summer-court-calendar-title-wrap">
-                    <strong>{getBloomName(viewedBloomIndex)} Bloom</strong>
-                    <span className="summer-court-calendar-head-meta">
-                      Crown Year {campaignDate.crown_year} · Bloom {viewedBloomIndex} of 12
-                    </span>
+                </div>
+                <div className="summer-court-focus-strip" aria-label="Current Summer Court moment">
+                  <p className="summer-court-focus-strip-title">Current moment</p>
+                  <div className="summer-court-focus-strip-values">
+                    <span>{getBloomName(campaignDate.bloom_index)}</span>
+                    <span>Petal {campaignDate.petal}</span>
+                    <span>{getPetalCycleNameFromPetal(campaignDate.petal)}</span>
+                    <span>{formatTimeHHMM(campaignDate.bell, campaignDate.chime)}</span>
                   </div>
                 </div>
+                <div className="summer-court-nearby">
+                  <div className="summer-court-nearby-header">
+                    <p className="summer-court-nearby-title">Nearby petals</p>
+                    <span className="summer-court-nearby-meta">
+                      Centered on petal {campaignDate.petal}
+                    </span>
+                  </div>
+                  <div className="summer-court-nearby-strip" role="list" aria-label="Nearby petals">
+                    {nearbyPetalEntries.map((entry) => {
+                      const isPastBloom = viewedBloomIndex < campaignDate.bloom_index;
+                      const isCurrentBloom = viewedBloomIndex === campaignDate.bloom_index;
+                      const isPastPetal = isPastBloom || (isCurrentBloom && entry.petal < campaignDate.petal);
+                      const isCurrentPetal = isCurrentBloom && entry.petal === campaignDate.petal;
+                      const classNames = [
+                        "summer-court-nearby-petal",
+                        isPastPetal ? "is-past" : "",
+                        isCurrentPetal ? "is-current" : "",
+                        entry.holidayNames.length ? "is-holiday" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+
+                      return (
+                        <div key={`nearby-${entry.petal}`} className={classNames} role="listitem" title={entry.holidayNames.join(" · ") || undefined}>
+                          <span className="summer-court-nearby-petal-number-wrap">
+                            <span className="summer-court-nearby-petal-number">{entry.petal}</span>
+                            {entry.holidayNames.length ? (
+                              <span
+                                className={
+                                  entry.holidayNames.includes("Solstice Day") || entry.holidayNames.includes("Solstice Masquerade")
+                                    ? "summer-court-petal-holiday-dot summer-court-petal-holiday-dot--accent"
+                                    : "summer-court-petal-holiday-dot"
+                                }
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                          </span>
+                          <span className="summer-court-nearby-petal-cycle">
+                            {getPetalCycleNameFromPetal(entry.petal).replace(/petal$/i, "")}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="summer-court-expand-toggle"
+                  aria-expanded={isFullBloomExpanded}
+                  onClick={() => setIsFullBloomExpanded((current) => !current)}
+                >
+                  {isFullBloomExpanded ? "Hide full bloom" : "Show full bloom"}
+                </button>
                 <div
                   key={`summer-bloom-${viewedBloomIndex}`}
-                  className={`summer-court-calendar-grid summer-court-calendar-grid--${calendarMotionDirection}`}
+                  className={`summer-court-calendar-grid summer-court-calendar-grid--${calendarMotionDirection} ${isFullBloomExpanded ? "is-expanded" : ""}`}
                 >
                   {PETAL_CYCLE.map((cycle) => (
                     <div
@@ -414,7 +509,19 @@ export default function HomePage() {
 
                       return (
                         <div key={petal} className={classNames} title={holidayNames.join(" · ") || undefined}>
-                          <span className="summer-court-petal-number">{petal}</span>
+                          <span className="summer-court-petal-number-wrap">
+                            <span className="summer-court-petal-number">{petal}</span>
+                            {holidayNames.length ? (
+                              <span
+                                className={
+                                  holidayNames.includes("Solstice Day") || holidayNames.includes("Solstice Masquerade")
+                                    ? "summer-court-petal-holiday-dot summer-court-petal-holiday-dot--accent"
+                                    : "summer-court-petal-holiday-dot"
+                                }
+                                aria-hidden="true"
+                              />
+                            ) : null}
+                          </span>
                           {holidayNames.map((holidayName) => (
                             <span
                               key={holidayName}
@@ -430,6 +537,25 @@ export default function HomePage() {
                         </div>
                       );
                     }),
+                  )}
+                </div>
+                <div className="summer-court-calendar-events" aria-live="polite">
+                  {viewedBloomHolidayEntries.length ? (
+                    <>
+                      <p className="summer-court-calendar-events-title">Bloom events and holidays</p>
+                      <ul className="summer-court-calendar-events-list">
+                        {viewedBloomHolidayEntries.map((entry) => (
+                          <li key={`${viewedBloomIndex}-${entry.petal}`}>
+                            <span className="summer-court-calendar-events-petal">Petal {entry.petal}</span>
+                            <span className="summer-court-calendar-events-names">
+                              {entry.holidayNames.map((holidayName) => getHolidayChipLabel(holidayName)).join(" · ")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="summer-court-calendar-events-empty">No festival markers in this bloom.</p>
                   )}
                 </div>
               </div>
