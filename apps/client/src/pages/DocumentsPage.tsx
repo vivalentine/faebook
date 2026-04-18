@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import FaeSelect from "../components/FaeSelect";
 import { renderRecapMarkdown } from "../components/RecapMarkdown";
 import { apiFetch } from "../lib/api";
+import { formatMarkdownPreview } from "../lib/markdownPreview";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
 import type { CampaignDocument } from "../types";
 
@@ -24,11 +25,6 @@ const EMPTY_FORM: DocumentFormState = {
   published: false,
   sort_order: "0",
 };
-
-function excerpt(text: string) {
-  const compact = text.replace(/\s+/g, " ").trim();
-  return compact.length > 180 ? `${compact.slice(0, 180)}…` : compact;
-}
 
 function toSlug(value: string) {
   return value
@@ -257,7 +253,7 @@ export default function DocumentsPage() {
                         {doc.published ? "Published" : "Draft"}
                       </span>
                     ) : null}
-                    <span className="topbar-meta">{excerpt(doc.body_markdown)}</span>
+                    <span className="topbar-meta documents-card-excerpt">{formatMarkdownPreview(doc.body_markdown)}</span>
                   </Link>
                   {isDm ? (
                     <div className="chapter-list-admin-actions">
