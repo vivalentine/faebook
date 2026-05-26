@@ -155,6 +155,11 @@ export default function WhisperNetworkPage() {
   const [heartAnimationByPostId, setHeartAnimationByPostId] = useState<Record<number, "like" | "unlike" | null>>({});
   const heartAnimationTimersRef = useRef<Record<number, number>>({});
   const [campaignDateTime, setCampaignDateTime] = useState<SummerCourtDateTime | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createPostTitleDraft, setCreatePostTitleDraft] = useState("");
+  const [createPostBodyDraft, setCreatePostBodyDraft] = useState("");
+  const [createPostError, setCreatePostError] = useState("");
+  const [isCreatingPost, setIsCreatingPost] = useState(false);
 
   const sortedPosts = useMemo(() => sortWhisperPosts(posts, sortMode), [posts, sortMode]);
 
@@ -236,6 +241,17 @@ export default function WhisperNetworkPage() {
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isReaderOpen]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsCreateModalOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isCreateModalOpen]);
 
   useEffect(
     () => () => {
@@ -342,6 +358,42 @@ export default function WhisperNetworkPage() {
       setError(commentError instanceof Error ? commentError.message : "Failed to post comment");
     } finally {
       setIsSubmittingCommentByPostId((current) => ({ ...current, [postId]: false }));
+    }
+  }
+
+  async function createPostFromFeed() {
+    const title = createPostTitleDraft.trim();
+    const body = createPostBodyDraft.trim();
+    if (!title || !body) {
+      setCreatePostError("Title and rumor text are required.");
+      return;
+    }
+
+    try {
+      setIsCreatingPost(true);
+      setCreatePostError("");
+      setError("");
+      const response = await apiFetch("/api/whisper/posts", {
+        method: "POST",
+        body: JSON.stringify({ title, body }),
+      });
+      const data = (await response.json()) as WhisperPost | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || "Failed to publish rumor");
+      }
+      const createdPost = data as WhisperPost;
+      setIsCreateModalOpen(false);
+      setCreatePostTitleDraft("");
+      setCreatePostBodyDraft("");
+      setSelectedPostId(createdPost.id);
+      setIsReaderOpen(true);
+      setPosts((current) => [createdPost, ...current.filter((post) => post.id !== createdPost.id)]);
+      await loadPostDetails(createdPost.id);
+      await loadFeed({ preferredSelectedPostId: createdPost.id });
+    } catch (createError) {
+      setCreatePostError(createError instanceof Error ? createError.message : "Failed to publish rumor");
+    } finally {
+      setIsCreatingPost(false);
     }
   }
 
@@ -586,6 +638,9 @@ export default function WhisperNetworkPage() {
           <div className="documents-index-header whisper-feed-header">
             <h2>Rumor Feed</h2>
             <div className="whisper-feed-tools">
+              <button type="button" className="action-button whisper-new-post-button" onClick={() => setIsCreateModalOpen(true)}>
+                New Post
+              </button>
               <label className="whisper-sort-label">
                 <span className="topbar-meta">Sort</span>
                 <FaeSelect
@@ -831,6 +886,51 @@ export default function WhisperNetworkPage() {
                   {isSubmittingCommentByPostId[activePost.id] ? "Posting…" : "Post anonymous comment"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreateModalOpen ? (
+        <div className="board-modal-overlay" role="presentation" onClick={() => setIsCreateModalOpen(false)}>
+          <div
+            className="board-modal whisper-create-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Create new whisper post"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dashboard-recap-editor-header">
+              <h2>New anonymous rumor</h2>
+              <button type="button" className="secondary-link" onClick={() => setIsCreateModalOpen(false)}>
+                Cancel
+              </button>
+            </div>
+            {createPostError ? <p className="error-banner">{createPostError}</p> : null}
+            <input
+              className="text-input"
+              placeholder="Rumor title"
+              maxLength={160}
+              value={createPostTitleDraft}
+              onChange={(event) => setCreatePostTitleDraft(event.target.value)}
+            />
+            <textarea
+              className="text-area"
+              rows={6}
+              placeholder="Share what you heard…"
+              maxLength={5000}
+              value={createPostBodyDraft}
+              onChange={(event) => setCreatePostBodyDraft(event.target.value)}
+            />
+            <div className="dashboard-row-actions whisper-create-modal-actions">
+              <button
+                type="button"
+                className="action-button"
+                disabled={isCreatingPost}
+                onClick={() => void createPostFromFeed()}
+              >
+                {isCreatingPost ? "Posting…" : "Post anonymous rumor"}
+              </button>
             </div>
           </div>
         </div>
