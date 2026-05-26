@@ -902,9 +902,6 @@ export default function WhisperNetworkPage() {
           >
             <div className="dashboard-recap-editor-header">
               <h2>New anonymous rumor</h2>
-              <button type="button" className="secondary-link" onClick={() => setIsCreateModalOpen(false)}>
-                Cancel
-              </button>
             </div>
             {createPostError ? <p className="error-banner">{createPostError}</p> : null}
             <input
@@ -922,7 +919,10 @@ export default function WhisperNetworkPage() {
               value={createPostBodyDraft}
               onChange={(event) => setCreatePostBodyDraft(event.target.value)}
             />
-            <div className="dashboard-row-actions whisper-create-modal-actions">
+            <div className="dashboard-row-actions whisper-create-modal-actions whisper-new-post-actions">
+              <button type="button" className="secondary-link" onClick={() => setIsCreateModalOpen(false)}>
+                Cancel
+              </button>
               <button
                 type="button"
                 className="action-button"
