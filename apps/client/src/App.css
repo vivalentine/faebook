@@ -3271,6 +3271,17 @@
   justify-content: flex-end;
 }
 
+.whisper-new-post-actions {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.whisper-new-post-actions .action-button {
+  margin-left: auto;
+}
+
 .whisper-sort-label {
   display: inline-flex;
   align-items: center;
