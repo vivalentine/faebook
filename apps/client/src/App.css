@@ -3259,6 +3259,18 @@
   flex: 0 0 auto;
 }
 
+.whisper-new-post-button {
+  white-space: nowrap;
+}
+
+.whisper-create-modal {
+  width: min(680px, 100%);
+}
+
+.whisper-create-modal-actions {
+  justify-content: flex-end;
+}
+
 .whisper-sort-label {
   display: inline-flex;
   align-items: center;

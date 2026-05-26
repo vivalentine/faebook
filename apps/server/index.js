@@ -4857,15 +4857,14 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
   });
 });
 
-app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
+app.post("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
   const sessionUser = req.session.user;
-  const title = String(req.body?.title || "").trim();
-  const body = String(req.body?.body || "").trim();
+  const isDm = sessionUser.role === "dm";
+  const title = limitString(req.body?.title, 160).trim();
+  const body = limitString(req.body?.body, 5000).trim();
   const parsedViewCount = Number.parseInt(String(req.body?.view_count ?? "0"), 10);
   const parsedLikeCount = Number.parseInt(String(req.body?.like_count ?? "0"), 10);
-  const viewCount = Number.isInteger(parsedViewCount) && parsedViewCount >= 0 ? parsedViewCount : 0;
-  const likeCount = Number.isInteger(parsedLikeCount) && parsedLikeCount >= 0 ? parsedLikeCount : 0;
-  const summerCourtInput = parseSummerCourtDateTimeInput(req.body || {});
+  const summerCourtInput = isDm ? parseSummerCourtDateTimeInput(req.body || {}) : { value: null, issues: [] };
 
   if (!title || !body) {
     return res.status(400).json({ error: "Title and body are required" });
@@ -4875,6 +4874,21 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
     return res.status(400).json({ error: summerCourtInput.issues.join(", ") });
   }
 
+  if (!isDm && (req.body?.view_count !== undefined || req.body?.like_count !== undefined)) {
+    return res.status(400).json({ error: "Only title and body are allowed" });
+  }
+
+  if (
+    !isDm &&
+    ["crown_year", "bloom_index", "petal", "bell", "chime"].some(
+      (field) => req.body?.[field] !== undefined && req.body?.[field] !== null && String(req.body?.[field]).trim() !== ""
+    )
+  ) {
+    return res.status(400).json({ error: "Only title and body are allowed" });
+  }
+
+  const viewCount = isDm && Number.isInteger(parsedViewCount) && parsedViewCount >= 0 ? parsedViewCount : 0;
+  const likeCount = isDm && Number.isInteger(parsedLikeCount) && parsedLikeCount >= 0 ? parsedLikeCount : 0;
   const campaignDate = getCampaignDateState();
   const whisperTimestamp = summerCourtInput.value || {
     crown_year: Number(campaignDate.crown_year),
@@ -4947,12 +4961,12 @@ app.post("/api/whisper/posts", requireRole("dm"), (req, res) => {
           updated_at,
           0 AS comment_count,
           0 AS liked_by_me,
-          1 AS can_moderate
+          CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
         FROM whisper_posts
         WHERE id = ?
       `
     )
-    .get(postId);
+    .get(sessionUser.role, postId);
 
   return res.status(201).json(mapWhisperPostForClient(post));
 });
