@@ -22,7 +22,7 @@ const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> 
   { value: "comments", label: "Most commented", icon: "chat-bubble" },
 ];
 
-const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";
+const DEFAULT_WHISPER_SORT: WhisperSortMode = "recent";
 const WHISPER_FEEDBACK_MS = 820;
 const WHISPER_HEART_ANIMATION_MS = 520;
 
