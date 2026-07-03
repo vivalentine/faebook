@@ -4846,7 +4846,14 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
           CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
         FROM whisper_comments AS comments
         WHERE comments.post_id = ?
-        ORDER BY comments.created_at ASC, comments.id ASC
+        ORDER BY
+          comments.crown_year DESC,
+          comments.bloom_index DESC,
+          comments.petal DESC,
+          comments.bell DESC,
+          comments.chime DESC,
+          comments.created_at DESC,
+          comments.id DESC
       `
     )
     .all(sessionUser.role, postId);
