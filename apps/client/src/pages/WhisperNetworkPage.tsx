@@ -22,7 +22,7 @@ const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> 
   { value: "comments", label: "Most commented", icon: "chat-bubble" },
 ];
 
-const DEFAULT_WHISPER_SORT: WhisperSortMode = "trending";
+const DEFAULT_WHISPER_SORT: WhisperSortMode = "recent";
 const WHISPER_FEEDBACK_MS = 820;
 const WHISPER_HEART_ANIMATION_MS = 520;
 
@@ -79,13 +79,33 @@ function getCommentTimestamp(comment: WhisperComment): string {
 }
 
 
-function getWhisperRecentSortTimestamp(post: WhisperPost): number {
-  const dt = getSummerCourtFromWhisperRecord(post);
+function getWhisperRecentSortValue(record: {
+  crown_year: number | null;
+  bloom_index: number | null;
+  petal: number | null;
+  bell: number | null;
+  chime: number | null;
+  created_at: string;
+}): number {
+  const dt = getSummerCourtFromWhisperRecord(record);
   if (dt) {
-    return dt.crown_year * 10_000_000 + dt.bloom_index * 100_000 + dt.petal * 1_000 + dt.bell * 60 + dt.chime;
+    return (((dt.crown_year * 12 + dt.bloom_index) * 28 + dt.petal) * 24 + dt.bell) * 60 + dt.chime;
   }
-  const createdTime = Date.parse(post.created_at);
+
+  const createdTime = Date.parse(record.created_at);
   return Number.isFinite(createdTime) ? createdTime : 0;
+}
+
+function getWhisperRecentSortTimestamp(post: WhisperPost): number {
+  return getWhisperRecentSortValue(post);
+}
+
+function sortWhisperCommentsByRecent(comments: WhisperComment[]): WhisperComment[] {
+  return [...comments].sort((a, b) => {
+    const diff = getWhisperRecentSortValue(b) - getWhisperRecentSortValue(a);
+    if (diff !== 0) return diff;
+    return b.id - a.id;
+  });
 }
 
 function getWhisperTrendingScore(post: WhisperPost): number {
@@ -282,7 +302,10 @@ export default function WhisperNetworkPage() {
         throw new Error((data as { error?: string }).error || "Failed to load post details");
       }
       const detail = data as WhisperPostDetailResponse;
-      setCommentsByPostId((current) => ({ ...current, [postId]: detail.comments || [] }));
+      setCommentsByPostId((current) => ({
+        ...current,
+        [postId]: sortWhisperCommentsByRecent(detail.comments || []),
+      }));
       setPosts((current) => current.map((post) => (post.id === postId ? detail.post : post)));
     } catch (detailsError) {
       setError(detailsError instanceof Error ? detailsError.message : "Failed to load post details");
@@ -344,7 +367,7 @@ export default function WhisperNetworkPage() {
       const createdComment = data as WhisperComment;
       setCommentsByPostId((current) => ({
         ...current,
-        [postId]: [...(current[postId] || []), createdComment],
+        [postId]: sortWhisperCommentsByRecent([...(current[postId] || []), createdComment]),
       }));
       setCommentDraftByPostId((current) => ({ ...current, [postId]: "" }));
       setPosts((current) =>
@@ -609,8 +632,10 @@ export default function WhisperNetworkPage() {
       const updatedComment = data as WhisperComment;
       setCommentsByPostId((current) => ({
         ...current,
-        [comment.post_id]: (current[comment.post_id] || []).map((entry) =>
-          entry.id === comment.id ? updatedComment : entry,
+        [comment.post_id]: sortWhisperCommentsByRecent(
+          (current[comment.post_id] || []).map((entry) =>
+            entry.id === comment.id ? updatedComment : entry,
+          ),
         ),
       }));
       resetCommentTimeForm();
