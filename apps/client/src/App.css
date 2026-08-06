@@ -2612,6 +2612,10 @@
   color: #c9b4ff;
 }
 
+.dashboard-markdown s {
+  opacity: 0.78;
+}
+
 .reader-prose {
   --reader-text: #e6def8;
   --reader-heading: #f6efff;
