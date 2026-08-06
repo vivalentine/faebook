@@ -8,7 +8,7 @@ type RenderRecapMarkdownOptions = {
 
 function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions) {
   const nodes: ReactNode[] = [];
-  const pattern = /(!\[[^\]]*]\([^)]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  const pattern = /(!\[[^\]]*]\([^)]+\)|~~[^~]+~~|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
   let lastIndex = 0;
   let matchIndex = 0;
   let match: RegExpExecArray | null = pattern.exec(text);
@@ -25,7 +25,13 @@ function renderInlineMarkdown(text: string, options: RenderRecapMarkdownOptions)
     }
 
     const token = match[0];
-    if (token.startsWith("**") && token.endsWith("**")) {
+    if (token.startsWith("~~") && token.endsWith("~~")) {
+      nodes.push(
+        <s key={`strikethrough-${matchIndex}`}>
+          <WikiInlineText text={token.slice(2, -2)} entityIndex={options.entityIndex} />
+        </s>,
+      );
+    } else if (token.startsWith("**") && token.endsWith("**")) {
       nodes.push(
         <strong key={`strong-${matchIndex}`}>
           <WikiInlineText text={token.slice(2, -2)} entityIndex={options.entityIndex} />
