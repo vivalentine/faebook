@@ -12,7 +12,7 @@ import {
   toSummerCourtDateTimeOrNull,
   type SummerCourtDateTime,
 } from "../lib/summerCourtCalendar";
-import type { DashboardData, WhisperComment, WhisperPost, WhisperSortMode } from "../types";
+import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
 
 const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> = [
   { value: "trending", label: "Trending", icon: "flame" },
@@ -40,6 +40,8 @@ type WhisperPostDetailResponse = {
   post: WhisperPost;
   comments: WhisperComment[];
 };
+
+type CampaignDateResponse = SummerCourtDateTime & { updated_at: string };
 
 function getSummerCourtFromWhisperRecord(record: {
   crown_year: number | null;
@@ -174,6 +176,9 @@ export default function WhisperNetworkPage() {
   const [isSavingCommentTime, setIsSavingCommentTime] = useState(false);
   const [heartAnimationByPostId, setHeartAnimationByPostId] = useState<Record<number, "like" | "unlike" | null>>({});
   const heartAnimationTimersRef = useRef<Record<number, number>>({});
+  const campaignUpdatedAtRef = useRef<string | null>(null);
+  const selectedPostIdRef = useRef<number | null>(null);
+  const isReaderOpenRef = useRef(false);
   const [campaignDateTime, setCampaignDateTime] = useState<SummerCourtDateTime | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createPostTitleDraft, setCreatePostTitleDraft] = useState("");
@@ -207,20 +212,22 @@ export default function WhisperNetworkPage() {
         setLoading(true);
         setError("");
       }
-      const [feedResponse, dashboardResponse] = await Promise.all([
+      const [feedResponse, campaignDateResponse] = await Promise.all([
         apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`),
-        apiFetch("/api/dashboard"),
+        apiFetch("/api/campaign-date"),
       ]);
       const data = (await feedResponse.json()) as WhisperFeedResponse | { error?: string };
-      const dashboardData = (await dashboardResponse.json()) as DashboardData | { error?: string };
+      const campaignDateData = (await campaignDateResponse.json()) as CampaignDateResponse | { error?: string };
       if (!feedResponse.ok) {
         throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
       }
-      if (!dashboardResponse.ok) {
-        throw new Error((dashboardData as { error?: string }).error || "Failed to load campaign date");
+      if (!campaignDateResponse.ok) {
+        throw new Error((campaignDateData as { error?: string }).error || "Failed to load campaign date");
       }
 
-      setCampaignDateTime(toSummerCourtDateTimeOrNull((dashboardData as DashboardData).campaign_date || undefined));
+      const nextCampaignDate = campaignDateData as CampaignDateResponse;
+      setCampaignDateTime(toSummerCourtDateTimeOrNull(nextCampaignDate));
+      campaignUpdatedAtRef.current = nextCampaignDate.updated_at;
 
       const loadedPosts = (data as WhisperFeedResponse).posts || [];
       setPosts(loadedPosts);
@@ -233,8 +240,12 @@ export default function WhisperNetworkPage() {
         if (current && loadedPostIdSet.has(current)) {
           return current;
         }
+        if (current && isReaderOpenRef.current) {
+          setIsReaderOpen(false);
+        }
         return loadedPosts[0]?.id ?? null;
       });
+      return loadedPostIdSet;
     } catch (loadError) {
       if (!silent) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
@@ -249,6 +260,47 @@ export default function WhisperNetworkPage() {
 
   useEffect(() => {
     void loadFeed();
+  }, [sortMode]);
+
+  useEffect(() => {
+    selectedPostIdRef.current = selectedPostId;
+  }, [selectedPostId]);
+
+  useEffect(() => {
+    isReaderOpenRef.current = isReaderOpen;
+  }, [isReaderOpen]);
+
+  useEffect(() => {
+    let disposed = false;
+    let pollInFlight = false;
+
+    async function pollCampaignDate() {
+      if (pollInFlight) return;
+      pollInFlight = true;
+      try {
+        const response = await apiFetch("/api/campaign-date");
+        const data = (await response.json()) as CampaignDateResponse | { error?: string };
+        if (!response.ok || disposed) return;
+        const next = data as CampaignDateResponse;
+        const previousUpdatedAt = campaignUpdatedAtRef.current;
+        campaignUpdatedAtRef.current = next.updated_at;
+        setCampaignDateTime(toSummerCourtDateTimeOrNull(next));
+        if (previousUpdatedAt && previousUpdatedAt !== next.updated_at) {
+          const openPostId = isReaderOpenRef.current ? selectedPostIdRef.current : null;
+          const visiblePostIds = await loadFeed({ preferredSelectedPostId: openPostId, silent: true });
+          if (disposed || !openPostId || !visiblePostIds?.has(openPostId)) return;
+          await loadPostDetails(openPostId, { silent: true });
+        }
+      } finally {
+        pollInFlight = false;
+      }
+    }
+
+    const intervalId = window.setInterval(() => void pollCampaignDate(), 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
   }, [sortMode]);
 
   useEffect(() => {
@@ -294,11 +346,16 @@ export default function WhisperNetworkPage() {
     }, WHISPER_HEART_ANIMATION_MS);
   }
 
-  async function loadPostDetails(postId: number) {
+  async function loadPostDetails(postId: number, options?: { silent?: boolean }) {
     try {
       const response = await apiFetch(`/api/whisper/posts/${postId}`);
       const data = (await response.json()) as WhisperPostDetailResponse | { error?: string };
       if (!response.ok) {
+        if (response.status === 404 && options?.silent) {
+          setSelectedPostId(null);
+          setIsReaderOpen(false);
+          return false;
+        }
         throw new Error((data as { error?: string }).error || "Failed to load post details");
       }
       const detail = data as WhisperPostDetailResponse;
@@ -307,8 +364,12 @@ export default function WhisperNetworkPage() {
         [postId]: sortWhisperCommentsByRecent(detail.comments || []),
       }));
       setPosts((current) => current.map((post) => (post.id === postId ? detail.post : post)));
+      return true;
     } catch (detailsError) {
-      setError(detailsError instanceof Error ? detailsError.message : "Failed to load post details");
+      if (!options?.silent) {
+        setError(detailsError instanceof Error ? detailsError.message : "Failed to load post details");
+      }
+      return false;
     }
   }
 

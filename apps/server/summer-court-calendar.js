@@ -80,6 +80,44 @@ function validateSummerCourtDateTime(dt) {
   return issues;
 }
 
+const SUMMER_COURT_TIMESTAMP_FIELDS = ["crown_year", "bloom_index", "petal", "bell", "chime"];
+
+function hasCompleteSummerCourtTimestamp(value = {}) {
+  return SUMMER_COURT_TIMESTAMP_FIELDS.every(
+    (field) => value[field] !== null && value[field] !== undefined && value[field] !== "" && Number.isInteger(Number(value[field]))
+  );
+}
+
+function compareSummerCourtTimestamps(left, right) {
+  if (!hasCompleteSummerCourtTimestamp(left) || !hasCompleteSummerCourtTimestamp(right)) {
+    return null;
+  }
+
+  for (const field of SUMMER_COURT_TIMESTAMP_FIELDS) {
+    const difference = Number(left[field]) - Number(right[field]);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+function isSummerCourtTimestampVisible(timestamp, campaignState) {
+  const comparison = compareSummerCourtTimestamps(timestamp, campaignState);
+  return comparison === null || comparison <= 0;
+}
+
+function buildSummerCourtVisibilitySql(tableAlias, campaignState) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(tableAlias || ""))) {
+    throw new Error("Invalid Summer Court SQL table alias");
+  }
+  if (!hasCompleteSummerCourtTimestamp(campaignState)) {
+    throw new Error("Campaign state must contain a complete Summer Court timestamp");
+  }
+
+  const columns = SUMMER_COURT_TIMESTAMP_FIELDS.map((field) => `${tableAlias}.${field}`);
+  const campaignTuple = SUMMER_COURT_TIMESTAMP_FIELDS.map((field) => Number(campaignState[field])).join(", ");
+  return `((${columns.join(" IS NULL OR ")} IS NULL) OR (${columns.join(", ")}) <= (${campaignTuple}))`;
+}
+
 module.exports = {
   BLOOMS,
   PETAL_CYCLE,
@@ -91,4 +129,9 @@ module.exports = {
   getPetalCycleNameFromPetal,
   getBellPeriodName,
   validateSummerCourtDateTime,
+  SUMMER_COURT_TIMESTAMP_FIELDS,
+  hasCompleteSummerCourtTimestamp,
+  compareSummerCourtTimestamps,
+  isSummerCourtTimestampVisible,
+  buildSummerCourtVisibilitySql,
 };

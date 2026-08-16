@@ -1,4 +1,5 @@
 const { buildSnippetPayload, getQueryTerms } = require("./search-snippets");
+const { buildSummerCourtVisibilitySql } = require("./summer-court-calendar");
 
 const DEFAULT_LIMIT = 40;
 const MAX_LIMIT = 100;
@@ -621,6 +622,10 @@ function searchForDm({ db, query, searchPattern, sourceLimit }) {
 
 function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit }) {
   const results = [];
+  const campaignState = db
+    .prepare("SELECT crown_year, bloom_index, petal, bell, chime FROM campaign_state WHERE id = 1")
+    .get();
+  const whisperVisibilitySql = buildSummerCourtVisibilitySql("whisper_posts", campaignState);
 
   const npcRows = db
     .prepare(
@@ -927,7 +932,8 @@ function searchForPlayer({ db, sessionUserId, query, searchPattern, sourceLimit 
       `
         SELECT id, title, body, updated_at
         FROM whisper_posts
-        WHERE LOWER(title) LIKE ? OR LOWER(body) LIKE ?
+        WHERE ${whisperVisibilitySql}
+          AND (LOWER(title) LIKE ? OR LOWER(body) LIKE ?)
         ORDER BY updated_at DESC, id DESC
         LIMIT ?
       `
