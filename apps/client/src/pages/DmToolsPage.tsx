@@ -6,6 +6,8 @@ import {
   formatSummerCourtDateTimeFull,
   toSummerCourtDateTimeOrNull,
 } from "../lib/summerCourtCalendar";
+import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
+import type { PresentationState, WinterInterferenceLevel } from "../types";
 
 type CampaignDateState = {
   crown_year: number;
@@ -138,6 +140,7 @@ type NpcCleanupItem = {
 };
 
 export default function DmToolsPage() {
+  const { refreshLiveState } = useLiveCampaignState();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [locationPreview, setLocationPreview] = useState<LocationImportPreview | null>(null);
   const [whisperPreview, setWhisperPreview] = useState<WhisperImportPreview | null>(null);
@@ -154,6 +157,8 @@ export default function DmToolsPage() {
   const [campaignPetalDraft, setCampaignPetalDraft] = useState("18");
   const [campaignBellDraft, setCampaignBellDraft] = useState("");
   const [campaignChimeDraft, setCampaignChimeDraft] = useState("");
+  const [presentationState, setPresentationState] = useState<PresentationState | null>(null);
+  const [presentationBusy, setPresentationBusy] = useState(false);
 
   useEffect(() => {
     void refresh();
@@ -171,6 +176,7 @@ export default function DmToolsPage() {
         logsResponse,
         cleanupResponse,
         campaignDateResponse,
+        presentationResponse,
       ] = await Promise.all([
         apiFetch("/api/dm/import/staging"),
         apiFetch("/api/dm/location-import/staging"),
@@ -178,6 +184,7 @@ export default function DmToolsPage() {
         apiFetch("/api/dm/import/logs"),
         apiFetch("/api/dm/npcs?include_archived=1"),
         apiFetch("/api/dm/campaign-date"),
+        apiFetch("/api/live-state"),
       ]);
 
       if (!previewResponse.ok) {
@@ -199,6 +206,9 @@ export default function DmToolsPage() {
       if (!campaignDateResponse.ok) {
         throw new Error(`Failed loading campaign date: ${campaignDateResponse.status}`);
       }
+      if (!presentationResponse.ok) {
+        throw new Error(`Failed loading presentation state: ${presentationResponse.status}`);
+      }
 
       setPreview(await previewResponse.json());
       setLocationPreview(await locationPreviewResponse.json());
@@ -212,6 +222,8 @@ export default function DmToolsPage() {
       setCampaignPetalDraft(String(loadedCampaignDate.petal));
       setCampaignBellDraft(String(loadedCampaignDate.bell));
       setCampaignChimeDraft(String(loadedCampaignDate.chime));
+      const liveState = (await presentationResponse.json()) as { presentation: PresentationState };
+      setPresentationState(liveState.presentation);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -611,6 +623,27 @@ export default function DmToolsPage() {
     }
   }
 
+  async function setWinterInterference(level: WinterInterferenceLevel) {
+    try {
+      setPresentationBusy(true);
+      setError("");
+      const response = await apiFetch("/api/dm/presentation-state", {
+        method: "PUT",
+        body: JSON.stringify({ winter_interference_level: level }),
+      });
+      const data = (await response.json()) as PresentationState | { error?: string };
+      if (!response.ok) {
+        throw new Error((data as { error?: string }).error || `Update failed: ${response.status}`);
+      }
+      setPresentationState(data as PresentationState);
+      await refreshLiveState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setPresentationBusy(false);
+    }
+  }
+
   const campaignPreview = toSummerCourtDateTimeOrNull({
     crown_year: Number.parseInt(campaignYearDraft, 10),
     bloom_index: Number.parseInt(campaignBloomDraft, 10),
@@ -829,6 +862,36 @@ export default function DmToolsPage() {
               Save Campaign Date
             </button>
           </div>
+        </section>
+
+        <section className="state-card winter-control-card">
+          <h2>Winter Interference</h2>
+          <p>
+            Controls Winter corruption effects on player interfaces.<br />
+            DM interfaces are unaffected.
+          </p>
+          <div className="winter-level-control" role="group" aria-label="Winter Interference level">
+            {(["off", "low", "medium", "severe"] as WinterInterferenceLevel[]).map((level) => (
+              <button
+                key={level}
+                className={`action-button winter-level-button ${presentationState?.winter_interference_level === level ? "active" : ""}`.trim()}
+                type="button"
+                aria-pressed={presentationState?.winter_interference_level === level}
+                disabled={presentationBusy}
+                onClick={() => void setWinterInterference(level)}
+              >
+                {level.charAt(0).toUpperCase() + level.slice(1)}
+              </button>
+            ))}
+          </div>
+          <p className="topbar-meta">
+            Current player effect: <strong>{presentationState
+              ? presentationState.winter_interference_level.charAt(0).toUpperCase() + presentationState.winter_interference_level.slice(1)
+              : "Loading…"}</strong>
+          </p>
+          {presentationState ? (
+            <p className="topbar-meta">Last updated: {new Date(presentationState.updated_at).toLocaleString()}</p>
+          ) : null}
         </section>
 
         <section className="state-card">
