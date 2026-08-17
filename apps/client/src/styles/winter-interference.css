@@ -1,0 +1,104 @@
+.winter-interference-layer {
+  --winter-frost-opacity: 0;
+  --winter-frost-depth: 12%;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.winter-interference-layer,
+.winter-interference-layer * {
+  pointer-events: none !important;
+  user-select: none;
+}
+
+.winter-cold-cast,
+.winter-frost,
+.winter-tear,
+.winter-fragments {
+  position: absolute;
+  inset: 0;
+}
+
+.winter-level-low { --winter-frost-opacity: .2; --winter-frost-depth: 8%; }
+.winter-level-medium { --winter-frost-opacity: .42; --winter-frost-depth: 13%; }
+.winter-level-severe { --winter-frost-opacity: .68; --winter-frost-depth: 20%; }
+
+.winter-cold-cast {
+  background: rgba(153, 221, 255, .025);
+}
+
+.winter-level-medium .winter-cold-cast { background: rgba(145, 216, 255, .045); }
+.winter-level-severe .winter-cold-cast { background: rgba(141, 211, 255, .075); }
+
+.winter-frost-primary {
+  opacity: var(--winter-frost-opacity);
+  background:
+    radial-gradient(ellipse at 0 0, rgba(226, 249, 255, .85), transparent var(--winter-frost-depth)),
+    radial-gradient(ellipse at 100% 0, rgba(188, 235, 255, .7), transparent var(--winter-frost-depth)),
+    radial-gradient(ellipse at 0 100%, rgba(180, 229, 255, .68), transparent var(--winter-frost-depth)),
+    radial-gradient(ellipse at 100% 100%, rgba(229, 250, 255, .78), transparent var(--winter-frost-depth)),
+    linear-gradient(90deg, rgba(205, 241, 255, .55), transparent 3%, transparent 97%, rgba(205, 241, 255, .5)),
+    linear-gradient(rgba(222, 247, 255, .5), transparent 4%, transparent 96%, rgba(190, 231, 255, .48));
+  filter: blur(1.5px);
+}
+
+.winter-frost-crystals {
+  opacity: calc(var(--winter-frost-opacity) * .55);
+  background-image:
+    repeating-linear-gradient(132deg, transparent 0 23px, rgba(223, 249, 255, .2) 24px 25px, transparent 26px 51px),
+    repeating-linear-gradient(48deg, transparent 0 37px, rgba(155, 219, 244, .13) 38px 40px, transparent 41px 69px);
+  mask-image: linear-gradient(90deg, #000, transparent 15%, transparent 85%, #000), linear-gradient(#000, transparent 14%, transparent 86%, #000);
+  mask-composite: add;
+}
+
+.winter-tear {
+  inset: var(--winter-tear-top) 0 auto;
+  height: 10px;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(207, 245, 255, .38) 18%, rgba(157, 209, 245, .2) 62%, transparent);
+  backdrop-filter: saturate(.35) brightness(1.15) hue-rotate(8deg);
+  transform: skewX(-12deg) scaleX(1.03);
+}
+
+.winter-fragments {
+  opacity: 0;
+  background:
+    conic-gradient(from 30deg at 12% 28%, transparent, rgba(214, 246, 255, .7) 4deg 15deg, transparent 18deg),
+    conic-gradient(from 110deg at 76% 21%, transparent, rgba(164, 222, 249, .55) 6deg 18deg, transparent 21deg),
+    conic-gradient(from 210deg at 64% 72%, transparent, rgba(223, 249, 255, .62) 5deg 13deg, transparent 16deg),
+    conic-gradient(from 70deg at 29% 84%, transparent, rgba(173, 229, 253, .5) 5deg 17deg, transparent 20deg);
+}
+
+.winter-event-horizontal-tear .winter-tear { opacity: .9; }
+.winter-event-signal-noise .winter-fragments { opacity: .65; }
+.winter-event-frost-surge .winter-frost-primary { opacity: min(1, calc(var(--winter-frost-opacity) + .28)); filter: blur(3px); }
+.winter-event-cold-flash .winter-cold-cast { background: rgba(194, 235, 255, .14); backdrop-filter: saturate(.72) brightness(1.04); }
+.winter-event-deep-freeze .winter-cold-cast { background: rgba(188, 230, 247, .12); backdrop-filter: saturate(.45) brightness(1.06) blur(.45px); }
+.winter-event-chromatic-ghost .winter-cold-cast { backdrop-filter: drop-shadow(2px 0 rgba(173, 229, 255, .34)) drop-shadow(-2px 0 rgba(233, 245, 255, .2)); }
+
+[data-winter-interference="medium"] .state-card,
+[data-winter-interference="medium"] .shell-header,
+[data-winter-interference="severe"] .state-card,
+[data-winter-interference="severe"] .shell-header {
+  box-shadow: inset 0 0 0 1px rgba(185, 229, 247, .1), 0 0 18px rgba(115, 191, 224, .06);
+}
+
+[data-winter-interference="severe"] h1,
+[data-winter-interference="severe"] h2 {
+  text-shadow: 1px 0 rgba(181, 231, 251, .2), -1px 0 rgba(240, 249, 255, .1);
+}
+
+body.prefers-reduced-motion .winter-interference-layer .winter-tear,
+body.prefers-reduced-motion .winter-interference-layer .winter-fragments {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winter-interference-layer .winter-tear,
+  .winter-interference-layer .winter-fragments { display: none; }
+  .winter-interference-layer * { animation: none !important; transition: none !important; }
+}

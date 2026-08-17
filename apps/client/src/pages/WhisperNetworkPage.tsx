@@ -13,6 +13,7 @@ import {
   type SummerCourtDateTime,
 } from "../lib/summerCourtCalendar";
 import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
+import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
 
 const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> = [
   { value: "trending", label: "Trending", icon: "flame" },
@@ -40,8 +41,6 @@ type WhisperPostDetailResponse = {
   post: WhisperPost;
   comments: WhisperComment[];
 };
-
-type CampaignDateResponse = SummerCourtDateTime & { updated_at: string };
 
 function getSummerCourtFromWhisperRecord(record: {
   crown_year: number | null;
@@ -143,6 +142,7 @@ function sortWhisperPosts(posts: WhisperPost[], sortMode: WhisperSortMode): Whis
 
 export default function WhisperNetworkPage() {
   const { user } = useAuth();
+  const { campaignDate, campaignUpdatedAt } = useLiveCampaignState();
   const isDm = user?.role === "dm";
 
   const [posts, setPosts] = useState<WhisperPost[]>([]);
@@ -212,22 +212,11 @@ export default function WhisperNetworkPage() {
         setLoading(true);
         setError("");
       }
-      const [feedResponse, campaignDateResponse] = await Promise.all([
-        apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`),
-        apiFetch("/api/campaign-date"),
-      ]);
+      const feedResponse = await apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`);
       const data = (await feedResponse.json()) as WhisperFeedResponse | { error?: string };
-      const campaignDateData = (await campaignDateResponse.json()) as CampaignDateResponse | { error?: string };
       if (!feedResponse.ok) {
         throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
       }
-      if (!campaignDateResponse.ok) {
-        throw new Error((campaignDateData as { error?: string }).error || "Failed to load campaign date");
-      }
-
-      const nextCampaignDate = campaignDateData as CampaignDateResponse;
-      setCampaignDateTime(toSummerCourtDateTimeOrNull(nextCampaignDate));
-      campaignUpdatedAtRef.current = nextCampaignDate.updated_at;
 
       const loadedPosts = (data as WhisperFeedResponse).posts || [];
       setPosts(loadedPosts);
@@ -271,37 +260,22 @@ export default function WhisperNetworkPage() {
   }, [isReaderOpen]);
 
   useEffect(() => {
+    setCampaignDateTime(campaignDate ? toSummerCourtDateTimeOrNull(campaignDate) : null);
+    if (!campaignUpdatedAt) return;
+    const previousUpdatedAt = campaignUpdatedAtRef.current;
+    campaignUpdatedAtRef.current = campaignUpdatedAt;
+    if (!previousUpdatedAt || previousUpdatedAt === campaignUpdatedAt) return;
+
     let disposed = false;
-    let pollInFlight = false;
-
-    async function pollCampaignDate() {
-      if (pollInFlight) return;
-      pollInFlight = true;
-      try {
-        const response = await apiFetch("/api/campaign-date");
-        const data = (await response.json()) as CampaignDateResponse | { error?: string };
-        if (!response.ok || disposed) return;
-        const next = data as CampaignDateResponse;
-        const previousUpdatedAt = campaignUpdatedAtRef.current;
-        campaignUpdatedAtRef.current = next.updated_at;
-        setCampaignDateTime(toSummerCourtDateTimeOrNull(next));
-        if (previousUpdatedAt && previousUpdatedAt !== next.updated_at) {
-          const openPostId = isReaderOpenRef.current ? selectedPostIdRef.current : null;
-          const visiblePostIds = await loadFeed({ preferredSelectedPostId: openPostId, silent: true });
-          if (disposed || !openPostId || !visiblePostIds?.has(openPostId)) return;
-          await loadPostDetails(openPostId, { silent: true });
-        }
-      } finally {
-        pollInFlight = false;
-      }
+    async function refreshRevealedWhispers() {
+      const openPostId = isReaderOpenRef.current ? selectedPostIdRef.current : null;
+      const visiblePostIds = await loadFeed({ preferredSelectedPostId: openPostId, silent: true });
+      if (disposed || !openPostId || !visiblePostIds?.has(openPostId)) return;
+      await loadPostDetails(openPostId, { silent: true });
     }
-
-    const intervalId = window.setInterval(() => void pollCampaignDate(), 1000);
-    return () => {
-      disposed = true;
-      window.clearInterval(intervalId);
-    };
-  }, [sortMode]);
+    void refreshRevealedWhispers();
+    return () => { disposed = true; };
+  }, [campaignDate, campaignUpdatedAt]);
 
   useEffect(() => {
     if (!isReaderOpen) return;

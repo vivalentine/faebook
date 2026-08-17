@@ -5,6 +5,8 @@ import FaeIcon, { type FaeIconName } from "./FaeIcon";
 import { apiFetch, apiUrl } from "../lib/api";
 import { getUserSettings } from "../lib/userSettings";
 import type { SearchSuggestion, SearchSuggestionsResponse, UserProfile } from "../types";
+import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
+import WinterInterferenceLayer from "./WinterInterferenceLayer";
 
 type NavItem = {
   label: string;
@@ -33,6 +35,8 @@ export default function AppShellLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { winterInterferenceLevel } = useLiveCampaignState();
+  const playerWinterLevel = user?.role === "player" ? winterInterferenceLevel : "off";
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
@@ -232,7 +236,11 @@ export default function AppShellLayout() {
   }
 
   return (
-    <div className={`app-shell app-shell-layout ${isDrawerOpen ? "drawer-open" : ""}`.trim()}>
+    <div
+      className={`app-shell app-shell-layout ${isDrawerOpen ? "drawer-open" : ""}`.trim()}
+      data-winter-interference={playerWinterLevel}
+    >
+      <WinterInterferenceLayer level={playerWinterLevel} />
       <button
         className="drawer-backdrop"
         type="button"

@@ -407,3 +407,24 @@ export type SearchSuggestionsResponse = {
   limit: number;
   suggestions: SearchSuggestion[];
 };
+
+export type WinterInterferenceLevel = "off" | "low" | "medium" | "severe";
+
+export type LiveCampaignDate = {
+  crown_year: number;
+  bloom_index: number;
+  petal: number;
+  bell: number;
+  chime: number;
+  updated_at: string;
+};
+
+export type PresentationState = {
+  winter_interference_level: WinterInterferenceLevel;
+  updated_at: string;
+};
+
+export type LiveStateResponse = {
+  campaign_date: LiveCampaignDate;
+  presentation: PresentationState;
+};

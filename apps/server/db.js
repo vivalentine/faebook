@@ -468,6 +468,15 @@ db.exec(`
     updated_by_user_id INTEGER,
     FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS presentation_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    winter_interference_level TEXT NOT NULL DEFAULT 'off'
+      CHECK (winter_interference_level IN ('off', 'low', 'medium', 'severe')),
+    updated_at TEXT NOT NULL,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+  );
 `);
 
 function tableExists(tableName) {
@@ -933,5 +942,18 @@ db.prepare(
     ON CONFLICT(id) DO NOTHING
   `
 ).run(campaignSeedBell, campaignSeedChime, campaignSeedNow);
+
+db.prepare(
+  `
+    INSERT INTO presentation_state (
+      id,
+      winter_interference_level,
+      updated_at,
+      updated_by_user_id
+    )
+    VALUES (1, 'off', ?, NULL)
+    ON CONFLICT(id) DO NOTHING
+  `
+).run(campaignSeedNow);
 
 module.exports = db;

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppShellLayout from "./components/AppShellLayout";
+import { LiveCampaignStateProvider } from "./context/LiveCampaignStateContext";
 import "./App.css";
 
 const ArchivePage = lazy(() => import("./pages/ArchivePage"));
@@ -54,8 +55,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Suspense fallback={<RouteLoadingFallback />}>
-          <Routes>
+        <LiveCampaignStateProvider>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
 
             <Route
@@ -115,8 +117,9 @@ export default function App() {
             <Route path="/dm/board" element={<Navigate to="/board" replace />} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </LiveCampaignStateProvider>
       </AuthProvider>
     </BrowserRouter>
   );

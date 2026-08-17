@@ -708,6 +708,36 @@ function getCampaignDateState() {
   return fallback;
 }
 
+const WINTER_INTERFERENCE_LEVELS = new Set(["off", "low", "medium", "severe"]);
+
+function getPresentationState() {
+  const row = db
+    .prepare(
+      `
+        SELECT winter_interference_level, updated_at
+        FROM presentation_state
+        WHERE id = 1
+      `
+    )
+    .get();
+
+  if (row) return row;
+
+  const fallback = {
+    winter_interference_level: "off",
+    updated_at: new Date().toISOString(),
+  };
+  db.prepare(
+    `
+      INSERT INTO presentation_state (
+        id, winter_interference_level, updated_at, updated_by_user_id
+      ) VALUES (1, 'off', ?, NULL)
+      ON CONFLICT(id) DO NOTHING
+    `
+  ).run(fallback.updated_at);
+  return fallback;
+}
+
 function getDefaultBoard() {
   return {
     nodes: [],
@@ -3086,6 +3116,45 @@ app.get("/api/dm/campaign-date", requireRole("dm"), (_req, res) => {
 
 app.get("/api/campaign-date", requireRole("player", "dm"), (_req, res) => {
   return res.json(getCampaignDateState());
+});
+
+app.get("/api/live-state", requireRole("player", "dm"), (_req, res) => {
+  return res.json({
+    campaign_date: getCampaignDateState(),
+    presentation: getPresentationState(),
+  });
+});
+
+app.put("/api/dm/presentation-state", requireRole("dm"), (req, res) => {
+  const level = req.body?.winter_interference_level;
+  if (typeof level !== "string" || !WINTER_INTERFERENCE_LEVELS.has(level)) {
+    return res.status(400).json({
+      error: "winter_interference_level must be one of: off, low, medium, severe",
+    });
+  }
+
+  const updatedAt = new Date().toISOString();
+  db.prepare(
+    `
+      INSERT INTO presentation_state (
+        id, winter_interference_level, updated_at, updated_by_user_id
+      ) VALUES (1, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        winter_interference_level = excluded.winter_interference_level,
+        updated_at = excluded.updated_at,
+        updated_by_user_id = excluded.updated_by_user_id
+    `
+  ).run(level, updatedAt, req.session.user.id);
+
+  createAuditLog(db, {
+    actorUserId: req.session.user.id,
+    actionType: "presentation_state_updated",
+    objectType: "presentation_state",
+    objectId: "1",
+    message: `Set Winter Interference to ${level}`,
+  });
+
+  return res.json(getPresentationState());
 });
 
 app.put("/api/dm/campaign-date", requireRole("dm"), (req, res) => {
