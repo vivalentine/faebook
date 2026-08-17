@@ -40,7 +40,7 @@ const {
   replaceNpcPortrait,
   SUPPORTED_EXTENSIONS,
 } = require("./portrait-assets");
-const { validateSummerCourtDateTime } = require("./summer-court-calendar");
+const { buildSummerCourtVisibilitySql, validateSummerCourtDateTime } = require("./summer-court-calendar");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -3084,6 +3084,10 @@ app.get("/api/dm/campaign-date", requireRole("dm"), (_req, res) => {
   return res.json(getCampaignDateState());
 });
 
+app.get("/api/campaign-date", requireRole("player", "dm"), (_req, res) => {
+  return res.json(getCampaignDateState());
+});
+
 app.put("/api/dm/campaign-date", requireRole("dm"), (req, res) => {
   const parsedBase = {
     crown_year: Number.parseInt(String(req.body?.crown_year ?? ""), 10),
@@ -4707,6 +4711,10 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
   const offset = Math.max(Number.parseInt(String(req.query.offset || "0"), 10) || 0, 0);
   const sort = parseWhisperPostSort(req.query.sort);
   const orderBySql = getWhisperPostOrderBySql(sort);
+  const isDm = sessionUser.role === "dm";
+  const campaignDate = getCampaignDateState();
+  const postVisibilitySql = isDm ? "1 = 1" : buildSummerCourtVisibilitySql("posts", campaignDate);
+  const commentVisibilitySql = isDm ? "1 = 1" : buildSummerCourtVisibilitySql("comments", campaignDate);
 
   const posts = db
     .prepare(
@@ -4730,9 +4738,11 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
         FROM whisper_posts AS posts
         LEFT JOIN whisper_comments AS comments
           ON comments.post_id = posts.id
+         AND ${commentVisibilitySql}
         LEFT JOIN whisper_likes AS my_like
           ON my_like.post_id = posts.id
          AND my_like.user_id = ?
+        WHERE ${postVisibilitySql}
         GROUP BY posts.id
         ORDER BY ${orderBySql}
         LIMIT ?
@@ -4745,7 +4755,8 @@ app.get("/api/whisper/posts", requireRole("player", "dm"), (req, res) => {
     .prepare(
       `
         SELECT COUNT(*) AS total
-        FROM whisper_posts
+        FROM whisper_posts AS posts
+        WHERE ${postVisibilitySql}
       `
     )
     .get();
@@ -4767,6 +4778,17 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
 
   if (!Number.isInteger(postId) || postId <= 0) {
     return res.status(400).json({ error: "Invalid post id" });
+  }
+
+  const isDm = sessionUser.role === "dm";
+  const campaignDate = getCampaignDateState();
+  const postVisibilitySql = isDm ? "1 = 1" : buildSummerCourtVisibilitySql("posts", campaignDate);
+  const commentVisibilitySql = isDm ? "1 = 1" : buildSummerCourtVisibilitySql("comments", campaignDate);
+  const accessiblePost = db
+    .prepare(`SELECT posts.id FROM whisper_posts AS posts WHERE posts.id = ? AND ${postVisibilitySql}`)
+    .get(postId);
+  if (!accessiblePost) {
+    return res.status(404).json({ error: "Post not found" });
   }
 
   const now = new Date().toISOString();
@@ -4816,10 +4838,11 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
         FROM whisper_posts AS posts
         LEFT JOIN whisper_comments AS comments
           ON comments.post_id = posts.id
+         AND ${commentVisibilitySql}
         LEFT JOIN whisper_likes AS my_like
           ON my_like.post_id = posts.id
          AND my_like.user_id = ?
-        WHERE posts.id = ?
+        WHERE posts.id = ? AND ${postVisibilitySql}
         GROUP BY posts.id
       `
     )
@@ -4845,7 +4868,7 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
           comments.updated_at,
           CASE WHEN ? = 'dm' THEN 1 ELSE 0 END AS can_moderate
         FROM whisper_comments AS comments
-        WHERE comments.post_id = ?
+        WHERE comments.post_id = ? AND ${commentVisibilitySql}
         ORDER BY
           comments.crown_year DESC,
           comments.bloom_index DESC,
@@ -5137,9 +5160,10 @@ app.post("/api/whisper/posts/:id/comments", requireRole("player", "dm"), (req, r
   const postExists = db
     .prepare(
       `
-        SELECT id
-        FROM whisper_posts
-        WHERE id = ?
+        SELECT posts.id
+        FROM whisper_posts AS posts
+        WHERE posts.id = ?
+          AND ${sessionUser.role === "dm" ? "1 = 1" : buildSummerCourtVisibilitySql("posts", getCampaignDateState())}
       `
     )
     .get(postId);
@@ -5326,9 +5350,10 @@ app.post("/api/whisper/posts/:id/likes", requireRole("player", "dm"), (req, res)
   const postExists = db
     .prepare(
       `
-        SELECT id
-        FROM whisper_posts
-        WHERE id = ?
+        SELECT posts.id
+        FROM whisper_posts AS posts
+        WHERE posts.id = ?
+          AND ${sessionUser.role === "dm" ? "1 = 1" : buildSummerCourtVisibilitySql("posts", getCampaignDateState())}
       `
     )
     .get(postId);
