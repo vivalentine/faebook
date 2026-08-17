@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import OpenSeadragon from "openseadragon";
 import { Link } from "react-router-dom";
 import PlayerLandmarkLocationCard from "./PlayerLandmarkLocationCard";
-import type { LocationRecord, MapLandmark, MapLayerConfig, MapPin } from "../types";
+import type { LocationRecord, MapCurrentLocation, MapLandmark, MapLayerConfig, MapPin } from "../types";
 
 type MarkerScreenPosition = {
   id: number;
@@ -20,6 +20,9 @@ type TiledMapViewerProps = {
   layer: MapLayerConfig;
   addMode: boolean;
   landmarkAddMode: boolean;
+  partyLocationMode: boolean;
+  currentLocation: MapCurrentLocation | null;
+  canEditCurrentLocation: boolean;
   pins: MapPin[];
   landmarks: MapLandmark[];
   selectedLandmark: MapLandmark | null;
@@ -29,6 +32,7 @@ type TiledMapViewerProps = {
   onMapPlacement: (point: { x: number; y: number }) => void;
   onPinClick: (pin: MapPin) => void;
   onLandmarkClick: (landmark: MapLandmark) => void;
+  onCurrentLocationMove: (point: { x: number; y: number }) => Promise<boolean>;
   onViewerPanningChange?: (isPanning: boolean) => void;
 };
 
@@ -107,6 +111,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     layer,
     addMode,
     landmarkAddMode,
+    partyLocationMode,
+    currentLocation,
+    canEditCurrentLocation,
     pins,
     landmarks,
     selectedLandmark,
@@ -116,6 +123,7 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     onMapPlacement,
     onPinClick,
     onLandmarkClick,
+    onCurrentLocationMove,
     onViewerPanningChange,
   },
   ref,
@@ -125,6 +133,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   const layerRef = useRef(layer);
   const addModeRef = useRef(addMode);
   const landmarkAddModeRef = useRef(landmarkAddMode);
+  const partyLocationModeRef = useRef(partyLocationMode);
+  const currentLocationRef = useRef(currentLocation);
+  const onCurrentLocationMoveRef = useRef(onCurrentLocationMove);
   const onMapPlacementRef = useRef(onMapPlacement);
   const onPinClickRef = useRef(onPinClick);
   const onLandmarkClickRef = useRef(onLandmarkClick);
@@ -135,6 +146,15 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   const [mapError, setMapError] = useState("");
   const [pinScreenPositions, setPinScreenPositions] = useState<MarkerScreenPosition[]>([]);
   const [landmarkScreenPositions, setLandmarkScreenPositions] = useState<MarkerScreenPosition[]>([]);
+  const [currentLocationPosition, setCurrentLocationPosition] = useState<{ left: number; top: number } | null>(null);
+  const [draggingCurrentLocation, setDraggingCurrentLocation] = useState(false);
+  const dragRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    moved: boolean;
+    saved: MapCurrentLocation;
+  } | null>(null);
 
   useEffect(() => {
     layerRef.current = layer;
@@ -147,6 +167,19 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   useEffect(() => {
     landmarkAddModeRef.current = landmarkAddMode;
   }, [landmarkAddMode]);
+
+  useEffect(() => {
+    partyLocationModeRef.current = partyLocationMode;
+  }, [partyLocationMode]);
+
+  useEffect(() => {
+    currentLocationRef.current = currentLocation;
+    recalculateMarkersRef.current();
+  }, [currentLocation]);
+
+  useEffect(() => {
+    onCurrentLocationMoveRef.current = onCurrentLocationMove;
+  }, [onCurrentLocationMove]);
 
   useEffect(() => {
     onMapPlacementRef.current = onMapPlacement;
@@ -173,6 +206,23 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
   useEffect(() => {
     recalculateMarkersRef.current();
   }, [layer.width, layer.height]);
+
+  useEffect(() => {
+    const cancelDrag = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !dragRef.current) return;
+      const drag = dragRef.current;
+      dragRef.current = null;
+      currentLocationRef.current = drag.saved;
+      viewerRef.current?.setMouseNavEnabled(true);
+      setDraggingCurrentLocation(false);
+      recalculateMarkersRef.current();
+    };
+    window.addEventListener("keydown", cancelDrag);
+    return () => {
+      window.removeEventListener("keydown", cancelDrag);
+      viewerRef.current?.setMouseNavEnabled(true);
+    };
+  }, []);
 
   useImperativeHandle(ref, () => ({
     zoomIn() {
@@ -251,6 +301,14 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
 
       setPinScreenPositions(nextPins);
       setLandmarkScreenPositions(nextLandmarks);
+      const location = currentLocationRef.current;
+      if (location) {
+        const viewportPoint = viewport.imageToViewportCoordinates(location.x * width, location.y * height);
+        const pixelPoint = viewport.pixelFromPoint(viewportPoint, true);
+        setCurrentLocationPosition({ left: pixelPoint.x, top: pixelPoint.y });
+      } else {
+        setCurrentLocationPosition(null);
+      }
     };
     recalculateMarkersRef.current = updateMarkerPositions;
 
@@ -286,7 +344,7 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
         return;
       }
 
-      if (!addModeRef.current && !landmarkAddModeRef.current) {
+      if (!addModeRef.current && !landmarkAddModeRef.current && !partyLocationModeRef.current) {
         return;
       }
 
@@ -312,6 +370,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
       recalculateMarkersRef.current = () => {};
       setPinScreenPositions([]);
       setLandmarkScreenPositions([]);
+      setCurrentLocationPosition(null);
+      dragRef.current = null;
+      setDraggingCurrentLocation(false);
       onViewerPanningChangeRef.current?.(false);
     };
   }, [
@@ -344,9 +405,9 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
     : null;
 
   return (
-    <section className={`maps-viewport-shell ${addMode ? "add-mode" : ""}`.trim()}>
+    <section className={`maps-viewport-shell ${addMode || landmarkAddMode || partyLocationMode ? "add-mode" : ""}`.trim()}>
       <div className="maps-osd-host" ref={viewerHostRef} />
-      <div className="maps-marker-layer" aria-hidden="true">
+      <div className="maps-marker-layer">
         {landmarks.map((landmark) => {
           const position = landmarkScreenById.get(landmark.id);
           if (!position) return null;
@@ -389,6 +450,83 @@ const TiledMapViewer = forwardRef<TiledMapViewerHandle, TiledMapViewerProps>(fun
             </button>
           );
         })}
+
+        {currentLocation?.visible && currentLocationPosition ? (
+          <button
+            type="button"
+            className={`map-current-location ${canEditCurrentLocation ? "is-editable" : ""} ${draggingCurrentLocation ? "is-dragging" : ""}`.trim()}
+            style={{ left: `${currentLocationPosition.left}px`, top: `${currentLocationPosition.top}px` }}
+            aria-hidden={canEditCurrentLocation ? undefined : true}
+            tabIndex={canEditCurrentLocation ? 0 : -1}
+            title={canEditCurrentLocation ? "Party Location — drag to move" : undefined}
+            onPointerDown={(event) => {
+              if (!canEditCurrentLocation || !currentLocationRef.current) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.setPointerCapture(event.pointerId);
+              dragRef.current = {
+                pointerId: event.pointerId,
+                startClientX: event.clientX,
+                startClientY: event.clientY,
+                moved: false,
+                saved: currentLocationRef.current,
+              };
+            }}
+            onPointerMove={(event) => {
+              const drag = dragRef.current;
+              const viewer = viewerRef.current;
+              const host = viewerHostRef.current;
+              if (!drag || drag.pointerId !== event.pointerId || !viewer || !host) return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (!drag.moved && Math.hypot(event.clientX - drag.startClientX, event.clientY - drag.startClientY) < 4) return;
+              if (!drag.moved) {
+                drag.moved = true;
+                viewer.setMouseNavEnabled(false);
+                setDraggingCurrentLocation(true);
+              }
+              const bounds = host.getBoundingClientRect();
+              const viewportPoint = viewer.viewport.pointFromPixel(
+                new OpenSeadragon.Point(event.clientX - bounds.left, event.clientY - bounds.top), true,
+              );
+              const imagePoint = viewer.viewport.viewportToImageCoordinates(viewportPoint);
+              currentLocationRef.current = {
+                ...drag.saved,
+                x: Math.max(0, Math.min(1, imagePoint.x / layerRef.current.width)),
+                y: Math.max(0, Math.min(1, imagePoint.y / layerRef.current.height)),
+              };
+              recalculateMarkersRef.current();
+            }}
+            onPointerUp={async (event) => {
+              const drag = dragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              event.preventDefault();
+              event.stopPropagation();
+              dragRef.current = null;
+              viewerRef.current?.setMouseNavEnabled(true);
+              setDraggingCurrentLocation(false);
+              if (!drag.moved) return;
+              const preview = currentLocationRef.current;
+              const saved = preview ? await onCurrentLocationMoveRef.current({ x: preview.x, y: preview.y }) : false;
+              if (!saved) {
+                currentLocationRef.current = drag.saved;
+                recalculateMarkersRef.current();
+              }
+            }}
+            onPointerCancel={(event) => {
+              const drag = dragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              dragRef.current = null;
+              currentLocationRef.current = drag.saved;
+              viewerRef.current?.setMouseNavEnabled(true);
+              setDraggingCurrentLocation(false);
+              recalculateMarkersRef.current();
+            }}
+          >
+            <span className="map-current-location-ring" />
+            <span className="map-current-location-dot" />
+          </button>
+        ) : null}
       </div>
 
       {selectedLandmark && selectedLandmarkScreenPosition ? (

@@ -3,7 +3,9 @@ import FaeSelect from "../components/FaeSelect";
 import TiledMapViewer, { type TiledMapViewerHandle } from "../components/TiledMapViewer";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
+import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
 import type {
+  MapCurrentLocation,
   MapLandmark,
   MapLandmarkMarkerStyle,
   MapLandmarkVisibilityScope,
@@ -83,16 +85,19 @@ function downloadJson(filename: string, payload: unknown) {
 
 export default function MapsPage() {
   const { user } = useAuth();
+  const { currentLocationsUpdatedAt, refreshLiveState } = useLiveCampaignState();
   const [layers, setLayers] = useState<MapLayerConfig[]>([]);
   const [pins, setPins] = useState<MapPin[]>([]);
   const [landmarks, setLandmarks] = useState<MapLandmark[]>([]);
   const [locationsBySlug, setLocationsBySlug] = useState<Record<string, LocationRecord>>({});
+  const [currentLocations, setCurrentLocations] = useState<MapCurrentLocation[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<MapLayerConfig["map_id"] | "">("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [addMode, setAddMode] = useState(false);
   const [landmarkAddMode, setLandmarkAddMode] = useState(false);
+  const [partyLocationMode, setPartyLocationMode] = useState(false);
   const [editorState, setEditorState] = useState<EditorState | null>(null);
   const [landmarkEditor, setLandmarkEditor] = useState<
     | {
@@ -122,6 +127,10 @@ export default function MapsPage() {
   const visibleLandmarks = useMemo(
     () => landmarks.filter((landmark) => landmark.map_id === activeLayerId),
     [landmarks, activeLayerId],
+  );
+  const activeCurrentLocation = useMemo(
+    () => currentLocations.find((location) => location.map_id === activeLayerId) || null,
+    [activeLayerId, currentLocations],
   );
 
   const selectedLandmark = useMemo(
@@ -158,17 +167,19 @@ export default function MapsPage() {
     setError("");
 
     try {
-      const [configResponse, pinResponse, landmarkResponse, locationsResponse] = await Promise.all([
+      const [configResponse, pinResponse, landmarkResponse, locationsResponse, currentLocationsResponse] = await Promise.all([
         apiFetch("/api/maps/config"),
         apiFetch("/api/maps/pins"),
         apiFetch("/api/maps/landmarks"),
         apiFetch("/api/locations"),
+        apiFetch("/api/maps/current-locations"),
       ]);
 
       const configData = await configResponse.json();
       const pinData = await pinResponse.json();
       const landmarkData = await landmarkResponse.json();
       const locationsData = await locationsResponse.json();
+      const currentLocationsData = await currentLocationsResponse.json();
 
       if (!configResponse.ok) {
         throw new Error(configData.error || `Failed to load maps config: ${configResponse.status}`);
@@ -190,6 +201,10 @@ export default function MapsPage() {
       setLayers(nextLayers);
       setPins(Array.isArray(pinData.pins) ? pinData.pins : []);
       setLandmarks(Array.isArray(landmarkData.landmarks) ? landmarkData.landmarks : []);
+      if (!currentLocationsResponse.ok) {
+        throw new Error(currentLocationsData.error || "Failed to load current party locations");
+      }
+      setCurrentLocations(Array.isArray(currentLocationsData.locations) ? currentLocationsData.locations : []);
       const nextLocations = Array.isArray(locationsData.locations) ? locationsData.locations : [];
       setLocationsBySlug(
         nextLocations.reduce((acc: Record<string, LocationRecord>, location: LocationRecord) => {
@@ -215,6 +230,69 @@ export default function MapsPage() {
   useEffect(() => {
     void loadMaps();
   }, [loadMaps]);
+
+  useEffect(() => {
+    if (loading) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await apiFetch("/api/maps/current-locations", { signal: controller.signal });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Failed to refresh party locations");
+        if (!controller.signal.aborted) {
+          setCurrentLocations(Array.isArray(data.locations) ? data.locations : []);
+        }
+      } catch (refreshError) {
+        if (!controller.signal.aborted) {
+          setError(refreshError instanceof Error ? refreshError.message : "Failed to refresh party locations");
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [currentLocationsUpdatedAt, loading]);
+
+  const saveCurrentLocation = useCallback(async (
+    mapId: MapLayerConfig["map_id"],
+    payload: { x?: number; y?: number; visible: boolean },
+  ) => {
+    setSaving(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/dm/maps/current-location/${encodeURIComponent(mapId)}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to save party location");
+      setCurrentLocations((current) => [data, ...current.filter((location) => location.map_id !== mapId)]);
+      setPartyLocationMode(false);
+      await refreshLiveState();
+      return true;
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save party location");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [refreshLiveState]);
+
+  async function clearCurrentLocation(mapId: MapLayerConfig["map_id"]) {
+    if (!window.confirm("Clear the saved party location for this map?")) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/api/dm/maps/current-location/${encodeURIComponent(mapId)}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to clear party location");
+      setCurrentLocations((current) => current.filter((location) => location.map_id !== mapId));
+      setPartyLocationMode(false);
+      await refreshLiveState();
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : "Failed to clear party location");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function savePin(payload: {
     method: "POST" | "PATCH";
@@ -368,6 +446,7 @@ export default function MapsPage() {
     mapViewerRef.current?.resetView();
     setAddMode(false);
     setLandmarkAddMode(false);
+    setPartyLocationMode(false);
     setEditorState(null);
     setLandmarkEditor(null);
     setSelectedLandmarkId(null);
@@ -375,6 +454,10 @@ export default function MapsPage() {
 
   function onMapPlacement(point: { x: number; y: number }) {
     if (!activeLayer) {
+      return;
+    }
+    if (partyLocationMode && user?.role === "dm") {
+      void saveCurrentLocation(activeLayer.map_id, { ...point, visible: true });
       return;
     }
     if (landmarkAddMode && user?.role === "dm") {
@@ -513,6 +596,7 @@ export default function MapsPage() {
               onClick={() => {
                 setAddMode((current) => !current);
                 setLandmarkAddMode(false);
+                setPartyLocationMode(false);
                 setEditorState(null);
                 setLandmarkEditor(null);
               }}
@@ -526,12 +610,46 @@ export default function MapsPage() {
                 onClick={() => {
                   setLandmarkAddMode((current) => !current);
                   setAddMode(false);
+                  setPartyLocationMode(false);
                   setEditorState(null);
                   setLandmarkEditor(null);
                 }}
               >
                 {landmarkAddMode ? "Cancel Landmark" : "Add Landmark"}
               </button>
+            ) : null}
+            {user?.role === "dm" ? (
+              <>
+                <button
+                  className={`secondary-link maps-action ${partyLocationMode ? "active" : ""}`.trim()}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setPartyLocationMode((current) => !current);
+                    setAddMode(false);
+                    setLandmarkAddMode(false);
+                    setEditorState(null);
+                    setLandmarkEditor(null);
+                  }}
+                >
+                  {partyLocationMode ? "Cancel Location" : activeCurrentLocation ? "Move Party Location" : "Set Party Location"}
+                </button>
+                {activeCurrentLocation ? (
+                  <button
+                    className="secondary-link maps-action"
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void saveCurrentLocation(activeLayer.map_id, { visible: !activeCurrentLocation.visible })}
+                  >
+                    {activeCurrentLocation.visible ? "Hide Location" : "Show Location"}
+                  </button>
+                ) : null}
+                {activeCurrentLocation ? (
+                  <button className="secondary-link maps-action" type="button" disabled={saving} onClick={() => void clearCurrentLocation(activeLayer.map_id)}>
+                    Clear Location
+                  </button>
+                ) : null}
+              </>
             ) : null}
             <button className="secondary-link maps-action" type="button" onClick={() => void exportPins("current")}>
               Export Current Pins
@@ -543,7 +661,9 @@ export default function MapsPage() {
         </div>
 
         <p className="maps-hint">
-          {landmarkAddMode && user?.role === "dm"
+          {partyLocationMode && user?.role === "dm"
+            ? "Party location mode is active. Tap the map to place the party."
+            : landmarkAddMode && user?.role === "dm"
             ? "Landmark mode is active. Tap the map to place a canonical landmark."
             : addMode
             ? "Add mode is active. Tap the map to place a pin."
@@ -556,6 +676,9 @@ export default function MapsPage() {
         layer={activeLayer}
         addMode={addMode}
         landmarkAddMode={landmarkAddMode}
+        partyLocationMode={partyLocationMode}
+        currentLocation={activeCurrentLocation}
+        canEditCurrentLocation={user?.role === "dm"}
         pins={visiblePins}
         landmarks={visibleLandmarks}
         selectedLandmark={selectedLandmark}
@@ -563,6 +686,7 @@ export default function MapsPage() {
         selectedLandmarkLinkedSummary={selectedLandmark?.linked_location || null}
         onCloseSelectedLandmark={() => setSelectedLandmarkId(null)}
         onMapPlacement={onMapPlacement}
+        onCurrentLocationMove={(point) => saveCurrentLocation(activeLayer.map_id, { ...point, visible: true })}
         onLandmarkClick={(landmark) => {
           setSelectedLandmarkId(landmark.id);
           if (user?.role === "dm") {
@@ -585,11 +709,13 @@ export default function MapsPage() {
               },
             });
             setAddMode(false);
+            setPartyLocationMode(false);
           }
         }}
         onPinClick={(pin) => {
           setAddMode(false);
           setLandmarkAddMode(false);
+          setPartyLocationMode(false);
           setEditorState({
             mode: "edit",
             pinId: pin.id,

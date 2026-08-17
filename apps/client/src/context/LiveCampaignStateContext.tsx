@@ -8,6 +8,7 @@ type LiveCampaignStateValue = {
   winterInterferenceLevel: WinterInterferenceLevel;
   campaignUpdatedAt: string | null;
   presentationUpdatedAt: string | null;
+  currentLocationsUpdatedAt: string | null;
   refreshLiveState: () => Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export function LiveCampaignStateProvider({ children }: { children: ReactNode })
   const [campaignDate, setCampaignDate] = useState<LiveCampaignDate | null>(null);
   const [winterInterferenceLevel, setWinterInterferenceLevel] = useState<WinterInterferenceLevel>("off");
   const [presentationUpdatedAt, setPresentationUpdatedAt] = useState<string | null>(null);
+  const [currentLocationsUpdatedAt, setCurrentLocationsUpdatedAt] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   const inFlightRef = useRef(false);
 
@@ -34,6 +36,7 @@ export function LiveCampaignStateProvider({ children }: { children: ReactNode })
       setCampaignDate(data.campaign_date);
       setWinterInterferenceLevel(data.presentation.winter_interference_level);
       setPresentationUpdatedAt(data.presentation.updated_at);
+      setCurrentLocationsUpdatedAt(data.maps?.current_locations_updated_at ?? null);
     } catch {
       // Transient live-state failures intentionally retain the last good state.
     } finally {
@@ -48,6 +51,7 @@ export function LiveCampaignStateProvider({ children }: { children: ReactNode })
       setCampaignDate(null);
       setWinterInterferenceLevel("off");
       setPresentationUpdatedAt(null);
+      setCurrentLocationsUpdatedAt(null);
       return;
     }
 
@@ -66,8 +70,9 @@ export function LiveCampaignStateProvider({ children }: { children: ReactNode })
     winterInterferenceLevel,
     campaignUpdatedAt: campaignDate?.updated_at ?? null,
     presentationUpdatedAt,
+    currentLocationsUpdatedAt,
     refreshLiveState,
-  }), [campaignDate, winterInterferenceLevel, presentationUpdatedAt, refreshLiveState]);
+  }), [campaignDate, winterInterferenceLevel, presentationUpdatedAt, currentLocationsUpdatedAt, refreshLiveState]);
 
   return <LiveCampaignStateContext.Provider value={value}>{children}</LiveCampaignStateContext.Provider>;
 }

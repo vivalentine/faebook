@@ -388,6 +388,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_map_landmarks_map_visibility_sort
   ON map_landmarks(map_id, visibility_scope, sort_order ASC, label ASC, id ASC);
 
+  CREATE TABLE IF NOT EXISTS map_current_locations (
+    map_id TEXT PRIMARY KEY,
+    x REAL NOT NULL CHECK (x >= 0 AND x <= 1),
+    y REAL NOT NULL CHECK (y >= 0 AND y <= 1),
+    visible INTEGER NOT NULL DEFAULT 0 CHECK (visible IN (0, 1)),
+    updated_at TEXT NOT NULL,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS map_current_locations_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    updated_at TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_map_landmarks_visibility_sort
   ON map_landmarks(visibility_scope, sort_order ASC, label ASC, id ASC);
 
