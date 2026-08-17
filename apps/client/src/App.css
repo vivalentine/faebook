@@ -1001,8 +1001,68 @@
 }
 
 .maps-marker-layer .map-pin,
-.maps-marker-layer .map-landmark {
+.maps-marker-layer .map-landmark,
+.maps-marker-layer .map-current-location.is-editable {
   pointer-events: auto;
+}
+
+.map-current-location {
+  position: absolute;
+  z-index: 8;
+  width: 30px;
+  height: 30px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.map-current-location.is-editable {
+  cursor: grab;
+}
+
+.map-current-location.is-dragging {
+  cursor: grabbing;
+}
+
+.map-current-location-ring,
+.map-current-location-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.map-current-location-ring {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(224, 244, 255, 0.92);
+  background: rgba(51, 153, 255, 0.2);
+  box-shadow: 0 0 0 5px rgba(38, 139, 255, 0.18), 0 0 14px rgba(47, 163, 255, 0.72);
+  animation: map-current-location-pulse 2.4s ease-in-out infinite;
+}
+
+.map-current-location-dot {
+  width: 10px;
+  height: 10px;
+  background: #258cff;
+  box-shadow: 0 0 0 1px rgba(4, 31, 68, 0.72), 0 0 8px #5ab9ff;
+}
+
+@keyframes map-current-location-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(38, 139, 255, 0.14), 0 0 12px rgba(47, 163, 255, 0.62); }
+  50% { box-shadow: 0 0 0 7px rgba(38, 139, 255, 0.05), 0 0 16px rgba(47, 163, 255, 0.78); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-current-location-ring { animation: none; }
 }
 
 .maps-layer-error {

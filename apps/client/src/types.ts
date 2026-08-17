@@ -427,4 +427,15 @@ export type PresentationState = {
 export type LiveStateResponse = {
   campaign_date: LiveCampaignDate;
   presentation: PresentationState;
+  maps: {
+    current_locations_updated_at: string | null;
+  };
+};
+
+export type MapCurrentLocation = {
+  map_id: MapLayerConfig["map_id"];
+  x: number;
+  y: number;
+  visible: boolean;
+  updated_at: string;
 };

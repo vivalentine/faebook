@@ -1122,6 +1122,28 @@ function loadMapsConfig() {
 }
 
 const MAP_CONFIGS = loadMapsConfig();
+const CURRENT_LOCATION_MAP_IDS = new Set(MAP_CONFIGS.map((layer) => layer.map_id));
+
+function mapCurrentLocationForClient(row) {
+  return {
+    map_id: row.map_id,
+    x: Number(row.x),
+    y: Number(row.y),
+    visible: Number(row.visible) === 1,
+    updated_at: row.updated_at,
+  };
+}
+
+function getCurrentLocationsUpdatedAt() {
+  return db.prepare("SELECT updated_at FROM map_current_locations_state WHERE id = 1").get()?.updated_at || null;
+}
+
+function advanceCurrentLocationsRevision(updatedAt) {
+  db.prepare(`
+    INSERT INTO map_current_locations_state (id, updated_at) VALUES (1, ?)
+    ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at
+  `).run(updatedAt);
+}
 
 function sanitizeSuspectStatus(value) {
   return ["active", "cleared", "unknown"].includes(value) ? value : "unknown";
@@ -3122,6 +3144,7 @@ app.get("/api/live-state", requireRole("player", "dm"), (_req, res) => {
   return res.json({
     campaign_date: getCampaignDateState(),
     presentation: getPresentationState(),
+    maps: { current_locations_updated_at: getCurrentLocationsUpdatedAt() },
   });
 });
 
@@ -5627,6 +5650,77 @@ app.get("/api/maps/config", requireRole("player", "dm"), (_req, res) => {
   res.json({
     layers: MAP_CONFIGS,
   });
+});
+
+app.get("/api/maps/current-locations", requireRole("player", "dm"), (_req, res) => {
+  const rows = db.prepare(`
+    SELECT map_id, x, y, visible, updated_at
+    FROM map_current_locations
+    ORDER BY map_id ASC
+  `).all();
+  res.json({ locations: rows.map(mapCurrentLocationForClient) });
+});
+
+app.put("/api/dm/maps/current-location/:mapId", requireRole("dm"), (req, res) => {
+  const mapId = String(req.params.mapId || "").trim();
+  if (!CURRENT_LOCATION_MAP_IDS.has(mapId)) {
+    return res.status(400).json({ error: "Current party location is not supported for this map" });
+  }
+  if (typeof req.body?.visible !== "boolean") {
+    return res.status(400).json({ error: "visible must be a boolean" });
+  }
+
+  const existing = db.prepare("SELECT * FROM map_current_locations WHERE map_id = ?").get(mapId);
+  const hasX = req.body?.x !== undefined;
+  const hasY = req.body?.y !== undefined;
+  if (hasX !== hasY) {
+    return res.status(400).json({ error: "x and y must be provided together" });
+  }
+  if (!existing && !hasX) {
+    return res.status(400).json({ error: "x and y are required when placing a location" });
+  }
+
+  const x = hasX ? Number(req.body.x) : Number(existing.x);
+  const y = hasY ? Number(req.body.y) : Number(existing.y);
+  if (!Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1) {
+    return res.status(400).json({ error: "x and y must be numbers between 0 and 1" });
+  }
+
+  const updatedAt = new Date().toISOString();
+  const save = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO map_current_locations (map_id, x, y, visible, updated_at, updated_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(map_id) DO UPDATE SET
+        x = excluded.x,
+        y = excluded.y,
+        visible = excluded.visible,
+        updated_at = excluded.updated_at,
+        updated_by_user_id = excluded.updated_by_user_id
+    `).run(mapId, x, y, req.body.visible ? 1 : 0, updatedAt, req.session.user.id);
+    advanceCurrentLocationsRevision(updatedAt);
+  });
+  save();
+
+  const saved = db.prepare(`
+    SELECT map_id, x, y, visible, updated_at FROM map_current_locations WHERE map_id = ?
+  `).get(mapId);
+  return res.json(mapCurrentLocationForClient(saved));
+});
+
+app.delete("/api/dm/maps/current-location/:mapId", requireRole("dm"), (req, res) => {
+  const mapId = String(req.params.mapId || "").trim();
+  if (!CURRENT_LOCATION_MAP_IDS.has(mapId)) {
+    return res.status(400).json({ error: "Current party location is not supported for this map" });
+  }
+  const updatedAt = new Date().toISOString();
+  const clear = db.transaction(() => {
+    const result = db.prepare("DELETE FROM map_current_locations WHERE map_id = ?").run(mapId);
+    advanceCurrentLocationsRevision(updatedAt);
+    return result;
+  });
+  const result = clear();
+  return res.json({ ok: true, cleared: result.changes > 0, map_id: mapId });
 });
 
 app.get("/api/maps/landmarks", requireRole("player", "dm"), (req, res) => {
