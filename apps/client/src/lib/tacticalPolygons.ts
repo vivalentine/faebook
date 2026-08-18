@@ -5,6 +5,13 @@ export const polygonArea = (points: Point[]) => Math.abs(points.reduce((sum, poi
   return sum + point.x * next.y - next.x * point.y;
 }, 0)) / 2;
 
+export const signedPolygonArea = (points: Point[]) => points.reduce((sum, point, index) => {
+  const next = points[(index + 1) % points.length];
+  return sum + point.x * next.y - next.x * point.y;
+}, 0) / 2;
+
+export type PreparedPolygonMorph = { from: Point[]; to: Point[] };
+
 export function polygonCentroid(points: Point[]): Point {
   if (!points.length) return { x: 0, y: 0 };
   const signed = points.reduce((sum, point, index) => {
@@ -31,4 +38,20 @@ export function resamplePolygon(points: Point[], count: number): Point[] {
   return Array.from({length:count},(_,sample)=>{let distance=perimeter*sample/count,index=0;while(distance>lengths[index]&&index<lengths.length-1){distance-=lengths[index];index++}const start=points[index],end=points[(index+1)%points.length],ratio=lengths[index]?distance/lengths[index]:0;return{x:start.x+(end.x-start.x)*ratio,y:start.y+(end.y-start.y)*ratio}});
 }
 
-export function interpolatePolygons(from:Point[],to:Point[],progress:number):Point[]{const count=Math.max(from.length,to.length),a=resamplePolygon(from,count),b=resamplePolygon(to,count),t=Math.max(0,Math.min(1,progress));return a.map((point,index)=>({x:point.x+(b[index].x-point.x)*t,y:point.y+(b[index].y-point.y)*t}))}
+export function preparePolygonMorph(fromPoints:Point[],toPoints:Point[]):PreparedPolygonMorph {
+  const count=Math.max(32,fromPoints.length,toPoints.length),from=resamplePolygon(fromPoints,count);
+  let to=resamplePolygon(toPoints,count);
+  if (Math.sign(signedPolygonArea(from))!==Math.sign(signedPolygonArea(to))) to=to.reverse();
+  let best=to,bestDistance=Number.POSITIVE_INFINITY;
+  for(let offset=0;offset<count;offset++){
+    const candidate=to.map((_,index)=>to[(index+offset)%count]);
+    const distance=from.reduce((sum,point,index)=>sum+(point.x-candidate[index].x)**2+(point.y-candidate[index].y)**2,0);
+    if(distance<bestDistance){bestDistance=distance;best=candidate}
+  }
+  return {from,to:best};
+}
+
+export function interpolatePreparedMorph(morph:PreparedPolygonMorph,progress:number):Point[]{
+  const t=Math.max(0,Math.min(1,progress));
+  return morph.from.map((point,index)=>({x:point.x+(morph.to[index].x-point.x)*t,y:point.y+(morph.to[index].y-point.y)*t}));
+}
