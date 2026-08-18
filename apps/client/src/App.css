@@ -5241,3 +5241,66 @@ body.prefers-reduced-motion *::after {
 
 /* Final tactical live-use polish */
 .initiative-panel ol{display:grid;gap:8px}.initiative-panel li{padding:9px;border:1px solid #493a57;border-radius:10px;background:linear-gradient(135deg,#211929,#15101b);overflow:hidden}.initiative-panel li>button{display:grid;grid-template-columns:40px 1fr 44px;align-items:center;gap:9px;border:0;background:transparent;text-align:left;padding:0}.initiative-panel li.current{border-left:5px solid #e8c66d;background:linear-gradient(135deg,#362643,#1d1625)}.initiative-panel li.current>button{box-shadow:none}.initiative-portrait{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;overflow:hidden;background:#31263b;color:#d9c8e8;font-weight:800}.initiative-portrait.crowd{background:radial-gradient(circle,#b3a083 1px,#31263b 2px);background-size:7px 7px}.initiative-portrait img{width:100%;height:100%;object-fit:contain}.initiative-identity{min-width:0;display:grid}.initiative-identity>b{overflow:hidden;text-overflow:ellipsis}.initiative-identity small{color:#e8c66d;text-transform:uppercase;font-size:.6rem}.initiative-badge{display:grid;place-items:center;padding:4px;border:1px solid #76549b;border-radius:8px;background:#100c17}.initiative-badge small{font-size:.55rem;color:#a99ab7}.initiative-badge b{font-size:1.15rem}.initiative-entry-actions{display:grid;grid-template-columns:48px 1fr 1fr 32px;gap:4px;margin-top:7px}.initiative-entry-actions input,.initiative-entry-actions button{min-width:0;padding:3px;font-size:.65rem}.family-member-label small{display:block}.inspector-panel details>div>button small{display:block;margin-left:.35rem;color:#9e93a8}.surge-authoring{outline:3px dashed #ff9b70;outline-offset:-8px}.battlefield-presentation{background:#09070d}
+
+/* Tactical control contrast and responsive presentation viewport */
+.tactical-board-page button {
+  color: #ede8f4;
+  background: #27202f;
+  border: 1px solid #665374;
+}
+.tactical-board-page input,
+.tactical-board-page select,
+.tactical-board-page textarea {
+  color: #ede8f4;
+  background: #110d16;
+  border: 1px solid #665374;
+}
+.tactical-board-page option { color: #ede8f4; background: #17121e; }
+.tactical-board-page button:disabled,
+.tactical-board-page input:disabled,
+.tactical-board-page select:disabled,
+.tactical-board-page textarea:disabled {
+  color: #a99eaf;
+  border-color: #4c4055;
+  background: #1d1822;
+  opacity: .72;
+  cursor: not-allowed;
+}
+.tactical-board-page button.danger { color: #ffd8df; border-color: #9a4f61; background: #44202b; }
+.tactical-toolbar button.active,
+.condition-grid button.active,
+.initiative-panel button.active { background: #76549b; border-color: #b995df; color: #fff; }
+.initiative-panel li > button { color: #ede8f4; }
+.initiative-identity { color: #b9adbf; }
+.initiative-identity > b { color: #f3edf8; }
+.initiative-badge { color: #b9a8c8; }
+.initiative-badge b { color: #fff; }
+.initiative-entry-actions { color: #b9adbf; }
+.initiative-entry-actions button { color: #ede8f4; }
+.initiative-entry-actions input { color: #fff; background: #110d16; }
+
+.tactical-presentation {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.tactical-presentation > .battlefield,
+.player-display-preview .battlefield {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+}
+.presenter-overlay { color: #ede8f4; }
+.presenter-overlay button {
+  color: #f3edf8;
+  background: #27202f;
+  border: 1px solid #806596;
+}
