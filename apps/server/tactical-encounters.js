@@ -1,5 +1,6 @@
 const db = require("./db");
 const { createAuditLog } = require("./archive");
+const { storeTacticalImage } = require("./tactical-assets");
 
 const LIMITS = { tokens: 250, zones: 100, crowdRegions: 50, annotations: 100, initiative: 100, eventLog: 1000, phases: 50, events: 250 };
 const STATUSES = new Set(["prep", "active", "complete"]);
@@ -9,7 +10,8 @@ const CROWD_STATES = new Set(["idle", "agitated", "surging", "hostile", "destroy
 
 function defaultState() {
   return {
-    battlefield: { width: 2400, height: 1600, backgroundImageUrl: "", imageScale: 1, imageX: 0, imageY: 0, gridVisible: true, snapEnabled: true, gridSize: 50, gridOffsetX: 0, gridOffsetY: 0, distancePerSquare: 5, unit: "ft" },
+    battlefield: { width: 2400, height: 1600, backgroundImageUrl: "", imageScale: 1, imageX: 0, imageY: 0, mapLocked: true, gridVisible: true, snapEnabled: true, gridSize: 50, gridOffsetX: 0, gridOffsetY: 0, distancePerSquare: 5, unit: "ft", presentationCamera: { zoom: .75, panX: 40, panY: 40 } },
+    presentation: { frozen: false, blackout: false, layers: { background: true, grid: true, tokens: true, tokenLabels: "full", hpBars: false, conditions: false, defeatedTokens: true, zones: true, crowdRegions: true, strings: true, spotlights: true, aoes: true, annotations: true } },
     tokens: [], initiative: { round: 1, currentIndex: 0, manualOrder: false, entries: [] },
     phases: [], activePhaseId: null, zones: [], crowdRegions: [], annotations: [], events: [], eventLog: [],
   };
@@ -48,6 +50,10 @@ function normalizeState(raw, version = 1) {
   if (version !== 1) throw new Error("Unsupported encounter schema version");
   const base = defaultState();
   const state = { ...base, ...raw, battlefield: { ...base.battlefield, ...(raw?.battlefield || {}) }, initiative: { ...base.initiative, ...(raw?.initiative || {}) } };
+  state.presentation = { ...base.presentation, ...(raw?.presentation || {}), layers: { ...base.presentation.layers, ...(raw?.presentation?.layers || {}) } };
+  state.tokens = state.tokens.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.visible }));
+  state.zones = state.zones.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? (item.visible && item.active) }));
+  state.crowdRegions = state.crowdRegions.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.active }));
   state.eventLog = state.eventLog.slice(-LIMITS.eventLog);
   return state;
 }
@@ -59,7 +65,7 @@ function serialize(row, includeState = true) {
 }
 function audit(userId, action, id, message) { createAuditLog(db, { actorUserId: userId, actionType: action, objectType: "tactical_encounter", objectId: id, message }); }
 
-function registerTacticalEncounterRoutes(app, requireDm) {
+function registerTacticalEncounterRoutes(app, requireDm, uploadImageSingle) {
   app.get("/api/dm/encounters", requireDm, (req, res) => {
     const archived = req.query.archived === "true";
     const rows = db.prepare(`SELECT * FROM tactical_encounters WHERE archived_at IS ${archived ? "NOT NULL" : "NULL"} ORDER BY updated_at DESC`).all();
@@ -82,6 +88,28 @@ function registerTacticalEncounterRoutes(app, requireDm) {
     const row = db.prepare("SELECT * FROM tactical_encounters WHERE id = ? AND archived_at IS NULL").get(id);
     if (!row) return res.status(404).json({ error: "Encounter not found" });
     try { return res.json({ encounter: serialize(row) }); } catch { return res.status(500).json({ error: "Encounter state could not be loaded" }); }
+  });
+  app.post("/api/dm/encounters/:id/map", requireDm, uploadImageSingle.single("image"), async (req, res, next) => {
+    try {
+      const id = parseId(req.params.id); const row = id && db.prepare("SELECT * FROM tactical_encounters WHERE id=? AND archived_at IS NULL").get(id);
+      if (!row) return res.status(404).json({ error: "Encounter not found" });
+      if (!req.file) return res.status(400).json({ error: "Map image is required" });
+      const asset = await storeTacticalImage(req.file, id, "maps");
+      const state = normalizeState(JSON.parse(row.state_json), row.schema_version);
+      state.battlefield = { ...state.battlefield, backgroundImageUrl: asset.path, mapAsset: asset, mapName: asset.originalName, mapWidth: asset.width, mapHeight: asset.height };
+      const now = new Date().toISOString(); db.prepare("UPDATE tactical_encounters SET state_json=?,updated_at=? WHERE id=?").run(JSON.stringify(state), now, id);
+      audit(req.session.user.id, "map_upload", id, `Uploaded tactical map ${asset.originalName}`);
+      res.status(201).json({ asset, encounter: serialize(db.prepare("SELECT * FROM tactical_encounters WHERE id=?").get(id)) });
+    } catch (error) { next(error); }
+  });
+  app.delete("/api/dm/encounters/:id/map", requireDm, (req, res) => {
+    const id = parseId(req.params.id); const row = id && db.prepare("SELECT * FROM tactical_encounters WHERE id=? AND archived_at IS NULL").get(id);
+    if (!row) return res.status(404).json({ error: "Encounter not found" });
+    const state = normalizeState(JSON.parse(row.state_json), row.schema_version); state.battlefield.backgroundImageUrl = ""; delete state.battlefield.mapAsset; delete state.battlefield.mapName;
+    db.prepare("UPDATE tactical_encounters SET state_json=?,updated_at=? WHERE id=?").run(JSON.stringify(state), new Date().toISOString(), id); audit(req.session.user.id, "map_remove", id, "Removed tactical map"); res.status(204).end();
+  });
+  app.post("/api/dm/encounters/:id/token-assets", requireDm, uploadImageSingle.single("image"), async (req, res, next) => {
+    try { const id=parseId(req.params.id); const row=id&&db.prepare("SELECT id FROM tactical_encounters WHERE id=? AND archived_at IS NULL").get(id); if(!row)return res.status(404).json({error:"Encounter not found"}); if(!req.file)return res.status(400).json({error:"Token image is required"}); const asset=await storeTacticalImage(req.file,id,"tokens"); audit(req.session.user.id,"token_asset_upload",id,`Uploaded token portrait ${asset.originalName}`); res.status(201).json({asset}); } catch(error){ next(error); }
   });
   app.patch("/api/dm/encounters/:id", requireDm, (req, res) => {
     const id = parseId(req.params.id); if (!id) return res.status(400).json({ error: "Invalid encounter ID" });
