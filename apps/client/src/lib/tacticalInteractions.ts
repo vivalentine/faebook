@@ -1,4 +1,4 @@
-import type { EncounterPhase, FamilyMutation, Point, TacticalAoe, TacticalFamily, TacticalState, ThresholdRule } from "../types/tactical";
+import type { EncounterPhase, FamilyMutation, PhaseMutation, Point, TacticalAoe, TacticalFamily, TacticalState, ThresholdRule } from "../types/tactical";
 
 export const MIN_POLYGON_VERTICES = 3;
 export const distance = (a: Point, b: Point) => Math.hypot(b.x-a.x,b.y-a.y);
@@ -14,7 +14,11 @@ export function objectsInRect(s:TacticalState,a:Point,b:Point){const x1=Math.min
 export function detectStacks(points:Array<Point&{id:string}>,tolerance:number){const remaining=new Set(points.map(x=>x.id)),result:string[][]=[];for(const p of points){if(!remaining.has(p.id))continue;const group=points.filter(o=>remaining.has(o.id)&&distance(p,o)<=tolerance).map(x=>x.id);group.forEach(id=>remaining.delete(id));if(group.length>1)result.push(group)}return result}
 export const fanOut=(center:Point,ids:string[],radius=45)=>Object.fromEntries(ids.map((id,i)=>[id,{x:center.x+Math.cos(i/ids.length*Math.PI*2)*radius,y:center.y+Math.sin(i/ids.length*Math.PI*2)*radius}]));
 export const applyThresholdRules=(pressure:number,rules:ThresholdRule[])=>(rules??[]).filter(r=>r.enabled&&(r.comparison==="below"?pressure<r.threshold:pressure>=r.threshold)).map(r=>r.mutation);
-export function applyFamilyMutation(s:TacticalState,id:string,m:FamilyMutation){const f=s.families.find(x=>x.id===id);if(!f)return s;const patch=(items:Array<{id:string;familyId?:string;visible?:boolean;presentationVisible?:boolean;locked?:boolean;active?:boolean}>)=>items.forEach(x=>{if(x.familyId!==id&&!f.memberIds.includes(x.id))return;if(m.visible!=null&&"visible"in x)x.visible=m.visible;if(m.presentationVisible!=null)x.presentationVisible=m.presentationVisible;if(m.locked!=null)x.locked=m.locked;if(m.active!=null&&"active"in x)x.active=m.active});[s.tokens,s.zones,s.crowdRegions,s.aoes,s.spotlights,s.annotations,s.tethers].forEach(x=>patch(x));f.active=m.active??f.active;return s}
+const tacticalObjects=(s:TacticalState)=>[...s.tokens,...s.zones,...s.crowdRegions,...s.aoes,...s.spotlights,...s.annotations,...s.tethers];
+export function setFamilyMembership(s:TacticalState,objectId:string,familyId?:string){const object=tacticalObjects(s).find(x=>x.id===objectId);if(!object)return s;s.families.forEach(f=>f.memberIds=f.memberIds.filter(id=>id!==objectId));object.familyId=familyId;const family=familyId&&s.families.find(f=>f.id===familyId);if(family&&!family.memberIds.includes(objectId))family.memberIds.push(objectId);return s}
+export function deleteFamily(s:TacticalState,familyId:string){const family=s.families.find(f=>f.id===familyId);if(family)family.memberIds.forEach(id=>setFamilyMembership(s,id));tacticalObjects(s).filter(x=>x.familyId===familyId).forEach(x=>x.familyId=undefined);s.families=s.families.filter(f=>f.id!==familyId);return s}
+export function repairFamilyMembership(s:TacticalState){s.families.forEach(f=>f.memberIds=[]);tacticalObjects(s).forEach(object=>{if(object.familyId&&s.families.some(f=>f.id===object.familyId))setFamilyMembership(s,object.id,object.familyId);else object.familyId=undefined});return s}
+export function applyFamilyMutation(s:TacticalState,id:string,m:FamilyMutation){const f=s.families.find(x=>x.id===id);if(!f)return s;const patch=(items:Array<{id:string;familyId?:string;visible?:boolean;presentationVisible?:boolean;locked?:boolean;active?:boolean}>)=>items.forEach(x=>{if(x.familyId!==id&&!f.memberIds.includes(x.id))return;if(m.visible!=null&&"visible"in x)x.visible=m.visible;if(m.presentationVisible!=null)x.presentationVisible=m.presentationVisible;if(m.locked!=null)x.locked=m.locked;if(m.active!=null&&"active"in x)x.active=m.active});[s.tokens,s.zones,s.crowdRegions,s.aoes,s.spotlights,s.annotations,s.tethers].forEach(x=>patch(x));if(m.active!=null)f.active=m.active;if(m.presentationVisible!=null)f.presentationVisible=m.presentationVisible;if(m.locked!=null)f.locked=m.locked;return s}
 export function applyObjectMutation(s:TacticalState,id:string,m:FamilyMutation&{pressure?:number;crowdState?:TacticalState["crowdRegions"][number]["state"]}){
   const objects=[...s.tokens,...s.zones,...s.crowdRegions,...s.aoes,...s.spotlights,...s.annotations,...s.tethers];
   const object=objects.find(x=>x.id===id) as (typeof objects[number]&{pressure?:number;state?:string})|undefined;
@@ -27,7 +31,7 @@ export function applyObjectMutation(s:TacticalState,id:string,m:FamilyMutation&{
   if(m.crowdState!=null&&"state"in object)object.state=m.crowdState;
   return s;
 }
-export function applyPhase(s:TacticalState,p:EncounterPhase){s.activePhaseId=p.id;(p.mutations??[]).forEach(m=>m.targetType==="family"?applyFamilyMutation(s,m.targetId,m.changes):applyObjectMutation(s,m.targetId,m.changes));return s}
+export function applyPhase(s:TacticalState,p:EncounterPhase){s.activePhaseId=p.id;(p.mutations??[]).forEach(m=>m.targetType==="family"?applyFamilyMutation(s,m.targetId,m.changes):applyObjectMutation(s,m.targetId,m.changes));s.tokens.forEach(t=>{if(p.activeTokenIds?.includes(t.id))t.visible=true;if(p.showPresentationTokenIds?.includes(t.id))t.presentationVisible=true;if(p.hidePresentationTokenIds?.includes(t.id))t.presentationVisible=false});s.zones.forEach(z=>{if(p.activeZoneIds?.includes(z.id))z.active=true;if(p.showPresentationZoneIds?.includes(z.id))z.presentationVisible=true;if(p.hidePresentationZoneIds?.includes(z.id))z.presentationVisible=false});s.crowdRegions.forEach(c=>{if(p.activeCrowdRegionIds?.includes(c.id))c.active=true;if(p.showPresentationCrowdRegionIds?.includes(c.id))c.presentationVisible=true;if(p.hidePresentationCrowdRegionIds?.includes(c.id))c.presentationVisible=false});p.showPresentationFamilyIds?.forEach(id=>applyFamilyMutation(s,id,{presentationVisible:true}));p.hidePresentationFamilyIds?.forEach(id=>applyFamilyMutation(s,id,{presentationVisible:false}));return s}
 export const familyMembers=(s:TacticalState,f:TacticalFamily)=>{const ids=new Set(f.memberIds);return[...s.tokens,...s.zones,...s.crowdRegions,...s.aoes,...s.spotlights,...s.annotations,...s.tethers].filter(x=>ids.has(x.id)||x.familyId===f.id)};
 
 export type TacticalSelection = { kind:"token"|"zone"|"crowd"|"aoe"|"spotlight"|"annotation"|"tether"; id:string };
@@ -40,3 +44,15 @@ export const commitHistory=(history:TacticalHistory,next:TacticalState):Tactical
 export const undoHistory=(history:TacticalHistory):TacticalHistory=>history.past.length?{past:history.past.slice(0,-1),present:structuredClone(history.past.at(-1)!),future:[structuredClone(history.present),...history.future]}:history;
 export const redoHistory=(history:TacticalHistory):TacticalHistory=>history.future.length?{past:[...history.past,structuredClone(history.present)],present:structuredClone(history.future[0]),future:history.future.slice(1)}:history;
 export const createCheckpoint=(state:TacticalState,label:string,id=crypto.randomUUID(),at=new Date().toISOString())=>({id,label,createdAt:at,state:structuredClone(state)});
+export function meaningfulStateChange(before:TacticalState,after:TacticalState){return JSON.stringify(before)!==JSON.stringify(after)}
+export function createCheckpointGate(){let committed=false;return{shouldCreate:(before:TacticalState,after:TacticalState)=>!committed&&meaningfulStateChange(before,after),markCreated:()=>{committed=true}}}
+export function moveTetherEndpoint(s:TacticalState,id:string,end:"from"|"to",point:Point){const tether=s.tethers.find(t=>t.id===id);if(!tether||tether.locked||tether[`${end}TokenId`])return s;tether[end]=point;return s}
+export const tokenDistance=(a:Point,b:Point,gridSize:number,distancePerSquare:number)=>distance(a,b)/gridSize*distancePerSquare;
+export type RulerState={points:Point[];preview?:Point;finished:boolean};
+export const startRuler=(point:Point):RulerState=>({points:[point],preview:point,finished:false});
+export const previewRuler=(ruler:RulerState,point:Point):RulerState=>({...ruler,preview:point});
+export const addRulerWaypoint=(ruler:RulerState,point:Point):RulerState=>({...ruler,points:[...ruler.points,point],preview:point});
+export const finishRuler=(ruler:RulerState):RulerState=>({...ruler,preview:undefined,finished:true});
+export const createPhaseMutation=(targetType:"family"|"object",targetId:string,id=crypto.randomUUID())=>({id,targetType,targetId,changes:{}});
+export const updatePhaseMutation=(phase:EncounterPhase,id:string,changes:Partial<PhaseMutation>):EncounterPhase=>({...phase,mutations:(phase.mutations??[]).map(m=>m.id===id?{...m,...changes}:m)});
+export const deletePhaseMutation=(phase:EncounterPhase,id:string):EncounterPhase=>({...phase,mutations:(phase.mutations??[]).filter(m=>m.id!==id)});

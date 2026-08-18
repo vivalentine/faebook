@@ -54,6 +54,16 @@ function normalizeState(raw, version = 1) {
   state.tokens = state.tokens.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.visible }));
   state.zones = state.zones.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? (item.visible && item.active) }));
   state.crowdRegions = state.crowdRegions.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.active }));
+  const objects = [...state.tokens, ...state.zones, ...state.crowdRegions, ...state.aoes, ...state.spotlights, ...state.annotations, ...state.tethers];
+  const legacyMembership = new Map();
+  state.families.forEach((family) => (family.memberIds || []).forEach((id) => { if (!legacyMembership.has(id)) legacyMembership.set(id, family.id); }));
+  state.families.forEach((family) => { family.memberIds = []; });
+  objects.forEach((object) => {
+    const familyId = state.families.some((family) => family.id === object.familyId) ? object.familyId : legacyMembership.get(object.id);
+    object.familyId = state.families.some((family) => family.id === familyId) ? familyId : undefined;
+    const family = state.families.find((item) => item.id === object.familyId);
+    if (family && !family.memberIds.includes(object.id)) family.memberIds.push(object.id);
+  });
   state.eventLog = state.eventLog.slice(-LIMITS.eventLog);
   return state;
 }
