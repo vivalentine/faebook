@@ -41,6 +41,7 @@ const {
   SUPPORTED_EXTENSIONS,
 } = require("./portrait-assets");
 const { buildSummerCourtVisibilitySql, validateSummerCourtDateTime } = require("./summer-court-calendar");
+const { registerTacticalEncounterRoutes } = require("./tactical-encounters");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -364,6 +365,8 @@ function requireRole(...roles) {
     next();
   };
 }
+
+registerTacticalEncounterRoutes(app, requireRole("dm"));
 
 function mapNpcForPlayer(npc) {
   if (!npc) return null;

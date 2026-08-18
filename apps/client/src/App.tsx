@@ -25,6 +25,8 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const WhisperNetworkPage = lazy(() => import("./pages/WhisperNetworkPage"));
+const TacticalEncountersPage = lazy(() => import("./pages/TacticalEncountersPage"));
+const TacticalEncounterPage = lazy(() => import("./pages/TacticalEncounterPage"));
 
 function RouteLoadingFallback() {
   return (
@@ -108,6 +110,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route path="dm/encounters" element={<ProtectedRoute allowRoles={["dm"]}><TacticalEncountersPage /></ProtectedRoute>} />
+              <Route path="dm/encounters/:encounterId" element={<ProtectedRoute allowRoles={["dm"]}><TacticalEncounterPage /></ProtectedRoute>} />
             </Route>
 
             <Route path="/player" element={<Navigate to="/directory" replace />} />

@@ -1,0 +1,14 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { apiFetch } from "../lib/api";
+import type { TacticalEncounter } from "../types/tactical";
+
+type Summary = Omit<TacticalEncounter,"state"> & {mapName?:string|null;currentPhase?:string|null;currentRound:number;tokenCount:number};
+export default function TacticalEncountersPage(){
+ const [items,setItems]=useState<Summary[]>([]),[error,setError]=useState(""),[busy,setBusy]=useState(false); const navigate=useNavigate();
+ async function load(){const r=await apiFetch("/api/dm/encounters");const d=await r.json();if(!r.ok)throw new Error(d.error);setItems(d.encounters)}
+ useEffect(()=>{load().catch(e=>setError(e.message))},[]);
+ async function create(){setBusy(true);try{const r=await apiFetch("/api/dm/encounters",{method:"POST",body:JSON.stringify({name:"New Tactical Encounter"})});const d=await r.json();if(!r.ok)throw new Error(d.error);navigate(`/dm/encounters/${d.encounter.id}`)}catch(e){setError(e instanceof Error?e.message:"Create failed")}finally{setBusy(false)}}
+ async function action(id:number,kind:"duplicate"|"archive"){if(kind==="archive"&&!confirm("Archive this encounter?"))return;const r=await apiFetch(`/api/dm/encounters/${id}${kind==="duplicate"?"/duplicate":""}`,{method:kind==="duplicate"?"POST":"DELETE"});if(!r.ok){const d=await r.json();setError(d.error);return}if(kind==="duplicate"){const d=await r.json();navigate(`/dm/encounters/${d.encounter.id}`)}else await load()}
+ return <main className="tactical-library"><header className="tactical-page-heading"><div><p className="eyebrow">DM Tools</p><h1>Tactical Encounters</h1><p>Private battle control for set-piece encounters.</p></div><button className="primary-action" disabled={busy} onClick={create}>＋ Create Encounter</button></header>{error&&<p className="form-error">{error}</p>}<section className="encounter-grid">{items.map(e=><article className="encounter-card" key={e.id}><div className="encounter-card-top"><span className={`encounter-status ${e.status}`}>{e.status}</span><time>{new Date(e.updatedAt).toLocaleString()}</time></div><h2>{e.name}</h2><p>{e.mapName||"Blank battlefield"}</p><dl><div><dt>Phase</dt><dd>{e.currentPhase||"Not set"}</dd></div><div><dt>Round</dt><dd>{e.currentRound}</dd></div><div><dt>Tokens</dt><dd>{e.tokenCount}</dd></div></dl><div className="encounter-actions"><Link className="primary-action" to={`/dm/encounters/${e.id}`}>Open</Link><button onClick={()=>action(e.id,"duplicate")}>Duplicate</button><button className="danger-quiet" onClick={()=>action(e.id,"archive")}>Archive</button></div></article>)}</section>{!items.length&&!error&&<div className="empty-state"><h2>No encounters yet</h2><p>Create a blank battlefield and prepare the finale.</p></div>}</main>
+}
