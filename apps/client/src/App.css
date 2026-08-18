@@ -5318,11 +5318,44 @@ body.prefers-reduced-motion *::after {
   fill: #fff0c2;
   stroke: #a6532f;
 }
-.surge-draft-controls { max-width: min(760px, calc(100vw - 2rem)); flex-wrap: wrap; }
-.surge-draft-controls label { display: flex; align-items: center; gap: .4rem; color: #f7e9da; }
-.surge-draft-controls input { width: 150px; }
-.surge-vertex-list { display: flex; gap: .3rem; max-width: 100%; overflow-x: auto; }
-.surge-vertex-list span { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; color: #f5dcc7; }
+.surge-actions {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .6rem;
+  border: 1px solid #d7869e;
+  border-radius: 10px;
+  background: #241528f2;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .45);
+}
+.surge-draft-controls {
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  max-height: calc(100% - 2rem);
+  box-sizing: border-box;
+  flex-wrap: wrap;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.surge-draft-heading { display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+.surge-draft-heading span { color: #f0b9c9; font-size: .82rem; }
+.surge-draft-controls label { display: flex; align-items: center; gap: .4rem; color: #f7e9da; white-space: nowrap; }
+.surge-draft-controls input { width: 150px; max-width: min(150px, 45vw); }
+.surge-vertices { max-width: 100%; color: #f5dcc7; }
+.surge-vertices summary { cursor: pointer; white-space: nowrap; }
+.surge-vertex-list { display: flex; flex-wrap: wrap; gap: .3rem; max-width: 100%; padding-top: .4rem; }
+.surge-draft-buttons { display: flex; gap: .4rem; margin-left: auto; }
+.surge-draft-controls .primary-action { background: #76549b; border-color: #c59bea; color: #fff; font-weight: 700; }
+@media (max-width: 640px) {
+  .surge-actions { bottom: .5rem; }
+  .surge-draft-controls { max-width: calc(100% - 1rem); max-height: calc(100% - 1rem); }
+  .surge-vertices { order: 4; width: 100%; }
+}
 .measurement-share { display: inline-flex; align-items: center; gap: .35rem; color: #ede8f4; white-space: nowrap; }
 .tactical-measurement { pointer-events: none; }
 .battlefield-presentation .tactical-measurement line { stroke-width: 7; filter: drop-shadow(0 0 5px #000); }
