@@ -366,7 +366,7 @@ function requireRole(...roles) {
   };
 }
 
-registerTacticalEncounterRoutes(app, requireRole("dm"));
+registerTacticalEncounterRoutes(app, requireRole("dm"), uploadImageSingle);
 
 function mapNpcForPlayer(npc) {
   if (!npc) return null;
