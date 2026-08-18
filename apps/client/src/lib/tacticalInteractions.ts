@@ -1,4 +1,4 @@
-import type { EncounterPhase, FamilyMutation, PhaseMutation, Point, TacticalAoe, TacticalFamily, TacticalState, ThresholdRule } from "../types/tactical";
+import type { EncounterPhase, FamilyMutation, InitiativeEntry, PhaseMutation, Point, TacticalAoe, TacticalFamily, TacticalState, TacticalTether, TacticalToken, ThresholdRule } from "../types/tactical";
 
 export const MIN_POLYGON_VERTICES = 3;
 export const distance = (a: Point, b: Point) => Math.hypot(b.x-a.x,b.y-a.y);
@@ -18,13 +18,14 @@ const tacticalObjects=(s:TacticalState)=>[...s.tokens,...s.zones,...s.crowdRegio
 export function setFamilyMembership(s:TacticalState,objectId:string,familyId?:string){const object=tacticalObjects(s).find(x=>x.id===objectId);if(!object)return s;s.families.forEach(f=>f.memberIds=f.memberIds.filter(id=>id!==objectId));object.familyId=familyId;const family=familyId&&s.families.find(f=>f.id===familyId);if(family&&!family.memberIds.includes(objectId))family.memberIds.push(objectId);return s}
 export function deleteFamily(s:TacticalState,familyId:string){const family=s.families.find(f=>f.id===familyId);if(family)family.memberIds.forEach(id=>setFamilyMembership(s,id));tacticalObjects(s).filter(x=>x.familyId===familyId).forEach(x=>x.familyId=undefined);s.families=s.families.filter(f=>f.id!==familyId);return s}
 export function repairFamilyMembership(s:TacticalState){s.families.forEach(f=>f.memberIds=[]);tacticalObjects(s).forEach(object=>{if(object.familyId&&s.families.some(f=>f.id===object.familyId))setFamilyMembership(s,object.id,object.familyId);else object.familyId=undefined});return s}
-export function applyFamilyMutation(s:TacticalState,id:string,m:FamilyMutation){const f=s.families.find(x=>x.id===id);if(!f)return s;const patch=(items:Array<{id:string;familyId?:string;visible?:boolean;presentationVisible?:boolean;locked?:boolean;active?:boolean}>)=>items.forEach(x=>{if(x.familyId!==id&&!f.memberIds.includes(x.id))return;if(m.visible!=null&&"visible"in x)x.visible=m.visible;if(m.presentationVisible!=null)x.presentationVisible=m.presentationVisible;if(m.locked!=null)x.locked=m.locked;if(m.active!=null&&"active"in x)x.active=m.active});[s.tokens,s.zones,s.crowdRegions,s.aoes,s.spotlights,s.annotations,s.tethers].forEach(x=>patch(x));if(m.active!=null)f.active=m.active;if(m.presentationVisible!=null)f.presentationVisible=m.presentationVisible;if(m.locked!=null)f.locked=m.locked;return s}
+export function applyFamilyMutation(s:TacticalState,id:string,m:FamilyMutation){const f=s.families.find(x=>x.id===id);if(!f)return s;const patch=(items:Array<{id:string;familyId?:string;visible?:boolean;presentationVisible?:boolean;presentationLabelVisible?:boolean;locked?:boolean;active?:boolean}>)=>items.forEach(x=>{if(x.familyId!==id&&!f.memberIds.includes(x.id))return;if(m.visible!=null&&"visible"in x)x.visible=m.visible;if(m.presentationVisible!=null)x.presentationVisible=m.presentationVisible;if(m.presentationLabelVisible!=null&&"category" in x)x.presentationLabelVisible=m.presentationLabelVisible;if(m.locked!=null)x.locked=m.locked;if(m.active!=null&&"active"in x)x.active=m.active});[s.tokens,s.zones,s.crowdRegions,s.aoes,s.spotlights,s.annotations,s.tethers].forEach(x=>patch(x));if(m.active!=null)f.active=m.active;if(m.presentationVisible!=null)f.presentationVisible=m.presentationVisible;if(m.locked!=null)f.locked=m.locked;return s}
 export function applyObjectMutation(s:TacticalState,id:string,m:FamilyMutation&{pressure?:number;crowdState?:TacticalState["crowdRegions"][number]["state"]}){
   const objects=[...s.tokens,...s.zones,...s.crowdRegions,...s.aoes,...s.spotlights,...s.annotations,...s.tethers];
   const object=objects.find(x=>x.id===id) as (typeof objects[number]&{pressure?:number;state?:string})|undefined;
   if(!object)return s;
   if(m.visible!=null&&"visible"in object)object.visible=m.visible;
   if(m.presentationVisible!=null)object.presentationVisible=m.presentationVisible;
+  if(m.presentationLabelVisible!=null){const token=s.tokens.find(x=>x.id===id);if(token)token.presentationLabelVisible=m.presentationLabelVisible;}
   if(m.locked!=null)object.locked=m.locked;
   if(m.active!=null&&"active"in object)object.active=m.active;
   if(m.pressure!=null&&"pressure"in object)object.pressure=m.pressure;
@@ -45,14 +46,24 @@ export const undoHistory=(history:TacticalHistory):TacticalHistory=>history.past
 export const redoHistory=(history:TacticalHistory):TacticalHistory=>history.future.length?{past:[...history.past,structuredClone(history.present)],present:structuredClone(history.future[0]),future:history.future.slice(1)}:history;
 export const createCheckpoint=(state:TacticalState,label:string,id=crypto.randomUUID(),at=new Date().toISOString())=>({id,label,createdAt:at,state:structuredClone(state)});
 export function meaningfulStateChange(before:TacticalState,after:TacticalState){return JSON.stringify(before)!==JSON.stringify(after)}
+export async function checkpointBeforeMutation(checkpoint:()=>Promise<unknown>,mutation:()=>void){await checkpoint();mutation()}
 export function createCheckpointGate(){let committed=false;return{shouldCreate:(before:TacticalState,after:TacticalState)=>!committed&&meaningfulStateChange(before,after),markCreated:()=>{committed=true}}}
 export function moveTetherEndpoint(s:TacticalState,id:string,end:"from"|"to",point:Point){const tether=s.tethers.find(t=>t.id===id);if(!tether||tether.locked||tether[`${end}TokenId`])return s;tether[end]=point;return s}
+export function createTether(input:{fromTokenId?:string;toTokenId?:string;from?:Point;to?:Point;category?:TacticalTether["category"];label?:string;presentationVisible?:boolean},id=crypto.randomUUID()):TacticalTether{return{id,fromTokenId:input.fromTokenId,toTokenId:input.toTokenId,from:input.from,to:input.to,category:input.category??"anchor",label:input.label||undefined,active:true,severed:false,presentationVisible:input.presentationVisible??true,presentationLabel:false,locked:false}}
+export const tokenInitiativeDefault=(category:TacticalToken["category"])=>category!=="object";
+export function normalizeInitiativeEntry(entry:InitiativeEntry):InitiativeEntry{return entry.targetType&&entry.targetId?entry:entry.tokenId?{...entry,targetType:"token",targetId:entry.tokenId}:entry}
+export function initiativeTarget(state:TacticalState,entry:InitiativeEntry){const normalized=normalizeInitiativeEntry(entry);return normalized.targetType==="crowd"?state.crowdRegions.find(x=>x.id===normalized.targetId):normalized.targetType==="token"?state.tokens.find(x=>x.id===normalized.targetId):undefined}
+export const initiativeDisplayName=(state:TacticalState,entry:InitiativeEntry)=>initiativeTarget(state,entry)?.name??entry.name;
+export function synchronizeInitiativeNames(state:TacticalState){state.initiative.entries=state.initiative.entries.map(entry=>{const normalized=normalizeInitiativeEntry(entry);return{...normalized,name:initiativeDisplayName(state,normalized)}});return state}
+export function addInitiativeTarget(state:TacticalState,targetType:"token"|"crowd",targetId:string,initiative=10){if(state.initiative.entries.some(e=>{const n=normalizeInitiativeEntry(e);return n.targetType===targetType&&n.targetId===targetId}))return state;const target=targetType==="token"?state.tokens.find(x=>x.id===targetId):state.crowdRegions.find(x=>x.id===targetId);if(target)state.initiative.entries.push({id:crypto.randomUUID(),targetType,targetId,...(targetType==="token"?{tokenId:targetId}:{}),name:target.name,initiative,active:false});return state}
+export function removeInitiativeTarget(state:TacticalState,targetType:"token"|"crowd",targetId:string){state.initiative.entries=state.initiative.entries.filter(e=>{const n=normalizeInitiativeEntry(e);return n.targetType!==targetType||n.targetId!==targetId});state.initiative.currentIndex=Math.max(0,Math.min(state.initiative.currentIndex,state.initiative.entries.length-1));return state}
 export const tokenDistance=(a:Point,b:Point,gridSize:number,distancePerSquare:number)=>distance(a,b)/gridSize*distancePerSquare;
-export type RulerState={points:Point[];preview?:Point;finished:boolean};
-export const startRuler=(point:Point):RulerState=>({points:[point],preview:point,finished:false});
-export const previewRuler=(ruler:RulerState,point:Point):RulerState=>({...ruler,preview:point});
-export const addRulerWaypoint=(ruler:RulerState,point:Point):RulerState=>({...ruler,points:[...ruler.points,point],preview:point});
-export const finishRuler=(ruler:RulerState):RulerState=>({...ruler,preview:undefined,finished:true});
+export type RulerState={status:"inactive"|"drawing"|"finished";points:Point[];preview?:Point;finished:boolean};
+export const inactiveRuler=():RulerState=>({status:"inactive",points:[],finished:false});
+export const startRuler=(point:Point):RulerState=>({status:"drawing",points:[point],preview:point,finished:false});
+export const previewRuler=(ruler:RulerState,point:Point):RulerState=>ruler.status==="drawing"?{...ruler,preview:point}:ruler;
+export const addRulerWaypoint=(ruler:RulerState,point:Point):RulerState=>ruler.status==="drawing"?{...ruler,points:[...ruler.points,point],preview:point}:ruler;
+export const finishRuler=(ruler:RulerState):RulerState=>ruler.status==="drawing"?{...ruler,status:"finished",preview:undefined,finished:true}:ruler;
 export const createPhaseMutation=(targetType:"family"|"object",targetId:string,id=crypto.randomUUID())=>({id,targetType,targetId,changes:{}});
 export const updatePhaseMutation=(phase:EncounterPhase,id:string,changes:Partial<PhaseMutation>):EncounterPhase=>({...phase,mutations:(phase.mutations??[]).map(m=>m.id===id?{...m,...changes}:m)});
 export const deletePhaseMutation=(phase:EncounterPhase,id:string):EncounterPhase=>({...phase,mutations:(phase.mutations??[]).filter(m=>m.id!==id)});

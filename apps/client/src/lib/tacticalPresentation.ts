@@ -15,3 +15,5 @@ export function presentedTokenIds(state:TacticalState):Set<string>{
   const phase=state.phases.find(item=>item.id===state.activePhaseId);
   return new Set(state.tokens.filter(token=>token.visible&&tokenIsPresented(token,phase)).map(token=>token.id));
 }
+
+export const tokenLabelIsPresented=(token:TacticalToken,state:TacticalState,mode:"dm"|"presentation")=>mode==="dm"||(state.presentation?.layers.tokenLabels!=="off"&&token.presentationLabelVisible!==false);

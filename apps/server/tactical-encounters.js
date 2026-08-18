@@ -52,6 +52,12 @@ function normalizeState(raw, version = 1) {
   const state = { ...base, ...raw, battlefield: { ...base.battlefield, ...(raw?.battlefield || {}) }, initiative: { ...base.initiative, ...(raw?.initiative || {}) } };
   state.presentation = { ...base.presentation, ...(raw?.presentation || {}), layers: { ...base.presentation.layers, ...(raw?.presentation?.layers || {}) } };
   state.tokens = state.tokens.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.visible }));
+  state.initiative.entries = state.initiative.entries.map((entry) => {
+    const targetType = entry.targetType || (entry.tokenId ? "token" : undefined);
+    const targetId = entry.targetId || entry.tokenId;
+    const target = targetType === "crowd" ? state.crowdRegions.find((item) => item.id === targetId) : targetType === "token" ? state.tokens.find((item) => item.id === targetId) : undefined;
+    return { ...entry, ...(targetType && targetId ? { targetType, targetId } : {}), name: target?.name || entry.name };
+  });
   state.zones = state.zones.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? (item.visible && item.active) }));
   state.crowdRegions = state.crowdRegions.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.active }));
   const objects = [...state.tokens, ...state.zones, ...state.crowdRegions, ...state.aoes, ...state.spotlights, ...state.annotations, ...state.tethers];
