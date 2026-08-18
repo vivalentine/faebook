@@ -1,0 +1,341 @@
+{
+  "name": "Idol Willow Finale",
+  "status": "prep",
+  "schemaVersion": 1,
+  "state": {
+    "battlefield": {
+      "width": 2400,
+      "height": 1600,
+      "backgroundImageUrl": "",
+      "imageScale": 1,
+      "imageX": 0,
+      "imageY": 0,
+      "mapLocked": true,
+      "gridVisible": true,
+      "snapEnabled": true,
+      "gridSize": 50,
+      "gridOffsetX": 0,
+      "gridOffsetY": 0,
+      "distancePerSquare": 5,
+      "unit": "ft",
+      "presentationCamera": {
+        "zoom": 0.75,
+        "panX": 40,
+        "panY": 40
+      },
+      "mapName": "Idol Willow Finale Acceptance Arena"
+    },
+    "presentation": {
+      "frozen": false,
+      "blackout": false,
+      "layers": {
+        "background": true,
+        "grid": true,
+        "tokens": true,
+        "tokenLabels": "full",
+        "hpBars": false,
+        "conditions": false,
+        "defeatedTokens": true,
+        "zones": true,
+        "crowdRegions": true,
+        "strings": true,
+        "spotlights": true,
+        "aoes": true,
+        "annotations": true
+      }
+    },
+    "tokens": [
+      {
+        "id": "willow",
+        "name": "Idol Willow",
+        "x": 1200,
+        "y": 700,
+        "size": 150,
+        "category": "boss",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": true,
+        "familyId": "willow-mechanics",
+        "currentHp": 310,
+        "maxHp": 310
+      },
+      {
+        "id": "hero-a",
+        "name": "Lumi",
+        "x": 650,
+        "y": 1000,
+        "size": 50,
+        "category": "player",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": true
+      },
+      {
+        "id": "hero-b",
+        "name": "Pip",
+        "x": 710,
+        "y": 1000,
+        "size": 50,
+        "category": "player",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": true
+      },
+      {
+        "id": "stack-a",
+        "name": "Thorn Knight A",
+        "x": 1500,
+        "y": 850,
+        "size": 50,
+        "category": "enemy",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": true,
+        "familyId": "thorn-guard"
+      },
+      {
+        "id": "stack-b",
+        "name": "Thorn Knight B",
+        "x": 1500,
+        "y": 850,
+        "size": 50,
+        "category": "enemy",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": true,
+        "familyId": "thorn-guard"
+      },
+      {
+        "id": "secret",
+        "name": "Hidden Dragon",
+        "x": 1850,
+        "y": 400,
+        "size": 150,
+        "category": "boss",
+        "conditions": [],
+        "visible": true,
+        "presentationVisible": false,
+        "familyId": "dragon-reveal"
+      }
+    ],
+    "initiative": {
+      "round": 1,
+      "currentIndex": 0,
+      "manualOrder": false,
+      "entries": []
+    },
+    "phases": [
+      {
+        "id": "phase-1",
+        "name": "The Revel Begins",
+        "description": "Willow and the crowd are visible."
+      },
+      {
+        "id": "phase-2",
+        "name": "The Idol Cracks",
+        "description": "Reveal roots and agitate the crowd.",
+        "mutations": [
+          {
+            "id": "m1",
+            "targetType": "family",
+            "targetId": "willow-mechanics",
+            "changes": {
+              "active": true,
+              "presentationVisible": true
+            }
+          }
+        ]
+      },
+      {
+        "id": "phase-3",
+        "name": "Dragonfall",
+        "description": "Reveal the hidden dragon family.",
+        "mutations": [
+          {
+            "id": "m2",
+            "targetType": "family",
+            "targetId": "dragon-reveal",
+            "changes": {
+              "active": true,
+              "presentationVisible": true
+            }
+          }
+        ]
+      }
+    ],
+    "activePhaseId": "phase-1",
+    "families": [
+      {
+        "id": "willow-mechanics",
+        "name": "Willow Mechanics",
+        "memberIds": [
+          "willow",
+          "roots",
+          "willow-aura",
+          "willow-light",
+          "dm-note",
+          "binding"
+        ],
+        "active": true
+      },
+      {
+        "id": "thorn-guard",
+        "name": "Thorn Guard",
+        "memberIds": [
+          "stack-a",
+          "stack-b"
+        ],
+        "active": true
+      },
+      {
+        "id": "dragon-reveal",
+        "name": "Dragon Reveal",
+        "memberIds": [
+          "secret",
+          "dragon-line"
+        ],
+        "active": false
+      }
+    ],
+    "zones": [
+      {
+        "id": "roots",
+        "name": "Grasping Root Maze",
+        "points": [
+          {
+            "x": 900,
+            "y": 500
+          },
+          {
+            "x": 1450,
+            "y": 480
+          },
+          {
+            "x": 1550,
+            "y": 930
+          },
+          {
+            "x": 850,
+            "y": 950
+          }
+        ],
+        "kind": "hazard",
+        "active": true,
+        "visible": true,
+        "presentationVisible": true,
+        "familyId": "willow-mechanics"
+      }
+    ],
+    "crowdRegions": [
+      {
+        "id": "crowd-east",
+        "name": "Panicked Revelers",
+        "points": [
+          {
+            "x": 1600,
+            "y": 1050
+          },
+          {
+            "x": 2200,
+            "y": 1000
+          },
+          {
+            "x": 2250,
+            "y": 1450
+          },
+          {
+            "x": 1550,
+            "y": 1480
+          }
+        ],
+        "state": "agitated",
+        "active": true,
+        "presentationVisible": true,
+        "pressure": 2,
+        "surgeDistance": 150,
+        "surgeDirection": 180,
+        "dangerThreshold": 3,
+        "escalationThreshold": 4,
+        "thresholdRules": [
+          {
+            "id": "danger-rule",
+            "name": "Reveal crush danger",
+            "enabled": true,
+            "comparison": "at-least",
+            "threshold": 3,
+            "mutation": {
+              "active": true,
+              "presentationVisible": true
+            }
+          }
+        ],
+        "surges": []
+      }
+    ],
+    "tethers": [
+      {
+        "id": "binding",
+        "fromTokenId": "willow",
+        "toTokenId": "hero-a",
+        "category": "binding",
+        "active": true,
+        "label": "Idol bond",
+        "presentationVisible": true,
+        "familyId": "willow-mechanics"
+      }
+    ],
+    "spotlights": [
+      {
+        "id": "willow-light",
+        "name": "Willow Focus",
+        "x": 1200,
+        "y": 700,
+        "radius": 250,
+        "intensity": 0.8,
+        "active": true,
+        "presentationVisible": true,
+        "familyId": "willow-mechanics"
+      }
+    ],
+    "aoes": [
+      {
+        "id": "willow-aura",
+        "name": "Idol Song",
+        "shape": "ring",
+        "x": 1200,
+        "y": 700,
+        "size": 350,
+        "innerRadius": 200,
+        "active": true,
+        "presentationVisible": true,
+        "familyId": "willow-mechanics"
+      },
+      {
+        "id": "dragon-line",
+        "name": "Moonfire Breath",
+        "shape": "line",
+        "x": 1850,
+        "y": 400,
+        "size": 500,
+        "width": 100,
+        "rotation": 135,
+        "active": false,
+        "presentationVisible": false,
+        "familyId": "dragon-reveal"
+      }
+    ],
+    "annotations": [
+      {
+        "id": "dm-note",
+        "type": "text",
+        "x": 1100,
+        "y": 300,
+        "text": "Phase trigger: crown breaks",
+        "presentationVisible": false,
+        "familyId": "willow-mechanics"
+      }
+    ],
+    "events": [],
+    "eventLog": []
+  }
+}
