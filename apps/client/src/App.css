@@ -5236,7 +5236,6 @@ body.prefers-reduced-motion *::after {
 /* Tactical finale direct-manipulation affordances */
 .editable-polygon{cursor:pointer}.editable-polygon.selected polygon{filter:drop-shadow(0 0 7px #d9b4ff);stroke:#f4dcff}.polygon-edge-hit{stroke:transparent;stroke-width:18;pointer-events:stroke;cursor:copy}.manipulation-handle{fill:#f7e8ff;stroke:#6d3b8c;stroke-width:4;vector-effect:non-scaling-stroke;cursor:grab;filter:drop-shadow(0 2px 3px #000)}.manipulation-handle.vertex{fill:#e8c9ff}.manipulation-handle.resize{fill:#8ee2ce}.manipulation-handle.rotate{fill:#ffd579}.manipulation-handle:active{cursor:grabbing;fill:white}.tactical-aoe.selected .persistent-aoe{stroke:#fff;filter:drop-shadow(0 0 8px #ba72ef)}
 .tactical-context-menu{position:fixed;z-index:240;width:220px;display:grid;gap:.3rem;padding:.55rem;background:#181120;border:1px solid #9671ad;border-radius:10px;box-shadow:0 14px 40px #000b}.tactical-context-menu button,.tactical-context-menu label{text-align:left;width:100%}.tactical-context-menu select{width:100%}.vertex-list{display:grid;gap:.25rem}
-.surge-preview polygon{fill:#e76c4933;stroke:#ff9b70;stroke-width:6;stroke-dasharray:14 8}.surge-preview line{stroke:#fff0a8;stroke-width:8;marker-end:none}.surge-preview circle{fill:#fff0a8;stroke:#7e3d30;stroke-width:4}.surge-preview circle.danger{fill:#eb405a22;stroke:#ff5c70;stroke-dasharray:10}.surge-preview text{fill:white;font-size:20px;font-weight:800;paint-order:stroke;stroke:#1a1018;stroke-width:5}.surge-actions{position:absolute;left:50%;bottom:1rem;transform:translateX(-50%);z-index:4;display:flex;align-items:center;gap:.45rem;background:#241528e8;border:1px solid #d7869e;padding:.5rem;border-radius:10px}
 .waypoint-ruler line{stroke:#f0cf72;stroke-width:5;stroke-dasharray:10 6}.waypoint-ruler circle{fill:#fff1b4;stroke:#6b4a22;stroke-width:3}.waypoint-ruler text{fill:#fff1b4;font-weight:800;font-size:18px;paint-order:stroke;stroke:#17101e;stroke-width:4}.stack-indicator{cursor:pointer}.stack-indicator circle{fill:#6e3d89;stroke:#fff;stroke-width:3}.stack-indicator text{fill:white;font-size:14px;font-weight:900;pointer-events:none}
 
 /* Final tactical live-use polish */
@@ -5304,3 +5303,23 @@ body.prefers-reduced-motion *::after {
   background: #27202f;
   border: 1px solid #806596;
 }
+
+/* Local polygon editor for authored crowd surge destinations. */
+.crowd-region.surge-source { opacity: .3; pointer-events: none; }
+.surge-draft {
+  fill: rgba(232, 139, 76, .2);
+  stroke: #ffb568;
+  stroke-width: 6;
+  stroke-dasharray: 14 8;
+  filter: drop-shadow(0 0 8px rgba(255, 158, 80, .55));
+  cursor: move;
+}
+.editable-polygon:has(.surge-draft) .manipulation-handle {
+  fill: #fff0c2;
+  stroke: #a6532f;
+}
+.surge-draft-controls { max-width: min(760px, calc(100vw - 2rem)); flex-wrap: wrap; }
+.surge-draft-controls label { display: flex; align-items: center; gap: .4rem; color: #f7e9da; }
+.surge-draft-controls input { width: 150px; }
+.surge-vertex-list { display: flex; gap: .3rem; max-width: 100%; overflow-x: auto; }
+.surge-vertex-list span { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; color: #f5dcc7; }
