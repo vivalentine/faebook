@@ -5328,3 +5328,19 @@ body.prefers-reduced-motion *::after {
 .battlefield-presentation .tactical-measurement line { stroke-width: 7; filter: drop-shadow(0 0 5px #000); }
 .battlefield-presentation .tactical-measurement circle { r: 9px; filter: drop-shadow(0 0 4px #000); }
 .battlefield-presentation .tactical-measurement text { font-size: 22px; }
+.altitude-controls { margin-top: .65rem; }
+.altitude-controls > div:last-child { display: grid; grid-template-columns: auto minmax(70px,1fr) auto auto; gap: .3rem; align-items: end; }
+.altitude-controls label { margin: 0; }
+.altitude-controls input { width: 100%; }
+.tactical-token > circle.flight-aura { fill: none; stroke: #72d9e7; stroke-width: 5; stroke-dasharray: 5 6; opacity: .85; filter: drop-shadow(0 0 7px #5ee1f0); pointer-events: none; }
+.altitude-badge { pointer-events: none; }
+.altitude-badge rect { fill: #10131ee8; stroke: #80dce8; stroke-width: 1.5; }
+.altitude-badge text { fill: #dffcff; stroke: none; font-size: 12px; font-weight: 800; }
+.ruler-mode { display: inline-flex; }
+.ruler-altitudes { display: inline-flex; align-items: center; gap: .4rem; }
+.ruler-altitudes label { display: inline-flex; align-items: center; gap: .2rem; color: #cfc4d8; font-size: .75rem; }
+.ruler-altitudes input { width: 62px; }
+.measurement-component { font-size: 13px; fill: #fff0b3; }
+.stack-chooser { position: absolute; z-index: 5; left: .7rem; bottom: 3rem; display: grid; min-width: 220px; padding: .6rem; gap: .3rem; border: 1px solid #76549b; border-radius: 9px; background: #130f19ee; }
+.stack-chooser button { display: flex; justify-content: space-between; gap: 1rem; }
+.stack-chooser small { color: #9de7ed; }

@@ -34,11 +34,12 @@ function validateState(input) {
   });
   if (!input.battlefield || !finite(input.battlefield.width, 100, 20000) || !finite(input.battlefield.height, 100, 20000) || !finite(input.battlefield.gridSize, 5, 1000) || !finite(input.battlefield.distancePerSquare, 0.01, 100000) || !text(input.battlefield.unit, 12, true)) issues.push("invalid battlefield settings");
   const measurement = input.presentation?.measurement;
-  if (measurement != null && (!point(measurement.start) || !point(measurement.end) || !finite(measurement.distance, 0, 1000000) || !text(measurement.unit, 12, true))) issues.push("invalid presentation measurement");
+  if (measurement != null && (!point(measurement.start) || !point(measurement.end) || !finite(measurement.distance, 0, 1000000) || !finite(measurement.horizontal, 0, 1000000) || !finite(measurement.vertical, 0, 200000) || !["2d","3d"].includes(measurement.mode) || !text(measurement.unit, 12, true))) issues.push("invalid presentation measurement");
   if (!input.initiative || !Number.isInteger(input.initiative.round) || input.initiative.round < 1 || !Number.isInteger(input.initiative.currentIndex)) issues.push("invalid initiative state");
   if (!uniqueIds(input.tokens)) issues.push("token IDs must be unique");
   input.tokens.forEach((token) => {
     if (!text(token.name, 120, true) || !point(token) || !finite(token.size, 10, 1000) || !TOKEN_CATEGORIES.has(token.category) || !Array.isArray(token.conditions) || token.conditions.length > 30 || token.conditions.some((c) => !text(c, 60, true))) issues.push(`invalid token ${token.id || "(unknown)"}`);
+    if (token.altitude != null && !finite(token.altitude, -100000, 100000)) issues.push(`invalid token altitude ${token.id || "(unknown)"}`);
     ["currentHp", "maxHp", "tempHp", "ac"].forEach((key) => { if (token[key] != null && !finite(token[key], 0, 1000000)) issues.push(`invalid token ${key}`); });
   });
   if (!uniqueIds(input.zones) || input.zones.some((zone) => !text(zone.name, 120, true) || !ZONE_KINDS.has(zone.kind) || !Array.isArray(zone.points) || zone.points.length < 3 || zone.points.length > 100 || !zone.points.every(point))) issues.push("invalid zone data");
@@ -53,7 +54,9 @@ function normalizeState(raw, version = 1) {
   const base = defaultState();
   const state = { ...base, ...raw, battlefield: { ...base.battlefield, ...(raw?.battlefield || {}) }, initiative: { ...base.initiative, ...(raw?.initiative || {}) } };
   state.presentation = { ...base.presentation, ...(raw?.presentation || {}), layers: { ...base.presentation.layers, ...(raw?.presentation?.layers || {}) } };
-  state.tokens = state.tokens.map((item) => ({ ...item, presentationVisible: item.presentationVisible ?? item.visible }));
+  if (state.presentation.measurement) { const m=state.presentation.measurement; state.presentation.measurement={...m,start:{...m.start,altitude:m.start.altitude??0},end:{...m.end,altitude:m.end.altitude??0},mode:m.mode||"2d",horizontal:m.horizontal??m.distance,vertical:m.vertical??0}; }
+  state.tokens = state.tokens.map((item) => ({ ...item, altitude: item.altitude ?? 0, presentationVisible: item.presentationVisible ?? item.visible }));
+  ["spotlights", "aoes", "annotations"].forEach((key) => { state[key] = state[key].map((item) => ({ ...item, altitude: item.altitude ?? 0 })); });
   state.initiative.entries = state.initiative.entries.map((entry) => {
     const targetType = entry.targetType || (entry.tokenId ? "token" : undefined);
     const targetId = entry.targetId || entry.tokenId;
