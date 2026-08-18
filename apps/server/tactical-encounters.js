@@ -2,7 +2,7 @@ const db = require("./db");
 const { createAuditLog } = require("./archive");
 const { storeTacticalImage } = require("./tactical-assets");
 
-const LIMITS = { tokens: 250, zones: 100, crowdRegions: 50, tethers: 250, spotlights: 50, aoes: 100, annotations: 100, initiative: 100, eventLog: 1000, phases: 50, events: 250 };
+const LIMITS = { tokens: 250, zones: 100, crowdRegions: 50, tethers: 250, spotlights: 50, aoes: 100, annotations: 100, initiative: 100, eventLog: 1000, phases: 50, families: 100, events: 250 };
 const STATUSES = new Set(["prep", "active", "complete"]);
 const TOKEN_CATEGORIES = new Set(["player", "ally", "enemy", "boss", "object"]);
 const ZONE_KINDS = new Set(["hazard", "terrain", "effect", "objective", "custom"]);
@@ -13,7 +13,7 @@ function defaultState() {
     battlefield: { width: 2400, height: 1600, backgroundImageUrl: "", imageScale: 1, imageX: 0, imageY: 0, mapLocked: true, gridVisible: true, snapEnabled: true, gridSize: 50, gridOffsetX: 0, gridOffsetY: 0, distancePerSquare: 5, unit: "ft", presentationCamera: { zoom: .75, panX: 40, panY: 40 } },
     presentation: { frozen: false, blackout: false, layers: { background: true, grid: true, tokens: true, tokenLabels: "full", hpBars: false, conditions: false, defeatedTokens: true, zones: true, crowdRegions: true, strings: true, spotlights: true, aoes: true, annotations: true } },
     tokens: [], initiative: { round: 1, currentIndex: 0, manualOrder: false, entries: [] },
-    phases: [], activePhaseId: null, zones: [], crowdRegions: [], tethers: [], spotlights: [], aoes: [], annotations: [], events: [], eventLog: [],
+    phases: [], activePhaseId: null, families: [], zones: [], crowdRegions: [], tethers: [], spotlights: [], aoes: [], annotations: [], events: [], eventLog: [],
   };
 }
 
@@ -25,7 +25,7 @@ function uniqueIds(items) { return items.every((item, index) => text(item?.id, 1
 function validateState(input) {
   const issues = [];
   if (!input || typeof input !== "object" || Array.isArray(input)) return ["state must be an object"];
-  const arrays = ["tokens", "phases", "zones", "crowdRegions", "tethers", "spotlights", "aoes", "annotations", "events", "eventLog"];
+  const arrays = ["tokens", "phases", "families", "zones", "crowdRegions", "tethers", "spotlights", "aoes", "annotations", "events", "eventLog"];
   arrays.forEach((key) => { if (!Array.isArray(input[key])) issues.push(`${key} must be an array`); });
   if (issues.length) return issues;
   Object.entries(LIMITS).forEach(([key, max]) => {
@@ -42,7 +42,7 @@ function validateState(input) {
   if (!uniqueIds(input.zones) || input.zones.some((zone) => !text(zone.name, 120, true) || !ZONE_KINDS.has(zone.kind) || !Array.isArray(zone.points) || zone.points.length < 3 || zone.points.length > 100 || !zone.points.every(point))) issues.push("invalid zone data");
   if (!uniqueIds(input.crowdRegions) || input.crowdRegions.some((region) => !text(region.name, 120, true) || !CROWD_STATES.has(region.state) || !Array.isArray(region.points) || region.points.length < 3 || region.points.length > 100 || !region.points.every(point))) issues.push("invalid crowd region data");
   if (!Array.isArray(input.initiative?.entries) || !uniqueIds(input.initiative?.entries || []) || input.initiative.entries.some((entry) => !text(entry.name, 120, true) || !finite(entry.initiative, -1000, 1000))) issues.push("invalid initiative entries");
-  [input.phases, input.tethers, input.spotlights, input.aoes, input.annotations, input.events, input.eventLog].forEach((items) => { if (!uniqueIds(items)) issues.push("object IDs must be unique"); });
+  [input.phases, input.families, input.tethers, input.spotlights, input.aoes, input.annotations, input.events, input.eventLog].forEach((items) => { if (!uniqueIds(items)) issues.push("object IDs must be unique"); });
   return [...new Set(issues)];
 }
 
