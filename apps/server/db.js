@@ -971,4 +971,39 @@ db.prepare(
   `
 ).run(campaignSeedNow);
 
+// Tactical encounters intentionally store a versioned document.  These additive
+// tables are the migration boundary; state evolution happens in the normalizer.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS tactical_encounters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'prep' CHECK (status IN ('prep', 'active', 'complete')),
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    state_json TEXT NOT NULL,
+    created_by_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    archived_at TEXT,
+    archived_by_user_id INTEGER,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id),
+    FOREIGN KEY (archived_by_user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_tactical_encounters_active_updated
+    ON tactical_encounters(archived_at, updated_at DESC);
+
+  CREATE TABLE IF NOT EXISTS tactical_encounter_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    encounter_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    state_json TEXT NOT NULL,
+    created_by_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (encounter_id) REFERENCES tactical_encounters(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_tactical_snapshots_encounter
+    ON tactical_encounter_snapshots(encounter_id, created_at DESC);
+`);
+
 module.exports = db;

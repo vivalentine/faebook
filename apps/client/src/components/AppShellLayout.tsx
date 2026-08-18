@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Locations", to: "/locations", icon: "map-pin" },
   { label: "Archive", to: "/archive", icon: "archive", dmOnly: true },
   { label: "DM Tools", to: "/dm-tools", icon: "sliders", dmOnly: true },
+  { label: "Tactical Encounters", to: "/dm/encounters", icon: "pinboard", dmOnly: true },
 ];
 
 export default function AppShellLayout() {
