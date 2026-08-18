@@ -13,6 +13,18 @@ test('DM tactical state rejects invalid polygons', () => {
   const state = defaultState(); state.zones.push({ id:'bad', name:'Bad', kind:'hazard', active:true, visible:true, points:[{x:0,y:0},{x:1,y:1}] });
   assert.match(validateState(state).join(','), /invalid zone data/);
 });
+test('presentation measurement is persisted and validated', () => {
+  const state = defaultState(); state.presentation.measurement = { start:{x:0,y:0}, end:{x:30,y:40}, distance:25, horizontal:25, vertical:0, mode:'2d', unit:'ft' };
+  assert.deepEqual(normalizeState(state).presentation.measurement, {...state.presentation.measurement,start:{...state.presentation.measurement.start,altitude:0},end:{...state.presentation.measurement.end,altitude:0},mode:'2d',horizontal:25,vertical:0});
+  assert.deepEqual(validateState(state), []);
+  state.presentation.measurement.distance = -1;
+  assert.match(validateState(state).join(','), /invalid presentation measurement/);
+});
+test('legacy positioned objects normalize altitude to zero and preserve serialized altitude', () => {
+  const state=defaultState(); state.tokens.push({id:'flyer',name:'Flyer',x:1,y:2,size:50,category:'enemy',conditions:[],visible:true});
+  assert.equal(normalizeState(JSON.parse(JSON.stringify(state))).tokens[0].altitude,0); state.tokens[0].altitude=40;
+  assert.equal(normalizeState(JSON.parse(JSON.stringify(state))).tokens[0].altitude,40);
+});
 test('normalization repairs stale family membership in both directions', () => {
   const state = defaultState();
   state.families = [{ id:'a', name:'A', memberIds:['token','token','missing'], active:true }, { id:'b', name:'B', memberIds:[], active:true }];
