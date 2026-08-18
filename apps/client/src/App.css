@@ -5344,3 +5344,30 @@ body.prefers-reduced-motion *::after {
 .stack-chooser { position: absolute; z-index: 5; left: .7rem; bottom: 3rem; display: grid; min-width: 220px; padding: .6rem; gap: .3rem; border: 1px solid #76549b; border-radius: 9px; background: #130f19ee; }
 .stack-chooser button { display: flex; justify-content: space-between; gap: 1rem; }
 .stack-chooser small { color: #9de7ed; }
+
+/* Surge authoring is an isolated battlefield editing layer. */
+.battlefield,
+.battlefield * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.battlefield image {
+  -webkit-user-drag: none;
+}
+.battlefield.surge-editing .battlefield-content > * {
+  pointer-events: none;
+}
+.battlefield.surge-editing .surge-edit-isolation,
+.battlefield.surge-editing .surge-draft-editor,
+.battlefield.surge-editing .surge-draft-editor * {
+  pointer-events: all;
+}
+.surge-edit-isolation {
+  fill: rgba(8, 5, 12, .12);
+  cursor: default;
+}
+.surge-draft-editor .surge-draft { cursor: grab; }
+.surge-draft-editor .surge-draft:active,
+.surge-draft-editor .manipulation-handle:active { cursor: grabbing; }
+.surge-draft-editor .manipulation-handle { cursor: grab; }
+.surge-draft-editor .polygon-edge-hit { cursor: copy; }
