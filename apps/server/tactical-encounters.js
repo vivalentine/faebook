@@ -33,6 +33,8 @@ function validateState(input) {
     if (!Array.isArray(items) || items.length > max) issues.push(`${key} exceeds limit ${max}`);
   });
   if (!input.battlefield || !finite(input.battlefield.width, 100, 20000) || !finite(input.battlefield.height, 100, 20000) || !finite(input.battlefield.gridSize, 5, 1000) || !finite(input.battlefield.distancePerSquare, 0.01, 100000) || !text(input.battlefield.unit, 12, true)) issues.push("invalid battlefield settings");
+  const measurement = input.presentation?.measurement;
+  if (measurement != null && (!point(measurement.start) || !point(measurement.end) || !finite(measurement.distance, 0, 1000000) || !text(measurement.unit, 12, true))) issues.push("invalid presentation measurement");
   if (!input.initiative || !Number.isInteger(input.initiative.round) || input.initiative.round < 1 || !Number.isInteger(input.initiative.currentIndex)) issues.push("invalid initiative state");
   if (!uniqueIds(input.tokens)) issues.push("token IDs must be unique");
   input.tokens.forEach((token) => {

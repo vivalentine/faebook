@@ -5323,3 +5323,8 @@ body.prefers-reduced-motion *::after {
 .surge-draft-controls input { width: 150px; }
 .surge-vertex-list { display: flex; gap: .3rem; max-width: 100%; overflow-x: auto; }
 .surge-vertex-list span { display: inline-flex; align-items: center; gap: .25rem; white-space: nowrap; color: #f5dcc7; }
+.measurement-share { display: inline-flex; align-items: center; gap: .35rem; color: #ede8f4; white-space: nowrap; }
+.tactical-measurement { pointer-events: none; }
+.battlefield-presentation .tactical-measurement line { stroke-width: 7; filter: drop-shadow(0 0 5px #000); }
+.battlefield-presentation .tactical-measurement circle { r: 9px; filter: drop-shadow(0 0 4px #000); }
+.battlefield-presentation .tactical-measurement text { font-size: 22px; }
