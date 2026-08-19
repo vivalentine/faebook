@@ -92,3 +92,12 @@ test('tether endpoint precedence uses live crowd polygon overrides',async()=>{
  assert.deepEqual(tetherEndpoint(s,{crowdId:'c'},{c:[{x:20,y:0},{x:30,y:0},{x:30,y:10},{x:20,y:10}]}),{x:25,y:5});
  assert.deepEqual(tetherEndpoint(s,{tokenId:'t',crowdId:'c'}),{x:10,y:10});
 });
+
+test('anaglyph channels stay perpendicular and screen-space calibrated',async()=>{
+ const {anaglyphChannelLines}=await import('../src/lib/tacticalTethers.ts');
+ const atOne=anaglyphChannelLines({x:0,y:0},{x:100,y:0},6,1),atTwo=anaglyphChannelLines({x:0,y:0},{x:100,y:0},6,2);
+ assert.deepEqual(atOne.red.a,{x:0,y:3});assert.deepEqual(atOne.cyan.a,{x:0,y:-3});
+ assert.equal((atTwo.red.a.y-atTwo.cyan.a.y)*2,6);
+ const vertical=anaglyphChannelLines({x:0,y:0},{x:0,y:100},6,1);assert.deepEqual(vertical.red.a,{x:-3,y:0});
+});
+test('new tethers default to normal and preserve anaglyph style',async()=>{const {createTether}=await import('../src/lib/tacticalInteractions.ts');assert.equal(createTether({from:{x:0,y:0},to:{x:1,y:1}}).style,'normal');assert.equal(createTether({from:{x:0,y:0},to:{x:1,y:1},style:'anaglyph'}).style,'anaglyph')});
