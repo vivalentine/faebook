@@ -5303,6 +5303,7 @@ body.prefers-reduced-motion *::after {
   background: #27202f;
   border: 1px solid #806596;
 }
+.tactical-presentation{cursor:grab;touch-action:none}.tactical-presentation.camera-dragging{cursor:grabbing;user-select:none}.battlefield-presentation .battlefield-content{pointer-events:none}.presenter-overlay{flex-wrap:wrap;max-width:calc(100vw - 2rem)}.presenter-overlay output{min-width:3.5rem;text-align:center;font-variant-numeric:tabular-nums}.follow-dm-camera{display:flex;align-items:center;gap:.35rem;white-space:nowrap;font-size:.78rem;color:#d8cbe3}.follow-dm-camera input{margin:0}
 
 /* Local polygon editor for authored crowd surge destinations. */
 .crowd-region.surge-source { opacity: .3; pointer-events: none; }
@@ -5406,3 +5407,4 @@ body.prefers-reduced-motion *::after {
 .surge-draft-editor .polygon-edge-hit { cursor: copy; }
 /* Tactical resizable workspace */
 .tactical-board-page{overflow:hidden}.tactical-layout{grid-template-columns:var(--left-width,260px) 6px minmax(320px,1fr) 6px var(--right-width,320px);transition:none;overflow:hidden}.tactical-layout.left-closed{grid-template-columns:0 0 minmax(320px,1fr) 6px var(--right-width,320px)}.tactical-layout.right-closed{grid-template-columns:var(--left-width,260px) 6px minmax(320px,1fr) 0 0}.tactical-layout.left-closed.right-closed{grid-template-columns:0 0 minmax(320px,1fr) 0 0}.resize-gutter{cursor:col-resize;background:linear-gradient(90deg,#201827,#76549b,#201827);touch-action:none;z-index:3}.resize-gutter:hover{background:#b995df}.resizing-tactical,.resizing-tactical *{cursor:col-resize!important;user-select:none!important}.initiative-panel,.inspector-panel{min-width:0;box-sizing:border-box;overscroll-behavior:contain}.initiative-panel *,.inspector-panel *{box-sizing:border-box;max-width:100%}.initiative-panel .button-row,.inspector-panel .button-row{flex-wrap:wrap}.initiative-panel button{white-space:normal}.initiative-panel summary,.inspector-panel summary{overflow-wrap:anywhere}.initiative-panel fieldset,.inspector-panel fieldset{min-width:0;margin-inline:0}.tactical-toolbar{white-space:nowrap;flex-wrap:nowrap}
+.preview-camera-controls{position:absolute;z-index:3;left:50%;bottom:1rem;transform:translateX(-50%);display:flex;align-items:center;gap:.4rem;padding:.4rem;background:#100c18dd;border:1px solid #806596;border-radius:10px}.preview-camera-controls output{min-width:3.5rem;text-align:center}.player-display-preview .battlefield-presentation .battlefield-content{pointer-events:none}
