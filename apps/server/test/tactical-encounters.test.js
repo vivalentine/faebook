@@ -34,3 +34,9 @@ test('normalization repairs stale family membership in both directions', () => {
   assert.deepEqual(normalized.families[1].memberIds, ['token']);
   assert.equal(normalized.tokens[0].familyId, 'b');
 });
+
+test('normalizeState defaults legacy tether style and anaglyph calibration',()=>{
+ const state=defaultState();state.tethers=[{id:'legacy',category:'anchor',active:true,from:{x:0,y:0},to:{x:1,y:1}}];
+ const normalized=normalizeState(state,1);assert.equal(normalized.tethers[0].style,'normal');assert.deepEqual(normalized.battlefield.anaglyph,{separation:6,opacity:.45,strokeWidth:2,red:'#ff1744',cyan:'#00e5ff'});
+});
+test('normalizeState preserves anaglyph tether style and battlefield calibration',()=>{const state=defaultState();state.tethers=[{id:'a',style:'anaglyph',category:'anchor',active:true,from:{x:0,y:0},to:{x:1,y:1}}];state.battlefield.anaglyph={separation:9,opacity:.6,strokeWidth:3,red:'#ff0000',cyan:'#00ffff'};const normalized=normalizeState(state,1);assert.equal(normalized.tethers[0].style,'anaglyph');assert.equal(normalized.battlefield.anaglyph.separation,9)});
