@@ -710,16 +710,22 @@ for (const columnName of ["import_key", "source_label", "last_imported_at"]) {
   }
 }
 
+// Import keys used to be globally unique. Identity is now scoped to the import
+// source so independently-authored files can safely reuse simple keys. Dropping
+// first makes this migration idempotent for both old and newly-created databases.
+db.exec(`DROP INDEX IF EXISTS idx_whisper_posts_import_key_unique`);
+db.exec(`DROP INDEX IF EXISTS idx_whisper_comments_import_key_unique`);
+
 db.exec(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_posts_import_key_unique
-  ON whisper_posts(import_key)
-  WHERE import_key IS NOT NULL
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_posts_import_identity_unique
+  ON whisper_posts(source_label, import_key)
+  WHERE source_label IS NOT NULL AND import_key IS NOT NULL
 `);
 
 db.exec(`
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_comments_import_key_unique
-  ON whisper_comments(import_key)
-  WHERE import_key IS NOT NULL
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_whisper_comments_import_identity_unique
+  ON whisper_comments(source_label, import_key)
+  WHERE source_label IS NOT NULL AND import_key IS NOT NULL
 `);
 
 db.exec(`
