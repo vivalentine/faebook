@@ -10,7 +10,7 @@ const CROWD_STATES = new Set(["idle", "agitated", "surging", "hostile", "destroy
 
 function defaultState() {
   return {
-    battlefield: { width: 2400, height: 1600, backgroundImageUrl: "", imageScale: 1, imageX: 0, imageY: 0, mapLocked: true, gridVisible: true, snapEnabled: true, gridSize: 50, gridOffsetX: 0, gridOffsetY: 0, distancePerSquare: 5, unit: "ft", presentationCamera: { zoom: .75, panX: 40, panY: 40 } },
+    battlefield: { width: 2400, height: 1600, backgroundImageUrl: "", imageScale: 1, imageX: 0, imageY: 0, mapLocked: true, gridVisible: true, snapEnabled: true, gridSize: 50, gridOffsetX: 0, gridOffsetY: 0, distancePerSquare: 5, unit: "ft", presentationCamera: { zoom: .75, panX: 40, panY: 40 }, anaglyph: { separation: 6, opacity: .45, strokeWidth: 2, red: "#ff1744", cyan: "#00e5ff" } },
     presentation: { frozen: false, blackout: false, layers: { background: true, grid: true, tokens: true, tokenLabels: "full", hpBars: false, conditions: false, defeatedTokens: true, zones: true, crowdRegions: true, strings: true, spotlights: true, aoes: true, annotations: true } },
     tokens: [], initiative: { round: 1, currentIndex: 0, manualOrder: false, entries: [] },
     phases: [], activePhaseId: null, families: [], zones: [], crowdRegions: [], tethers: [], spotlights: [], aoes: [], annotations: [], events: [], eventLog: [],
@@ -52,9 +52,10 @@ function validateState(input) {
 function normalizeState(raw, version = 1) {
   if (version !== 1) throw new Error("Unsupported encounter schema version");
   const base = defaultState();
-  const state = { ...base, ...raw, battlefield: { ...base.battlefield, ...(raw?.battlefield || {}) }, initiative: { ...base.initiative, ...(raw?.initiative || {}) } };
+  const state = { ...base, ...raw, battlefield: { ...base.battlefield, ...(raw?.battlefield || {}), anaglyph: { ...base.battlefield.anaglyph, ...(raw?.battlefield?.anaglyph || {}) } }, initiative: { ...base.initiative, ...(raw?.initiative || {}) } };
   state.presentation = { ...base.presentation, ...(raw?.presentation || {}), layers: { ...base.presentation.layers, ...(raw?.presentation?.layers || {}) } };
   if (state.presentation.measurement) { const m=state.presentation.measurement; state.presentation.measurement={...m,start:{...m.start,altitude:m.start.altitude??0},end:{...m.end,altitude:m.end.altitude??0},mode:m.mode||"2d",horizontal:m.horizontal??m.distance,vertical:m.vertical??0}; }
+  state.tethers = state.tethers.map((item) => ({ ...item, style: item.style === "anaglyph" ? "anaglyph" : "normal" }));
   state.tokens = state.tokens.map((item) => ({ ...item, altitude: item.altitude ?? 0, presentationVisible: item.presentationVisible ?? item.visible }));
   ["spotlights", "aoes", "annotations"].forEach((key) => { state[key] = state[key].map((item) => ({ ...item, altitude: item.altitude ?? 0 })); });
   state.initiative.entries = state.initiative.entries.map((entry) => {
