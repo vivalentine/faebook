@@ -63,6 +63,10 @@ type LocationImportPreview = {
 type WhisperImportPreviewComment = {
   comment_key: string | null;
   status: "create" | "update" | null;
+  source_label: string;
+  existing_id: number | null;
+  existing_body: string | null;
+  incoming_body: string | null;
   validation_issues: string[];
   warnings: string[];
 };
@@ -71,6 +75,10 @@ type WhisperImportPreviewPost = {
   title: string | null;
   post_key: string | null;
   status: "create" | "update" | null;
+  source_label: string;
+  existing_id: number | null;
+  existing_title: string | null;
+  incoming_title: string | null;
   timestamp: {
     crown_year: number | null;
     bloom_index: number | null;
@@ -1004,6 +1012,12 @@ export default function DmToolsPage() {
                         <span>{post.status || "invalid"}</span>
                       </div>
                       <p>Post key: {post.post_key || "—"}</p>
+                      <p>Source: {post.source_label}</p>
+                      {post.status === "update" ? (
+                        <p>
+                          UPDATE{post.existing_id ? ` #${post.existing_id}` : ""} • Existing: “{post.existing_title}” • Incoming: “{post.incoming_title}”
+                        </p>
+                      ) : null}
                       <p>
                         Timestamp:{" "}
                         {post.timestamp.crown_year !== null
@@ -1015,6 +1029,11 @@ export default function DmToolsPage() {
                       </p>
                       {post.validation_issues.length ? <p>Validation issues: {post.validation_issues.join("; ")}</p> : null}
                       {post.warnings.length ? <p>Warnings: {post.warnings.join("; ")}</p> : null}
+                      {post.comments.filter((comment) => comment.status === "update").map((comment) => (
+                        <p key={comment.comment_key || comment.existing_id || "comment-update"}>
+                          UPDATE comment • Source: {comment.source_label} • Key: {comment.comment_key} • Existing: “{comment.existing_body}” • Incoming: “{comment.incoming_body}”
+                        </p>
+                      ))}
                     </div>
                   ))}
                 </article>

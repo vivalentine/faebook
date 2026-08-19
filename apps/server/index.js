@@ -42,6 +42,7 @@ const {
 } = require("./portrait-assets");
 const { buildSummerCourtVisibilitySql, validateSummerCourtDateTime } = require("./summer-court-calendar");
 const { registerTacticalEncounterRoutes } = require("./tactical-encounters");
+const { createDatabaseRecoveryPoint } = require("./local-backup");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -2935,8 +2936,36 @@ app.post("/api/dm/whisper-import/staging/clear", requireRole("dm"), (req, res) =
 });
 
 app.post("/api/dm/whisper-import/finalize", requireRole("dm"), async (req, res) => {
-  const results = await finalizeWhisperImport(db, req.session.user.id);
-  res.json(results);
+  try {
+    const preview = getWhisperImportStagingSummary(db, req.session.user.id);
+    if (preview.files.length === 0) {
+      return res.status(400).json({ error: "No Whisper import files are staged" });
+    }
+    if (preview.totals.invalid > 0) {
+      return res.status(400).json({
+        error: "Resolve Whisper import validation errors or identity collisions before finalizing",
+      });
+    }
+    const backup = await createDatabaseRecoveryPoint(db, {
+      prefix: "faebook-whisper-import",
+      reason: "automatic pre-import Whisper recovery point",
+      actorUserId: req.session.user.id,
+    });
+    createAuditLog(db, {
+      actorUserId: req.session.user.id,
+      actionType: "backup_create",
+      objectType: "whisper_import_backup",
+      objectId: backup.name,
+      message: `Created recovery point ${backup.name} before Whisper import`,
+      createdAt: backup.createdAt,
+    });
+    const results = await finalizeWhisperImport(db, req.session.user.id);
+    res.json({ ...results, backup: { name: backup.name } });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Whisper import backup or finalization failed",
+    });
+  }
 });
 
 app.get("/api/dm/import/logs", requireRole("dm"), (_req, res) => {

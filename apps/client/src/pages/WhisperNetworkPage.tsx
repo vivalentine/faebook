@@ -14,6 +14,7 @@ import {
 } from "../lib/summerCourtCalendar";
 import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
 import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
+import { hasMoreWhispers, mergeWhisperPage } from "../lib/whisperPagination";
 
 const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> = [
   { value: "trending", label: "Trending", icon: "flame" },
@@ -24,6 +25,7 @@ const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> 
 ];
 
 const DEFAULT_WHISPER_SORT: WhisperSortMode = "recent";
+const WHISPER_PAGE_SIZE = 40;
 const WHISPER_FEEDBACK_MS = 820;
 const WHISPER_HEART_ANIMATION_MS = 520;
 
@@ -97,47 +99,12 @@ function getWhisperRecentSortValue(record: {
   return Number.isFinite(createdTime) ? createdTime : 0;
 }
 
-function getWhisperRecentSortTimestamp(post: WhisperPost): number {
-  return getWhisperRecentSortValue(post);
-}
-
 function sortWhisperCommentsByRecent(comments: WhisperComment[]): WhisperComment[] {
   return [...comments].sort((a, b) => {
     const diff = getWhisperRecentSortValue(b) - getWhisperRecentSortValue(a);
     if (diff !== 0) return diff;
     return b.id - a.id;
   });
-}
-
-function getWhisperTrendingScore(post: WhisperPost): number {
-  return post.view_count + post.like_count * 3 + post.comment_count * 5;
-}
-
-function sortWhisperPosts(posts: WhisperPost[], sortMode: WhisperSortMode): WhisperPost[] {
-  const sorted = [...posts];
-  sorted.sort((a, b) => {
-    if (sortMode === "recent") {
-      const diff = getWhisperRecentSortTimestamp(b) - getWhisperRecentSortTimestamp(a);
-      if (diff !== 0) return diff;
-    } else if (sortMode === "views") {
-      const diff = b.view_count - a.view_count;
-      if (diff !== 0) return diff;
-    } else if (sortMode === "likes") {
-      const diff = b.like_count - a.like_count;
-      if (diff !== 0) return diff;
-    } else if (sortMode === "comments") {
-      const diff = b.comment_count - a.comment_count;
-      if (diff !== 0) return diff;
-    } else {
-      const diff = getWhisperTrendingScore(b) - getWhisperTrendingScore(a);
-      if (diff !== 0) return diff;
-    }
-
-    const recentDiff = getWhisperRecentSortTimestamp(b) - getWhisperRecentSortTimestamp(a);
-    if (recentDiff !== 0) return recentDiff;
-    return b.id - a.id;
-  });
-  return sorted;
 }
 
 export default function WhisperNetworkPage() {
@@ -147,9 +114,12 @@ export default function WhisperNetworkPage() {
 
   const [posts, setPosts] = useState<WhisperPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalPosts, setTotalPosts] = useState(0);
   const [error, setError] = useState("");
   const [sortMode, setSortMode] = useState<WhisperSortMode>(DEFAULT_WHISPER_SORT);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
+  const [selectedPostDetail, setSelectedPostDetail] = useState<WhisperPost | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
   const [commentsByPostId, setCommentsByPostId] = useState<Record<number, WhisperComment[]>>({});
   const [commentDraftByPostId, setCommentDraftByPostId] = useState<Record<number, string>>({});
@@ -179,6 +149,11 @@ export default function WhisperNetworkPage() {
   const campaignUpdatedAtRef = useRef<string | null>(null);
   const selectedPostIdRef = useRef<number | null>(null);
   const isReaderOpenRef = useRef(false);
+  const postsRef = useRef<WhisperPost[]>([]);
+  const feedRequestInFlightRef = useRef(false);
+  const feedAbortControllerRef = useRef<AbortController | null>(null);
+  const feedGenerationRef = useRef(0);
+  const feedSentinelRef = useRef<HTMLDivElement | null>(null);
   const [campaignDateTime, setCampaignDateTime] = useState<SummerCourtDateTime | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createPostTitleDraft, setCreatePostTitleDraft] = useState("");
@@ -186,11 +161,10 @@ export default function WhisperNetworkPage() {
   const [createPostError, setCreatePostError] = useState("");
   const [isCreatingPost, setIsCreatingPost] = useState(false);
 
-  const sortedPosts = useMemo(() => sortWhisperPosts(posts, sortMode), [posts, sortMode]);
-
   const activePost = useMemo(
-    () => sortedPosts.find((post) => post.id === selectedPostId) || null,
-    [sortedPosts, selectedPostId],
+    () => posts.find((post) => post.id === selectedPostId) ||
+      (selectedPostDetail?.id === selectedPostId ? selectedPostDetail : null),
+    [posts, selectedPostDetail, selectedPostId],
   );
 
   function triggerPostFeedback(postId: number) {
@@ -205,51 +179,99 @@ export default function WhisperNetworkPage() {
     }, WHISPER_FEEDBACK_MS);
   }
 
-  async function loadFeed(options?: { preferredSelectedPostId?: number | null; silent?: boolean }) {
+  async function loadFeed(options?: {
+    preferredSelectedPostId?: number | null;
+    silent?: boolean;
+    append?: boolean;
+    requestedSort?: WhisperSortMode;
+  }) {
     const silent = Boolean(options?.silent);
+    const append = Boolean(options?.append);
+    if (feedRequestInFlightRef.current) return;
+    const generation = feedGenerationRef.current;
+    const offset = append ? postsRef.current.length : 0;
+    const requestedSort = options?.requestedSort || sortMode;
+    const controller = new AbortController();
     try {
-      if (!silent) {
+      feedRequestInFlightRef.current = true;
+      feedAbortControllerRef.current = controller;
+      if (append) {
+        setLoadingMore(true);
+      } else if (!silent) {
         setLoading(true);
         setError("");
       }
-      const feedResponse = await apiFetch(`/api/whisper/posts?limit=40&offset=0&sort=${sortMode}`);
+      const feedResponse = await apiFetch(
+        `/api/whisper/posts?limit=${WHISPER_PAGE_SIZE}&offset=${offset}&sort=${requestedSort}`,
+        { signal: controller.signal },
+      );
       const data = (await feedResponse.json()) as WhisperFeedResponse | { error?: string };
       if (!feedResponse.ok) {
         throw new Error((data as { error?: string }).error || "Failed to load whisper feed");
       }
 
-      const loadedPosts = (data as WhisperFeedResponse).posts || [];
-      setPosts(loadedPosts);
+      if (generation !== feedGenerationRef.current) return;
+      const feed = data as WhisperFeedResponse;
+      const loadedPosts = feed.posts || [];
+      setTotalPosts(feed.pagination.total);
+      setPosts((current) => append ? mergeWhisperPage(current, loadedPosts) : loadedPosts);
       const preferredSelectedPostId = options?.preferredSelectedPostId ?? null;
       const loadedPostIdSet = new Set(loadedPosts.map((post) => post.id));
-      setSelectedPostId((current) => {
+      if (!append) setSelectedPostId((current) => {
         if (preferredSelectedPostId && loadedPostIdSet.has(preferredSelectedPostId)) {
           return preferredSelectedPostId;
         }
         if (current && loadedPostIdSet.has(current)) {
           return current;
         }
-        if (current && isReaderOpenRef.current) {
-          setIsReaderOpen(false);
-        }
+        if (current && isReaderOpenRef.current) return current;
         return loadedPosts[0]?.id ?? null;
       });
       return loadedPostIdSet;
     } catch (loadError) {
+      if (controller.signal.aborted) return;
       if (!silent) {
         setError(loadError instanceof Error ? loadError.message : "Failed to load whisper feed");
-        setPosts([]);
+        if (!append) setPosts([]);
       }
     } finally {
-      if (!silent) {
-        setLoading(false);
+      if (feedAbortControllerRef.current === controller) {
+        feedRequestInFlightRef.current = false;
+        feedAbortControllerRef.current = null;
+        setLoadingMore(false);
+        if (!silent) setLoading(false);
       }
     }
   }
 
   useEffect(() => {
-    void loadFeed();
+    feedGenerationRef.current += 1;
+    feedAbortControllerRef.current?.abort();
+    feedRequestInFlightRef.current = false;
+    setPosts([]);
+    setTotalPosts(0);
+    void loadFeed({ requestedSort: sortMode });
   }, [sortMode]);
+
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
+
+  const hasMorePosts = hasMoreWhispers(posts.length, totalPosts);
+  useEffect(() => {
+    const sentinel = feedSentinelRef.current;
+    if (!sentinel || !hasMorePosts) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadFeed({ append: true, silent: true });
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMorePosts, posts.length, sortMode]);
 
   useEffect(() => {
     selectedPostIdRef.current = selectedPostId;
@@ -269,8 +291,8 @@ export default function WhisperNetworkPage() {
     let disposed = false;
     async function refreshRevealedWhispers() {
       const openPostId = isReaderOpenRef.current ? selectedPostIdRef.current : null;
-      const visiblePostIds = await loadFeed({ preferredSelectedPostId: openPostId, silent: true });
-      if (disposed || !openPostId || !visiblePostIds?.has(openPostId)) return;
+      await loadFeed({ preferredSelectedPostId: openPostId, silent: true });
+      if (disposed || !openPostId) return;
       await loadPostDetails(openPostId, { silent: true });
     }
     void refreshRevealedWhispers();
@@ -327,12 +349,14 @@ export default function WhisperNetworkPage() {
       if (!response.ok) {
         if (response.status === 404 && options?.silent) {
           setSelectedPostId(null);
+          setSelectedPostDetail(null);
           setIsReaderOpen(false);
           return false;
         }
         throw new Error((data as { error?: string }).error || "Failed to load post details");
       }
       const detail = data as WhisperPostDetailResponse;
+      setSelectedPostDetail(detail.post);
       setCommentsByPostId((current) => ({
         ...current,
         [postId]: sortWhisperCommentsByRecent(detail.comments || []),
@@ -575,6 +599,7 @@ export default function WhisperNetworkPage() {
       }
 
       setPosts((current) => current.filter((entry) => entry.id !== post.id));
+      setTotalPosts((current) => Math.max(0, current - 1));
       setCommentsByPostId((current) => {
         const next = { ...current };
         delete next[post.id];
@@ -711,13 +736,13 @@ export default function WhisperNetworkPage() {
                   options={WHISPER_SORT_OPTIONS}
                 />
               </label>
-              <p className="topbar-meta">{sortedPosts.length} whispers</p>
+              <p className="topbar-meta">{totalPosts} whispers</p>
             </div>
           </div>
           {loading ? <p className="topbar-meta">Gathering whispers…</p> : null}
-          {!loading && sortedPosts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}
+          {!loading && posts.length === 0 ? <p className="topbar-meta">No whispers yet.</p> : null}
           <ul className="chapter-list whisper-list">
-            {sortedPosts.map((post) => {
+            {posts.map((post) => {
               const isActive = post.id === selectedPostId;
               const hasFeedback = Boolean(feedbackPostIds[post.id]);
               return (
@@ -778,6 +803,10 @@ export default function WhisperNetworkPage() {
                 </li>
               );
             })}
+            <li aria-hidden="true">
+              <div ref={feedSentinelRef} className="whisper-feed-sentinel" />
+              {loadingMore ? <p className="topbar-meta">Gathering older whispers…</p> : null}
+            </li>
           </ul>
         </article>
       </div>

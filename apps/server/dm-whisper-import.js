@@ -130,30 +130,53 @@ function classifyFileResult({ createdCount, updatedCount, invalidCount }) {
 
 function buildImportPreview(db, dmUserId) {
   const stage = getStage(dmUserId);
-  const postExistingByImportKey = db
+  const existingPosts = db
     .prepare(
       `
-        SELECT import_key
+        SELECT id, import_key, source_label, title
         FROM whisper_posts
         WHERE import_key IS NOT NULL
       `
     )
     .all();
-  const existingPostKeys = new Set(postExistingByImportKey.map((row) => row.import_key));
-
-  const commentExistingByImportKey = db
+  const existingComments = db
     .prepare(
       `
-        SELECT import_key
+        SELECT id, import_key, source_label, body
         FROM whisper_comments
         WHERE import_key IS NOT NULL
       `
     )
     .all();
-  const existingCommentKeys = new Set(commentExistingByImportKey.map((row) => row.import_key));
+
+  function resolveIdentity(rows, sourceLabel, importKey, kind) {
+    if (!importKey) return { existing: null, issue: null };
+    const exact = rows.filter(
+      (row) => row.import_key === importKey && row.source_label === sourceLabel
+    );
+    if (exact.length === 1) return { existing: exact[0], issue: null };
+    if (exact.length > 1) {
+      return {
+        existing: null,
+        issue: `Collision: multiple ${kind} records use source '${sourceLabel}' and key '${importKey}'`,
+      };
+    }
+    const ambiguousLegacy = rows.filter(
+      (row) => row.import_key === importKey && !normalizeString(row.source_label)
+    );
+    if (ambiguousLegacy.length > 0) {
+      return {
+        existing: null,
+        issue: `Collision: legacy ${kind} key '${importKey}' has no source label and cannot be matched safely`,
+      };
+    }
+    return { existing: null, issue: null };
+  }
 
   const files = [];
   const totals = { create: 0, update: 0, invalid: 0, warnings: 0 };
+  const stagedPostIdentities = new Set();
+  const stagedCommentIdentities = new Set();
 
   for (const stagedFile of stage.files) {
     const fileValidationIssues = [];
@@ -213,6 +236,11 @@ function buildImportPreview(db, dmUserId) {
             postIssues.push("Duplicate post_key in file");
           }
           seenPostKeys.add(postKey);
+          const stagedIdentity = `${sourceLabel}\u0000${postKey}`;
+          if (stagedPostIdentities.has(stagedIdentity)) {
+            postIssues.push("Duplicate source_label + post_key across staged files");
+          }
+          stagedPostIdentities.add(stagedIdentity);
         }
 
         const likeCount = toOptionalNonNegativeInt(rawPost?.like_count, "like_count", postIssues);
@@ -242,19 +270,24 @@ function buildImportPreview(db, dmUserId) {
               commentIssues.push("Duplicate comment_key in file");
             }
             seenCommentKeys.add(commentKey);
+            const stagedIdentity = `${sourceLabel}\u0000${commentKey}`;
+            if (stagedCommentIdentities.has(stagedIdentity)) {
+              commentIssues.push("Duplicate source_label + comment_key across staged files");
+            }
+            stagedCommentIdentities.add(stagedIdentity);
           }
 
           const commentTimestamp = parseSummerCourtInput(rawComment || {}, commentIssues);
-          const status = commentKey
-            ? existingCommentKeys.has(commentKey)
-              ? "update"
-              : "create"
-            : null;
+          const identity = resolveIdentity(existingComments, sourceLabel, commentKey, "comment");
+          if (identity.issue) commentIssues.push(identity.issue);
+          const status = commentKey ? (identity.existing ? "update" : "create") : null;
 
           return {
             index: commentIndex,
             comment_key: commentKey,
             body: commentBody,
+            existing_id: identity.existing?.id ?? null,
+            existing_body: identity.existing?.body ?? null,
             status,
             validation_issues: commentIssues,
             warnings: commentWarnings,
@@ -262,12 +295,16 @@ function buildImportPreview(db, dmUserId) {
           };
         });
 
-        const status = postKey ? (existingPostKeys.has(postKey) ? "update" : "create") : null;
+        const identity = resolveIdentity(existingPosts, sourceLabel, postKey, "post");
+        if (identity.issue) postIssues.push(identity.issue);
+        const status = postKey ? (identity.existing ? "update" : "create") : null;
         const invalidCommentsCount = commentRows.filter((row) => row.validation_issues.length > 0).length;
 
         postRows.push({
           index: postIndex,
           title,
+          existing_id: identity.existing?.id ?? null,
+          existing_title: identity.existing?.title ?? null,
           post_key: postKey,
           body,
           like_count: likeCount,
@@ -288,11 +325,18 @@ function buildImportPreview(db, dmUserId) {
       update: postRows.filter((post) => post.status === "update" && post.validation_issues.length === 0).length,
       invalid: postRows.filter((post) => post.validation_issues.length > 0).length,
     };
+    counts.invalid += postRows.reduce((sum, post) => sum + post.invalid_comment_count, 0);
 
     totals.create += counts.create;
     totals.update += counts.update;
     totals.invalid += counts.invalid + (fileValidationIssues.length ? 1 : 0);
-    totals.warnings += fileWarnings.length + postRows.reduce((acc, post) => acc + post.warnings.length, 0);
+    totals.warnings += fileWarnings.length + postRows.reduce(
+      (acc, post) => acc + post.warnings.length + post.comments.reduce(
+        (commentTotal, comment) => commentTotal + comment.warnings.length,
+        0
+      ),
+      0
+    );
 
     files.push({
       filename: stagedFile.filename,
@@ -311,8 +355,12 @@ function buildImportPreview(db, dmUserId) {
       },
       posts: postRows.map((post) => ({
         title: post.title,
+        source_label: sourceLabel,
         post_key: post.post_key,
         status: post.status,
+        existing_id: post.existing_id,
+        existing_title: post.existing_title,
+        incoming_title: post.title,
         timestamp: post.timestamp,
         comment_count: post.comment_count,
         invalid_comment_count: post.invalid_comment_count,
@@ -321,6 +369,10 @@ function buildImportPreview(db, dmUserId) {
         comments: post.comments.map((comment) => ({
           comment_key: comment.comment_key,
           status: comment.status,
+          source_label: sourceLabel,
+          existing_id: comment.existing_id,
+          existing_body: comment.existing_body,
+          incoming_body: comment.body,
           validation_issues: comment.validation_issues,
           warnings: comment.warnings,
         })),
@@ -341,6 +393,9 @@ function buildImportPreview(db, dmUserId) {
 
 async function finalizeImport(db, dmUserId) {
   const preview = buildImportPreview(db, dmUserId);
+  if (preview.totals.invalid > 0) {
+    throw new Error("Whisper import contains validation errors or identity collisions");
+  }
   const now = getNow();
   const results = [];
 
@@ -348,14 +403,14 @@ async function finalizeImport(db, dmUserId) {
     `
       SELECT id
       FROM whisper_posts
-      WHERE import_key = ?
+      WHERE source_label = ? AND import_key = ?
     `
   );
   const selectCommentByImportKey = db.prepare(
     `
       SELECT id
       FROM whisper_comments
-      WHERE import_key = ?
+      WHERE source_label = ? AND import_key = ?
     `
   );
 
@@ -462,7 +517,7 @@ async function finalizeImport(db, dmUserId) {
           continue;
         }
 
-        const existingPost = selectPostByImportKey.get(post.post_key);
+        const existingPost = selectPostByImportKey.get(file.internal.source_label, post.post_key);
         let postId;
 
         if (existingPost) {
@@ -512,7 +567,10 @@ async function finalizeImport(db, dmUserId) {
             continue;
           }
 
-          const existingComment = selectCommentByImportKey.get(comment.comment_key);
+          const existingComment = selectCommentByImportKey.get(
+            file.internal.source_label,
+            comment.comment_key
+          );
           if (existingComment) {
             updateComment.run(
               postId,
