@@ -15,6 +15,7 @@ import {
 import type { WhisperComment, WhisperPost, WhisperSortMode } from "../types";
 import { useLiveCampaignState } from "../context/LiveCampaignStateContext";
 import { hasMoreWhispers, mergeWhisperPage } from "../lib/whisperPagination";
+import { sortWhisperCommentsChronologically } from "../lib/whisperComments";
 
 const WHISPER_SORT_OPTIONS: Array<FaeSelectOption & { value: WhisperSortMode }> = [
   { value: "trending", label: "Trending", icon: "flame" },
@@ -81,31 +82,6 @@ function getCommentTimestamp(comment: WhisperComment): string {
   return formatSummerCourtCommentDateTime(dt);
 }
 
-
-function getWhisperRecentSortValue(record: {
-  crown_year: number | null;
-  bloom_index: number | null;
-  petal: number | null;
-  bell: number | null;
-  chime: number | null;
-  created_at: string;
-}): number {
-  const dt = getSummerCourtFromWhisperRecord(record);
-  if (dt) {
-    return (((dt.crown_year * 12 + dt.bloom_index) * 28 + dt.petal) * 24 + dt.bell) * 60 + dt.chime;
-  }
-
-  const createdTime = Date.parse(record.created_at);
-  return Number.isFinite(createdTime) ? createdTime : 0;
-}
-
-function sortWhisperCommentsByRecent(comments: WhisperComment[]): WhisperComment[] {
-  return [...comments].sort((a, b) => {
-    const diff = getWhisperRecentSortValue(b) - getWhisperRecentSortValue(a);
-    if (diff !== 0) return diff;
-    return b.id - a.id;
-  });
-}
 
 export default function WhisperNetworkPage() {
   const { user } = useAuth();
@@ -359,7 +335,7 @@ export default function WhisperNetworkPage() {
       setSelectedPostDetail(detail.post);
       setCommentsByPostId((current) => ({
         ...current,
-        [postId]: sortWhisperCommentsByRecent(detail.comments || []),
+        [postId]: sortWhisperCommentsChronologically(detail.comments || []),
       }));
       setPosts((current) => current.map((post) => (post.id === postId ? detail.post : post)));
       return true;
@@ -426,7 +402,7 @@ export default function WhisperNetworkPage() {
       const createdComment = data as WhisperComment;
       setCommentsByPostId((current) => ({
         ...current,
-        [postId]: sortWhisperCommentsByRecent([...(current[postId] || []), createdComment]),
+        [postId]: sortWhisperCommentsChronologically([...(current[postId] || []), createdComment]),
       }));
       setCommentDraftByPostId((current) => ({ ...current, [postId]: "" }));
       setPosts((current) =>
@@ -692,7 +668,7 @@ export default function WhisperNetworkPage() {
       const updatedComment = data as WhisperComment;
       setCommentsByPostId((current) => ({
         ...current,
-        [comment.post_id]: sortWhisperCommentsByRecent(
+        [comment.post_id]: sortWhisperCommentsChronologically(
           (current[comment.post_id] || []).map((entry) =>
             entry.id === comment.id ? updatedComment : entry,
           ),

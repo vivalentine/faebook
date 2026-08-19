@@ -4994,13 +4994,13 @@ app.get("/api/whisper/posts/:id", requireRole("player", "dm"), (req, res) => {
         FROM whisper_comments AS comments
         WHERE comments.post_id = ? AND ${commentVisibilitySql}
         ORDER BY
-          comments.crown_year DESC,
-          comments.bloom_index DESC,
-          comments.petal DESC,
-          comments.bell DESC,
-          comments.chime DESC,
-          comments.created_at DESC,
-          comments.id DESC
+          comments.crown_year ASC,
+          comments.bloom_index ASC,
+          comments.petal ASC,
+          comments.bell ASC,
+          comments.chime ASC,
+          comments.created_at ASC,
+          comments.id ASC
       `
     )
     .all(sessionUser.role, postId);
