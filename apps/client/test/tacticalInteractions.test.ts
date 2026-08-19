@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFamilyMutation, applyPhase, applyThresholdRules, createCheckpointGate, createPhaseMutation, deleteFamily, deletePhaseMutation, commitHistory, createCheckpoint, detectStacks, fanOut, insertVertex, isAirborne, measurementClick, measurementPointerMove, moveSelections, objectAltitude, rulerDistance, moveTetherEndpoint, moveVertex, objectsInRect, redoHistory, removeVertex, repairFamilyMembership, resizeAoe, rotateAoe, saveCrowdSurgePreset, setFamilyMembership, setObjectAltitude, tacticalObjectLabel, triggerCrowdSurgePreset, initiativePortrait, startRuler, addRulerWaypoint, finishRuler, tokenDistance, updatePhaseMutation, selectionsInRect, toggleSelection, translatePoints, undoHistory, waypointDistance } from '../src/lib/tacticalInteractions.ts';
+import { applyFamilyMutation, applyPhase, applyThresholdRules, createCheckpointGate, createPhaseMutation, createTether, deleteFamily, deletePhaseMutation, commitHistory, createCheckpoint, detectStacks, fanOut, insertVertex, isAirborne, measurementClick, measurementPointerMove, moveSelections, objectAltitude, rulerDistance, moveTetherEndpoint, moveVertex, objectsInRect, redoHistory, removeVertex, repairFamilyMembership, resizeAoe, rotateAoe, saveCrowdSurgePreset, setFamilyMembership, setObjectAltitude, tacticalObjectLabel, triggerCrowdSurgePreset, initiativePortrait, startRuler, addRulerWaypoint, finishRuler, tokenDistance, updatePhaseMutation, selectionsInRect, toggleSelection, translatePoints, undoHistory, waypointDistance } from '../src/lib/tacticalInteractions.ts';
 import { interpolatePreparedMorph, normalizePolygonArea, polygonArea, preparePolygonMorph, resamplePolygon, signedPolygonArea } from '../src/lib/tacticalPolygons.ts';
 import { presentationViewBox } from '../src/lib/tacticalPresentationConstants.ts';
 import type { TacticalAoe, TacticalState } from '../src/types/tactical.ts';
@@ -65,3 +65,30 @@ test('prepared morphs stay finite across unlike authored polygons and never repl
 test('saved and triggered surge presets retain compatibility and undo exact points',()=>{const s=state(),original=[point,{x:10,y:0},{x:10,y:10},{x:0,y:10}];s.crowdRegions=[{id:'c',name:'South Crowd',points:structuredClone(original),state:'idle',active:true,surges:[{id:'legacy',origin:point,direction:90,distance:5,pressure:2,createdAt:'then'}]}];assert.equal(s.crowdRegions[0].surgePresets,undefined);const preset=saveCrowdSurgePreset(s,'c',{id:'p',name:'South Crush',points:[{x:20,y:20},{x:40,y:20},{x:40,y:25},{x:20,y:25}],createdAt:'now'});assert.equal(s.crowdRegions[0].surges?.[0].id,'legacy');const before=structuredClone(s),history=commitHistory({past:[],present:before,future:[]},triggerCrowdSurgePreset(structuredClone(s),'c',preset.id));assert.deepEqual(history.present.crowdRegions[0].points,preset.points);assert.deepEqual(undoHistory(history).present.crowdRegions[0].points,original)});
 test('surge draft operations can change vertex count without touching the live crowd before save',()=>{const s=state(),live=[point,{x:20,y:0},{x:20,y:20},{x:0,y:20}];s.crowdRegions=[{id:'south',name:'Crowd Region S',points:structuredClone(live),state:'idle',active:true}];let draft=structuredClone(live);draft=moveVertex(draft,1,{x:170,y:10});draft=insertVertex(draft,1);draft=translatePoints(draft,{x:5,y:-3});draft=removeVertex(draft,0);assert.deepEqual(s.crowdRegions[0].points,live);const preset=saveCrowdSurgePreset(s,'south',{id:'south-crush',name:'South Crush',points:draft});assert.equal(preset.points.length,draft.length);assert.deepEqual(s.crowdRegions[0].points,live);const edited=saveCrowdSurgePreset(s,'south',{id:preset.id,name:'South Crush Revised',points:insertVertex(preset.points,0)});assert.equal(s.crowdRegions[0].surgePresets?.length,1);assert.equal(edited.points.length,preset.points.length+1);assert.deepEqual(s.crowdRegions[0].points,live)});
 test('family labels and initiative portraits resolve useful display data',()=>{const s=state();s.tokens[0].name='Straw Doll 4';s.tokens[0].imageUrl='/doll.png';assert.deepEqual(tacticalObjectLabel(s,'t'),{label:'Straw Doll 4',type:'Token'});assert.deepEqual(tacticalObjectLabel(s,'missing'),{label:'Unknown object',type:'Legacy'});const entry={id:'i',tokenId:'t',name:'old',initiative:10,active:false};assert.equal(initiativePortrait(s,entry).imageUrl,'/doll.png')});
+
+test('crowd baselines initialize once and survive multiple surge transitions',async()=>{
+ const {ensureCrowdOriginals,returnCrowdToOriginal,setCrowdOriginal}=await import('../src/lib/tacticalInteractions.ts');
+ const s=state(),original=[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}];
+ s.crowdRegions=[{id:'south',name:'Crowd Region S',points:structuredClone(original),state:'idle',active:true}];
+ assert.equal(ensureCrowdOriginals(s),true);assert.equal(ensureCrowdOriginals(s),false);
+ saveCrowdSurgePreset(s,'south',{id:'a',name:'A',points:[{x:20,y:0},{x:30,y:0},{x:30,y:10},{x:20,y:10}]});
+ saveCrowdSurgePreset(s,'south',{id:'b',name:'B',points:[{x:40,y:0},{x:50,y:0},{x:50,y:10},{x:40,y:10}]});
+ triggerCrowdSurgePreset(s,'south','a');triggerCrowdSurgePreset(s,'south','b');
+ assert.deepEqual(s.crowdRegions[0].originalPoints,original);returnCrowdToOriginal(s,'south');
+ assert.deepEqual(s.crowdRegions[0].points,original);assert.equal(s.crowdRegions[0].state,'idle');
+ s.crowdRegions[0].points=[{x:1,y:1},{x:2,y:1},{x:2,y:2}];setCrowdOriginal(s,'south');s.crowdRegions[0].points[0].x=99;assert.equal(s.crowdRegions[0].originalPoints?.[0].x,1);
+});
+
+test('crowd tether fields are backward compatible and prevent endpoint dragging',()=>{
+ const s=state();s.crowdRegions=[{id:'south',name:'South',points:[{x:0,y:0},{x:10,y:0},{x:10,y:10}],state:'idle',active:true}];
+ const tether=createTether({fromCrowdId:'south',toTokenId:'t'},'crowd-tether');assert.equal(tether.fromCrowdId,'south');assert.equal(tether.toTokenId,'t');
+ s.tethers=[tether];moveTetherEndpoint(s,'crowd-tether','from',{x:99,y:99});assert.equal(s.tethers[0].from,undefined);
+});
+
+test('tether endpoint precedence uses live crowd polygon overrides',async()=>{
+ const {tetherEndpoint}=await import('../src/lib/tacticalTethers.ts');const s=state();
+ s.crowdRegions=[{id:'c',name:'Crowd',points:[{x:0,y:0},{x:10,y:0},{x:10,y:10},{x:0,y:10}],state:'idle',active:true}];
+ assert.deepEqual(tetherEndpoint(s,{crowdId:'c',fallback:{x:99,y:99}}),{x:5,y:5});
+ assert.deepEqual(tetherEndpoint(s,{crowdId:'c'},{c:[{x:20,y:0},{x:30,y:0},{x:30,y:10},{x:20,y:10}]}),{x:25,y:5});
+ assert.deepEqual(tetherEndpoint(s,{tokenId:'t',crowdId:'c'}),{x:10,y:10});
+});
