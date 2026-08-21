@@ -14,7 +14,7 @@ const ROTATION_SPEED = 0.88;
 const GLASS_OPACITY = 0.52;
 const SPECTRAL_GLASS_OPACITY = 0.14;
 
-const SUN_RADIUS = 0.52;
+const SUN_RADIUS = 0.46;
 const SUN_ROTATION_SPEED = -0.16;
 const SUN_HOME_Y = 0.035;
 const SUN_BOUNCE_X = 0.095;
@@ -26,7 +26,7 @@ const HALO_RADIUS = 0.86;
 const HALO_TUBE = 0.018;
 
 const BOUNCE_AMOUNT = 0.024;
-const BOUNCE_SPEED = 0.001;
+const BOUNCE_SPEED = 0.0015;
 
 function makeProceduralSunTexture(size = 512) {
   const canvas = document.createElement("canvas");
