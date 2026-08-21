@@ -58,7 +58,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       iridescenceThicknessRange: [90, 340],
       attenuationColor: new THREE.Color(0xeef5ff),
       attenuationDistance: 14,
-      opacity: 0.68,
+      opacity: 0.18,
       transparent: true,
       side: THREE.DoubleSide,
       clearcoat: 0.35,
