@@ -315,65 +315,49 @@
 .long-noon-halo {
   position: absolute;
   z-index: 3;
-  top: 15.5%;
-  left: 10%;
-  width: 80%;
-  height: 14%;
+  top: 16.5%;
+  left: 15%;
+  width: 70%;
+  height: 12.5%;
   box-sizing: border-box;
-  border: clamp(2px, 0.9cqw, 4px) solid rgba(255, 250, 218, 0.98);
+  border: clamp(2px, 1.3cqw, 4px) solid rgba(255, 251, 220, 0.98);
   border-radius: 50%;
-  background: transparent;
+  transform: perspective(320px) rotateX(62deg);
   box-shadow:
-    0 0 3px rgba(255, 255, 250, 0.98),
-    0 0 9px rgba(255, 239, 184, 0.9),
-    0 0 20px rgba(245, 199, 101, 0.56),
-    0 0 38px rgba(214, 151, 54, 0.24),
-    inset 0 0 5px rgba(255, 246, 205, 0.72);
-  animation: long-noon-halo-pulse 12s ease-in-out infinite;
+    0 0 4px rgba(255, 252, 235, 0.95),
+    0 0 12px rgba(255, 238, 169, 0.88),
+    0 0 24px rgba(239, 179, 63, 0.58),
+    0 0 42px rgba(215, 133, 33, 0.28),
+    inset 0 0 7px rgba(255, 244, 193, 0.8);
+  animation: long-noon-halo-pulse 5.5s ease-in-out infinite;
   pointer-events: none;
-}
-
-.long-noon-halo::before,
-.long-noon-halo::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.long-noon-halo::before {
-  border: 1px solid rgba(255, 255, 245, 0.58);
-  filter: blur(1.6px);
-}
-
-.long-noon-halo::after {
-  inset: -18%;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 44%,
-    rgba(255, 228, 155, 0.12) 49%,
-    rgba(255, 197, 91, 0.08) 53%,
-    transparent 61%
-  );
-  filter: blur(5px);
 }
 
 @keyframes long-noon-halo-pulse {
   0%,
-  100% { opacity: 0.94; }
-  50% { opacity: 1; }
-}
+  100% {
+    opacity: 0.9;
+    box-shadow:
+      0 0 4px rgba(255, 252, 235, 0.95),
+      0 0 12px rgba(255, 238, 169, 0.88),
+      0 0 24px rgba(239, 179, 63, 0.58),
+      0 0 42px rgba(215, 133, 33, 0.28),
+      inset 0 0 7px rgba(255, 244, 193, 0.8);
+  }
 
-@keyframes long-noon-radiance-pulse {
-  0%,
-  100% { opacity: 0.5; }
-  50% { opacity: 0.58; }
+  50% {
+    opacity: 1;
+    box-shadow:
+      0 0 6px rgba(255, 252, 235, 1),
+      0 0 16px rgba(255, 241, 181, 0.96),
+      0 0 32px rgba(244, 189, 78, 0.72),
+      0 0 58px rgba(227, 149, 43, 0.42),
+      inset 0 0 10px rgba(255, 246, 205, 0.92);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .long-noon-halo,
-  .long-noon-radiance {
+  .long-noon-halo {
     animation: none;
   }
 }

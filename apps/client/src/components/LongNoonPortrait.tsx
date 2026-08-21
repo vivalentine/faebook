@@ -7,42 +7,10 @@ type Props = {
   name: string;
 };
 
-/*
- * Easy visual tuning:
- * - PRISM_Y: more negative = lower
- * - PRISM_SCALE: smaller number = smaller prism
- * - ROTATION_SPEED: larger number = faster rotation
- * - GLASS_OPACITY: smaller number = more transparent
- * - SPECTRAL_OPACITY: larger number = stronger rainbow tint
- */
-const PRISM_Y = -0.70;
-const PRISM_SCALE = 0.52;
-const ROTATION_SPEED = 0.72;
-const GLASS_OPACITY = 0.08;
-const SPECTRAL_OPACITY = 0.12;
-
-function addSpectralColors(geometry: THREE.BufferGeometry) {
-  const position = geometry.getAttribute("position");
-  const colors = new Float32Array(position.count * 3);
-  const color = new THREE.Color();
-
-  for (let i = 0; i < position.count; i += 1) {
-    const x = position.getX(i);
-    const y = position.getY(i);
-    const z = position.getZ(i);
-
-    const angle = Math.atan2(z, x);
-    const hue = ((angle / (Math.PI * 2)) + 0.5 + y * 0.055 + 1) % 1;
-
-    color.setHSL(hue, 0.78, 0.62);
-
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
-  }
-
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-}
+const PRISM_Y = -0.7;
+const PRISM_SCALE = 0.62;
+const ROTATION_SPEED = 0.32;
+const GLASS_OPACITY = 0.28;
 
 export default function LongNoonPortrait({ className = "", name }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -65,14 +33,11 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       antialias: true,
       powerPreference: "high-performance",
     });
-
     renderer.setClearColor(0x000000, 0);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.95;
 
-    // Broad environment reflections give the glass soft highlights
-    // instead of tiny white point-light dots.
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     const roomEnvironment = new RoomEnvironment();
     const environmentTarget = pmremGenerator.fromScene(roomEnvironment, 0.08);
@@ -85,56 +50,29 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     scene.add(prism);
 
     const geometry = new THREE.DodecahedronGeometry(1, 0);
-
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0.48,
-      roughness: 0.11,
-      transmission: 0.98,
-      thickness: 0.55,
+      metalness: 0,
+      roughness: 0.13,
+      transmission: 1,
+      thickness: 0.52,
       ior: 1.46,
-
       transparent: true,
       opacity: GLASS_OPACITY,
       depthWrite: false,
-
-      iridescence: 0.24,
+      iridescence: 0.18,
       iridescenceIOR: 1.2,
-      iridescenceThicknessRange: [110, 310],
-
+      iridescenceThicknessRange: [110, 300],
       attenuationColor: new THREE.Color("#eef5ff"),
-      attenuationDistance: 18,
-
-      clearcoat: 0.35,
+      attenuationDistance: 20,
+      clearcoat: 0.32,
       clearcoatRoughness: 0.11,
-
-      specularIntensity: 0.42,
+      specularIntensity: 0.38,
       specularColor: new THREE.Color("#eaf2ff"),
-
       side: THREE.FrontSide,
     });
-
     const glass = new THREE.Mesh(geometry, glassMaterial);
     prism.add(glass);
-
-    /*
-     * The rainbow is supplied by a faint inner shell rather than by
-     * colored point lights. This keeps the hues broad and diffuse.
-     */
-    const spectralGeometry = new THREE.DodecahedronGeometry(0.965, 0).toNonIndexed();
-    addSpectralColors(spectralGeometry);
-
-    const spectralMaterial = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: SPECTRAL_OPACITY,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-
-    const spectralShell = new THREE.Mesh(spectralGeometry, spectralMaterial);
-    prism.add(spectralShell);
 
     const edgeGeometry = new THREE.EdgesGeometry(geometry, 10);
     const edgeMaterial = new THREE.LineBasicMaterial({
@@ -143,28 +81,103 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       opacity: 0.72,
       depthWrite: false,
     });
+    const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+    prism.add(edges);
 
-    prism.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
+    const coreGroup = new THREE.Group();
+    coreGroup.position.set(0, 0.04, 0);
+    prism.add(coreGroup);
 
-    // Broad illumination only. No PointLights.
+    const coreGeometry = new THREE.SphereGeometry(0.145, 32, 32);
+    const coreMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#fff6cf"),
+      transparent: true,
+      opacity: 0.98,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const core = new THREE.Mesh(coreGeometry, coreMaterial);
+    coreGroup.add(core);
+
+    const innerGlowGeometry = new THREE.SphereGeometry(0.28, 32, 32);
+    const innerGlowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffd778"),
+      transparent: true,
+      opacity: 0.18,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.BackSide,
+    });
+    const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
+    coreGroup.add(innerGlow);
+
+    const outerGlowGeometry = new THREE.SphereGeometry(0.42, 32, 32);
+    const outerGlowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffbf66"),
+      transparent: true,
+      opacity: 0.08,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.BackSide,
+    });
+    const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+    coreGroup.add(outerGlow);
+
+    const spectralGlowGeometry = new THREE.SphereGeometry(0.56, 32, 32);
+    const spectralGlowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#b9c3ff"),
+      transparent: true,
+      opacity: 0.035,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.BackSide,
+    });
+    const spectralGlow = new THREE.Mesh(spectralGlowGeometry, spectralGlowMaterial);
+    spectralGlow.scale.set(1.08, 0.95, 1.02);
+    coreGroup.add(spectralGlow);
+
+    const rayMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffe7a8"),
+      transparent: true,
+      opacity: 0.075,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+
+    const rayGeometries: THREE.BufferGeometry[] = [];
+    const rayMeshes: THREE.Mesh[] = [];
+    const rayData = [
+      { rotX: 0.0, rotY: 0.0, rotZ: 0.28, y: 0.02 },
+      { rotX: 0.65, rotY: 0.55, rotZ: -0.2, y: -0.01 },
+      { rotX: -0.52, rotY: 1.12, rotZ: 0.16, y: 0.05 },
+      { rotX: 0.38, rotY: -0.92, rotZ: -0.34, y: -0.04 },
+    ];
+
+    for (const ray of rayData) {
+      const rayGeometry = new THREE.CylinderGeometry(0.012, 0.04, 1.16, 10, 1, true);
+      const rayMesh = new THREE.Mesh(rayGeometry, rayMaterial);
+      rayMesh.position.y = ray.y;
+      rayMesh.rotation.set(ray.rotX, ray.rotY, ray.rotZ);
+      coreGroup.add(rayMesh);
+      rayGeometries.push(rayGeometry);
+      rayMeshes.push(rayMesh);
+    }
+
     scene.add(new THREE.AmbientLight(0xffffff, 0.62));
     scene.add(new THREE.HemisphereLight(0xffedc9, 0x182446, 0.72));
 
-    const amberLight = new THREE.DirectionalLight(0xffb45f, 1.15);
+    const amberLight = new THREE.DirectionalLight(0xffd18c, 0.95);
     amberLight.position.set(3.2, 3.5, 4.5);
     scene.add(amberLight);
 
-    const blueLight = new THREE.DirectionalLight(0x74aaff, 0.82);
-    blueLight.position.set(-4.5, 1.2, 3.2);
-    scene.add(blueLight);
+    const coolLight = new THREE.DirectionalLight(0xb8d2ff, 0.55);
+    coolLight.position.set(-4.5, 1.2, 3.2);
+    scene.add(coolLight);
 
-    const roseLight = new THREE.DirectionalLight(0xff7fa9, 0.58);
-    roseLight.position.set(3.5, -2.5, 2.2);
-    scene.add(roseLight);
-
-    const violetLight = new THREE.DirectionalLight(0xab8cff, 0.48);
-    violetLight.position.set(-2.8, -3.4, 1.2);
-    scene.add(violetLight);
+    const backLight = new THREE.DirectionalLight(0xf3d8ff, 0.22);
+    backLight.position.set(-2.5, -3.2, -2.2);
+    scene.add(backLight);
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -180,17 +193,32 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
         return;
       }
 
-      const delta = previousTime
-        ? Math.min((time - previousTime) / 1000, 0.1)
-        : 0;
-
+      const delta = previousTime ? Math.min((time - previousTime) / 1000, 0.1) : 0;
       previousTime = time;
 
-      prism.rotation.y =
-        (prism.rotation.y + delta * ROTATION_SPEED) % (Math.PI * 2);
-
+      prism.rotation.y = (prism.rotation.y + delta * ROTATION_SPEED) % (Math.PI * 2);
       prism.rotation.x = 0.28 + Math.sin(time * 0.00014) * 0.018;
       prism.rotation.z = 0.055 + Math.sin(time * 0.0001) * 0.009;
+
+      const pulse = 0.92 + Math.sin(time * 0.0022) * 0.08;
+      const secondaryPulse = 0.94 + Math.sin(time * 0.00155 + 1.2) * 0.06;
+      core.scale.setScalar(pulse);
+      innerGlow.scale.setScalar(0.98 + Math.sin(time * 0.0019) * 0.06);
+      outerGlow.scale.setScalar(secondaryPulse);
+      spectralGlow.scale.set(
+        1.08 + Math.sin(time * 0.0013) * 0.03,
+        0.95 + Math.sin(time * 0.0015 + 0.7) * 0.025,
+        1.02 + Math.sin(time * 0.0011 + 1.4) * 0.025,
+      );
+
+      coreMaterial.opacity = 0.9 + Math.sin(time * 0.0022) * 0.06;
+      innerGlowMaterial.opacity = 0.16 + Math.sin(time * 0.0019) * 0.035;
+      outerGlowMaterial.opacity = 0.075 + Math.sin(time * 0.0015 + 0.4) * 0.02;
+      spectralGlowMaterial.opacity = 0.03 + Math.sin(time * 0.0011 + 0.9) * 0.012;
+
+      rayMeshes.forEach((mesh, index) => {
+        mesh.rotation.y += delta * (0.04 + index * 0.012);
+      });
 
       render();
       frameId = window.requestAnimationFrame(animate);
@@ -198,7 +226,6 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
 
     const startAnimation = () => {
       render();
-
       if (isVisible && !reducedMotion.matches && frameId === 0) {
         previousTime = 0;
         frameId = window.requestAnimationFrame(animate);
@@ -206,38 +233,26 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     };
 
     const stopAnimation = () => {
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-      }
-
+      if (frameId) window.cancelAnimationFrame(frameId);
       frameId = 0;
     };
 
     const resizeObserver = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (!width || !height) return;
-
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(width, height, false);
-
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-
       render();
     });
-
     resizeObserver.observe(host);
 
     const intersectionObserver = new IntersectionObserver(([entry]) => {
       isVisible = entry.isIntersecting;
-
-      if (isVisible) {
-        startAnimation();
-      } else {
-        stopAnimation();
-      }
+      if (isVisible) startAnimation();
+      else stopAnimation();
     });
-
     intersectionObserver.observe(host);
 
     const handleMotionChange = () => {
@@ -247,41 +262,37 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     };
 
     reducedMotion.addEventListener("change", handleMotionChange);
-
     startAnimation();
 
     return () => {
       stopAnimation();
-
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       reducedMotion.removeEventListener("change", handleMotionChange);
 
       geometry.dispose();
       glassMaterial.dispose();
-      spectralGeometry.dispose();
-      spectralMaterial.dispose();
       edgeGeometry.dispose();
       edgeMaterial.dispose();
+      coreGeometry.dispose();
+      coreMaterial.dispose();
+      innerGlowGeometry.dispose();
+      innerGlowMaterial.dispose();
+      outerGlowGeometry.dispose();
+      outerGlowMaterial.dispose();
+      spectralGlowGeometry.dispose();
+      spectralGlowMaterial.dispose();
+      rayGeometries.forEach((g) => g.dispose());
+      rayMaterial.dispose();
 
       environmentTarget.dispose();
       pmremGenerator.dispose();
-
       roomEnvironment.traverse((object) => {
         const mesh = object as THREE.Mesh;
-
-        if (mesh.geometry) {
-          mesh.geometry.dispose();
-        }
-
+        if (mesh.geometry) mesh.geometry.dispose();
         if (mesh.material) {
-          const materials = Array.isArray(mesh.material)
-            ? mesh.material
-            : [mesh.material];
-
-          for (const material of materials) {
-            material.dispose();
-          }
+          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          materials.forEach((material) => material.dispose());
         }
       });
 
@@ -299,11 +310,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     >
       <div className="long-noon-radiance" aria-hidden="true" />
       <div className="long-noon-halo" aria-hidden="true" />
-      <canvas
-        ref={canvasRef}
-        className="long-noon-canvas"
-        aria-hidden="true"
-      />
+      <canvas ref={canvasRef} className="long-noon-canvas" aria-hidden="true" />
     </div>
   );
 }
