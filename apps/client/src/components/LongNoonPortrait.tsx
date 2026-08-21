@@ -19,7 +19,7 @@ const PRISM_Y = -0.68;
 const PRISM_SCALE = 0.64;
 const ROTATION_SPEED = 0.32;
 const GLASS_OPACITY = 0.38;
-const SPECTRAL_OPACITY = 0.18;
+const SPECTRAL_OPACITY = 0.48;
 
 function addSpectralColors(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
