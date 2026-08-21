@@ -11,7 +11,7 @@ type Props = {
 const PRISM_Y = -0.6;
 const PRISM_SCALE = 0.48;
 const ROTATION_SPEED = 0.88;
-const GLASS_OPACITY = 0.52;
+const GLASS_OPACITY = 0.22;
 const SPECTRAL_GLASS_OPACITY = 0.14;
 
 const SUN_RADIUS = 0.46;
