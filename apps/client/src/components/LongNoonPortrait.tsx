@@ -125,8 +125,8 @@ function makeGlowTexture() {
   gradient.addColorStop(0, "rgba(255,255,235,1)");
   gradient.addColorStop(0.18, "rgba(191, 122, 255, 0.9)");
   gradient.addColorStop(0.42, "rgba(160, 44, 255, 0.38)");
-  gradient.addColorStop(0.7, "rgba(255,103,24,0.1)");
-  gradient.addColorStop(1, "rgba(255,103,24,0)");
+  gradient.addColorStop(0.7, "rgba(247, 24, 255, 0.1)");
+  gradient.addColorStop(1, "rgba(255, 24, 166, 0)");
 
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, size, size);
@@ -365,14 +365,10 @@ export default function LongNoonPortrait({
     const proceduralSunTexture = makeProceduralSunTexture();
     const textureLoader = new THREE.TextureLoader();
 
-    const sunMaterial = new THREE.MeshStandardMaterial({
+    const sunMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#ffffff"),
       map: proceduralSunTexture,
-      emissive: new THREE.Color("#e62cff"),
-      emissiveIntensity: 0.15,
-      roughness: 0.32,
-      metalness: 0,
-      toneMapped: true,
+      toneMapped: false,
     });
 
     let loadedSunTexture: THREE.Texture | null = null;
@@ -383,11 +379,13 @@ export default function LongNoonPortrait({
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
         texture.needsUpdate = true;
 
         loadedSunTexture = texture;
         sunMaterial.map = texture;
         sunMaterial.needsUpdate = true;
+        texture.colorSpace = THREE.SRGBColorSpace;
       },
       undefined,
       () => {},
@@ -409,9 +407,9 @@ export default function LongNoonPortrait({
     );
 
     const photosphereMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ffb13a"),
+      color: new THREE.Color("#d84cff"),
       transparent: true,
-      opacity: 0.1,
+      opacity: 0.055,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.BackSide,
@@ -427,10 +425,10 @@ export default function LongNoonPortrait({
     const glowTexture = makeGlowTexture();
 
     const coronaMaterial = new THREE.SpriteMaterial({
-      map: glowTexture,
-      color: new THREE.Color("#ffb04a"),
+        map: glowTexture,
+      color: new THREE.Color("#df55ff"),
       transparent: true,
-      opacity: 0.58,
+      opacity: 0.26,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
@@ -442,9 +440,9 @@ export default function LongNoonPortrait({
 
     const outerCoronaMaterial = new THREE.SpriteMaterial({
       map: glowTexture,
-      color: new THREE.Color("#ffd27a"),
+      color: new THREE.Color("#8f63ff"),
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.12,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
@@ -599,9 +597,6 @@ export default function LongNoonPortrait({
 
       outerCoronaMaterial.opacity =
         0.2 + slowPulse * 0.045;
-
-      sunMaterial.emissiveIntensity =
-        1.75 + pulse * 0.18;
 
       render();
       frameId = window.requestAnimationFrame(animate);
