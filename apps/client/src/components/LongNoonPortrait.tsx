@@ -52,9 +52,9 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     const geometry = new THREE.DodecahedronGeometry(1, 0);
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0.18,
-      roughness: 0.13,
-      transmission: 0.96,
+      metalness: 0.28,
+      roughness: 0.08,
+      transmission: 1,
       thickness: 0.52,
       ior: 1.46,
       transparent: true,
@@ -67,7 +67,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       attenuationDistance: 20,
       clearcoat: 0.32,
       clearcoatRoughness: 0.11,
-      specularIntensity: 0.48,
+      specularIntensity: 0.78,
       specularColor: new THREE.Color("#eaf2ff"),
       side: THREE.FrontSide,
     });
