@@ -10,8 +10,8 @@ type Props = {
 const PRISM_Y = -0.6;
 const PRISM_SCALE = 0.48;
 const ROTATION_SPEED = 0.78;
-const GLASS_OPACITY = 0.62;
-const SPECTRAL_GLASS_OPACITY = 0.08;
+const GLASS_OPACITY = 0.32;
+const SPECTRAL_GLASS_OPACITY = 0.18;
 
 const SUN_TEXTURE_PATH = "/textures/sun.jpg";
 const SUN_RADIUS = 0.42;
@@ -90,7 +90,7 @@ function makeProceduralSunTexture(size = 512) {
       else ctx.lineTo(x, py);
     }
 
-    ctx.strokeStyle = i % 3 === 0 ? "#fff2a8" : "#ffb23c";
+    ctx.strokeStyle = i % 3 === 0 ? "#f08bda" : "#6d0088";
     ctx.lineWidth = 1 + Math.random() * 2;
     ctx.stroke();
   }
@@ -123,8 +123,8 @@ function makeGlowTexture() {
   );
 
   gradient.addColorStop(0, "rgba(255,255,235,1)");
-  gradient.addColorStop(0.18, "rgba(255,224,122,0.9)");
-  gradient.addColorStop(0.42, "rgba(255,154,44,0.38)");
+  gradient.addColorStop(0.18, "rgba(191, 122, 255, 0.9)");
+  gradient.addColorStop(0.42, "rgba(160, 44, 255, 0.38)");
   gradient.addColorStop(0.7, "rgba(255,103,24,0.1)");
   gradient.addColorStop(1, "rgba(255,103,24,0)");
 
