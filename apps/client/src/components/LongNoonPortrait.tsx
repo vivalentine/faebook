@@ -11,11 +11,15 @@ const PRISM_Y = -0.7;
 const PRISM_SCALE = 0.62;
 const ROTATION_SPEED = 0.32;
 const GLASS_OPACITY = 0.26;
-const SPECTRAL_GLASS_OPACITY = 0.24;
+const SPECTRAL_GLASS_OPACITY = 0.16;
 
 const SUN_TEXTURE_PATH = "/textures/sun.jpg";
-const SUN_RADIUS = 0.28;
-const SUN_ROTATION_SPEED = 0.25;
+const SUN_RADIUS = 0.16;
+const SUN_ROTATION_SPEED = 0.2;
+
+const HALO_Y = 0.92;
+const HALO_RADIUS = 1.28;
+const HALO_TUBE = 0.032;
 
 function makeProceduralSunTexture(size = 512) {
   const canvas = document.createElement("canvas");
@@ -177,6 +181,63 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     const roomEnvironment = new RoomEnvironment();
     const environmentTarget = pmremGenerator.fromScene(roomEnvironment, 0.08);
     scene.environment = environmentTarget.texture;
+
+    // A real 3D halo, built from torus meshes in the same WebGL scene as the prism.
+    // The bright inner torus supplies the solid ring, while two larger additive
+    // shells create a soft glow without relying on the old CSS ellipse.
+    const haloGroup = new THREE.Group();
+    haloGroup.position.set(0, HALO_Y, 0);
+    haloGroup.rotation.set(1.24, 0.03, -0.015);
+    scene.add(haloGroup);
+
+    const haloGeometry = new THREE.TorusGeometry(HALO_RADIUS, HALO_TUBE, 24, 160);
+    const haloMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#fff1b0"),
+      emissive: new THREE.Color("#ffd36a"),
+      emissiveIntensity: 2.4,
+      roughness: 0.24,
+      metalness: 0.08,
+      toneMapped: false,
+    });
+    const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+    haloGroup.add(halo);
+
+    const haloGlowGeometry = new THREE.TorusGeometry(
+      HALO_RADIUS,
+      HALO_TUBE * 2.6,
+      20,
+      160,
+    );
+    const haloGlowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffd36f"),
+      transparent: true,
+      opacity: 0.17,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const haloGlow = new THREE.Mesh(haloGlowGeometry, haloGlowMaterial);
+    haloGroup.add(haloGlow);
+
+    const haloOuterGlowGeometry = new THREE.TorusGeometry(
+      HALO_RADIUS,
+      HALO_TUBE * 5.6,
+      16,
+      160,
+    );
+    const haloOuterGlowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffb84a"),
+      transparent: true,
+      opacity: 0.055,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const haloOuterGlow = new THREE.Mesh(
+      haloOuterGlowGeometry,
+      haloOuterGlowMaterial,
+    );
+    haloGroup.add(haloOuterGlow);
 
     const prism = new THREE.Group();
     prism.position.set(0, PRISM_Y, 0);
@@ -360,6 +421,20 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       prism.rotation.x = 0.28 + Math.sin(time * 0.00014) * 0.018;
       prism.rotation.z = 0.055 + Math.sin(time * 0.0001) * 0.009;
 
+      // Slow 3D precession keeps the halo visibly volumetric while preserving
+      // the iconic flattened-ring silhouette. The glow breathes very gently.
+      haloGroup.rotation.x = 1.24 + Math.sin(time * 0.00034) * 0.035;
+      haloGroup.rotation.y = 0.03 + Math.sin(time * 0.00027 + 0.7) * 0.055;
+      haloGroup.rotation.z = -0.015 + Math.sin(time * 0.00022 + 1.1) * 0.018;
+
+      const haloPulse = 0.5 + 0.5 * Math.sin(time * 0.00145);
+      haloMaterial.emissiveIntensity = 2.15 + haloPulse * 0.45;
+      haloGlowMaterial.opacity = 0.13 + haloPulse * 0.075;
+      haloOuterGlowMaterial.opacity = 0.038 + haloPulse * 0.035;
+      const haloScale = 0.997 + haloPulse * 0.006;
+      haloGlow.scale.setScalar(haloScale);
+      haloOuterGlow.scale.setScalar(0.994 + haloPulse * 0.012);
+
       // Tiny independent drift keeps the rainbow tint moving across the glass.
       spectralGlass.rotation.y = Math.sin(time * 0.00022) * 0.16;
       spectralGlass.rotation.x = Math.sin(time * 0.00017 + 0.8) * 0.08;
@@ -441,6 +516,13 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       intersectionObserver.disconnect();
       reducedMotion.removeEventListener("change", handleMotionChange);
 
+      haloGeometry.dispose();
+      haloMaterial.dispose();
+      haloGlowGeometry.dispose();
+      haloGlowMaterial.dispose();
+      haloOuterGlowGeometry.dispose();
+      haloOuterGlowMaterial.dispose();
+
       geometry.dispose();
       glassMaterial.dispose();
       spectralGeometry.dispose();
@@ -480,11 +562,10 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     <div
       ref={hostRef}
       className={`${className} long-noon-portrait`}
+      style={{ background: "#2a2f3a" }}
       role="img"
-      aria-label={`${name}, a radiant halo above a glass dodecahedron containing a miniature sun`}
+      aria-label={`${name}, a three-dimensional radiant halo above a rainbow-glass dodecahedron containing a miniature sun`}
     >
-      <div className="long-noon-radiance" aria-hidden="true" />
-      <div className="long-noon-halo" aria-hidden="true" />
       <canvas ref={canvasRef} className="long-noon-canvas" aria-hidden="true" />
     </div>
   );
