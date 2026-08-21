@@ -41,8 +41,8 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     scene.environment = environmentMap;
 
     const prism = new THREE.Group();
-    prism.position.set(0, -0.48, 0);
-    prism.scale.setScalar(0.78);
+    prism.position.set(0, -0.62, 0);
+    prism.scale.setScalar(0.68);
     scene.add(prism);
 
     const geometry = new THREE.DodecahedronGeometry(1, 0);
@@ -50,7 +50,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       color: new THREE.Color(0xf7fbff),
       metalness: 0.1,
       roughness: 0.025,
-      transmission: 0.98,
+      transmission: 1,
       thickness: 1.05,
       ior: 1.48,
       iridescence: 0.62,
@@ -58,8 +58,8 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       iridescenceThicknessRange: [90, 340],
       attenuationColor: new THREE.Color(0xeef5ff),
       attenuationDistance: 14,
-      opacity: 0.6,
-      transparent: false,
+      opacity: 0.68,
+      transparent: true,
       side: THREE.DoubleSide,
       clearcoat: 0.35,
       clearcoatRoughness: 0.025,
@@ -122,7 +122,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       const delta = previousTime ? Math.min((time - previousTime) / 1000, 0.1) : 0;
       previousTime = time;
 
-      prism.rotation.y = (prism.rotation.y + delta * 0.15) % (Math.PI * 2);
+      prism.rotation.y = (prism.rotation.y + delta * 0.32) % (Math.PI * 2);
       prism.rotation.x = 0.27 + Math.sin(time * 0.00013) * 0.018;
       prism.rotation.z = 0.035 + Math.sin(time * 0.00009) * 0.008;
 
