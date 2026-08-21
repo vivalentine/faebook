@@ -10,18 +10,18 @@ type Props = {
 
 const PRISM_Y = -0.6;
 const PRISM_SCALE = 0.48;
-const ROTATION_SPEED = 0.78;
-const GLASS_OPACITY = 0.32;
-const SPECTRAL_GLASS_OPACITY = 0.18;
+const ROTATION_SPEED = 0.88;
+const GLASS_OPACITY = 0.52;
+const SPECTRAL_GLASS_OPACITY = 0.14;
 
-const SUN_RADIUS = 0.42;
-const SUN_ROTATION_SPEED = -0.06;
+const SUN_RADIUS = 0.52;
+const SUN_ROTATION_SPEED = -0.16;
 const SUN_HOME_Y = 0.035;
 const SUN_BOUNCE_X = 0.095;
 const SUN_BOUNCE_Y = 0.082;
-const SUN_BOUNCE_Z = 0.076;
+const SUN_BOUNCE_Z = 0.056;
 
-const HALO_Y = 0.36;
+const HALO_Y = 0.26;
 const HALO_RADIUS = 0.86;
 const HALO_TUBE = 0.018;
 
