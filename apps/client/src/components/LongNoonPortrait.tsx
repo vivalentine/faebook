@@ -8,21 +8,21 @@ type Props = {
 };
 
 const PRISM_Y = -0.6;
-const PRISM_SCALE = 0.56;
-const ROTATION_SPEED = 0.92;
-const GLASS_OPACITY = 0.66;
-const SPECTRAL_GLASS_OPACITY = 0.17;
+const PRISM_SCALE = 0.52;
+const ROTATION_SPEED = 0.78;
+const GLASS_OPACITY = 0.46;
+const SPECTRAL_GLASS_OPACITY = 0.08;
 
 const SUN_TEXTURE_PATH = "/textures/sun.jpg";
-const SUN_RADIUS = 0.32;
-const SUN_ROTATION_SPEED = -0.23;
+const SUN_RADIUS = 0.28;
+const SUN_ROTATION_SPEED = 0.03;
 
 const HALO_Y = 0.40;
 const HALO_RADIUS = 0.88;
-const HALO_TUBE = 0.022;
+const HALO_TUBE = 0.014;
 
-const BOUNCE_AMOUNT = 0.035;
-const BOUNCE_SPEED = 0.0017;
+const BOUNCE_AMOUNT = 0.024;
+const BOUNCE_SPEED = 0.001;
 
 function makeProceduralSunTexture(size = 512) {
   const canvas = document.createElement("canvas");
@@ -201,7 +201,7 @@ export default function LongNoonPortrait({
 
     const haloGroup = new THREE.Group();
     haloGroup.position.set(0, HALO_Y, 0);
-    haloGroup.rotation.set(1.24, 0.03, -0.015);
+    haloGroup.rotation.set(1.24, 0.03, -0.01);
     scene.add(haloGroup);
 
     const haloGeometry = new THREE.TorusGeometry(
@@ -214,9 +214,9 @@ export default function LongNoonPortrait({
     const haloMaterial = new THREE.MeshStandardMaterial({
       color: new THREE.Color("#fff1c6"),
       emissive: new THREE.Color("#f2bf63"),
-      emissiveIntensity: 1.35,
-      roughness: 0.28,
-      metalness: 0.02,
+      emissiveIntensity: 1.45,
+      roughness: 0.18,
+      metalness: 0.92,
       toneMapped: false,
     });
 
@@ -233,7 +233,7 @@ export default function LongNoonPortrait({
     const haloCoreMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#fff8df"),
       transparent: true,
-      opacity: 0.98,
+      opacity: 0.92,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
@@ -253,7 +253,7 @@ export default function LongNoonPortrait({
     const haloGlowMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#ffd57f"),
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.12,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -277,7 +277,7 @@ export default function LongNoonPortrait({
     const haloOuterGlowMaterial = new THREE.MeshBasicMaterial({
       color: new THREE.Color("#ffb347"),
       transparent: true,
-      opacity: 0.055,
+      opacity: 0.035,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -301,7 +301,7 @@ export default function LongNoonPortrait({
 
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0.4,
+      metalness: 0.48,
       roughness: 0.095,
       transmission: 1,
       thickness: 0.52,
@@ -510,7 +510,6 @@ export default function LongNoonPortrait({
       const drift =
         Math.sin(time * 0.0011 + 0.8) * 0.012;
 
-      prism.position.y = PRISM_Y + bounce + drift;
       haloGroup.position.y = HALO_Y + bounce + drift;
 
       prism.rotation.y =
@@ -665,7 +664,6 @@ export default function LongNoonPortrait({
     const handleMotionChange = () => {
       stopAnimation();
 
-      prism.position.set(0, PRISM_Y, 0);
       haloGroup.position.set(0, HALO_Y, 0);
 
       prism.rotation.set(0.28, -0.58, 0.055);
