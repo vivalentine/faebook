@@ -17,9 +17,9 @@ type Props = {
  */
 const PRISM_Y = -0.70;
 const PRISM_SCALE = 0.52;
-const ROTATION_SPEED = 0.42;
-const GLASS_OPACITY = 0.18;
-const SPECTRAL_OPACITY = 0.32;
+const ROTATION_SPEED = 0.72;
+const GLASS_OPACITY = 0.08;
+const SPECTRAL_OPACITY = 0.12;
 
 function addSpectralColors(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
