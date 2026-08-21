@@ -366,14 +366,13 @@ export default function LongNoonPortrait({
     const textureLoader = new THREE.TextureLoader();
 
     const sunMaterial = new THREE.MeshStandardMaterial({
-      color: new THREE.Color("#ffb347"),
+      color: new THREE.Color("#ffffff"),
       map: proceduralSunTexture,
-      emissiveMap: proceduralSunTexture,
-      emissive: new THREE.Color("#ff8a24"),
-      emissiveIntensity: 1.8,
-      roughness: 0.8,
+      emissive: new THREE.Color("#e62cff"),
+      emissiveIntensity: 0.15,
+      roughness: 0.32,
       metalness: 0,
-      toneMapped: false,
+      toneMapped: true,
     });
 
     let loadedSunTexture: THREE.Texture | null = null;
@@ -388,7 +387,6 @@ export default function LongNoonPortrait({
 
         loadedSunTexture = texture;
         sunMaterial.map = texture;
-        sunMaterial.emissiveMap = texture;
         sunMaterial.needsUpdate = true;
       },
       undefined,
