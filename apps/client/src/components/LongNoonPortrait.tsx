@@ -581,16 +581,16 @@ export default function LongNoonPortrait({
       // three-axis path. The mixed frequencies keep the motion organic
       // without letting it drift anywhere near the glass shell.
       const sunBounceX =
-        Math.sin(time * 0.0054) * SUN_BOUNCE_X +
-        Math.sin(time * 0.00107 + 0.7) * 0.014;
+        Math.sin(time * 0.00154) * SUN_BOUNCE_X +
+        Math.sin(time * 0.001107 + 0.7) * 0.014;
 
       const sunBounceY =
-        Math.sin(time * 0.0069 + 1.15) * SUN_BOUNCE_Y +
+        Math.sin(time * 0.00169 + 1.15) * SUN_BOUNCE_Y +
         Math.sin(time * 0.00131 + 2.0) * 0.01;
 
       const sunBounceZ =
-        Math.sin(time * 0.0061 + 2.25) * SUN_BOUNCE_Z +
-        Math.sin(time * 0.0113 + 0.35) * 0.012;
+        Math.sin(time * 0.00161 + 2.25) * SUN_BOUNCE_Z +
+        Math.sin(time * 0.01113 + 0.35) * 0.012;
 
       sunGroup.position.set(
         sunBounceX,
