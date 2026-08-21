@@ -14,7 +14,8 @@
     "openseadragon": "^5.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.14.0"
+    "react-router-dom": "^7.14.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
@@ -22,6 +23,7 @@
     "@types/openseadragon": "^4.1.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",

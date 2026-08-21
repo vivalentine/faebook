@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import WikiInlineText from "../components/WikiInlineText";
-import { apiFetch, apiUrl } from "../lib/api";
+import NpcPortrait from "../components/NpcPortrait";
+import { apiFetch } from "../lib/api";
 import { getFallbackReputation } from "../lib/npcReputation";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
@@ -211,7 +212,6 @@ export default function PlayerNpcPage() {
 
   if (!npc) return null;
 
-  const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
   const reputation = npc.reputation || getFallbackReputation();
 
   return (
@@ -223,11 +223,7 @@ export default function PlayerNpcPage() {
       <section className="detail-shell">
         <div className="detail-hero">
           <div className="detail-image-wrap">
-            {imageUrl ? (
-              <img className="detail-image" src={imageUrl} alt={npc.name} />
-            ) : (
-              <div className="detail-image placeholder">No image</div>
-            )}
+            <NpcPortrait npc={npc} variant="detail" />
           </div>
 
           <div className="detail-meta">
