@@ -15,11 +15,11 @@ type Props = {
  * - GLASS_OPACITY: smaller number = more transparent
  * - SPECTRAL_OPACITY: larger number = stronger rainbow tint
  */
-const PRISM_Y = -0.68;
-const PRISM_SCALE = 0.58;
+const PRISM_Y = -0.70;
+const PRISM_SCALE = 0.52;
 const ROTATION_SPEED = 0.42;
 const GLASS_OPACITY = 0.18;
-const SPECTRAL_OPACITY = 0.38;
+const SPECTRAL_OPACITY = 0.32;
 
 function addSpectralColors(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
@@ -88,9 +88,9 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
 
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0,
-      roughness: 0.13,
-      transmission: 1,
+      metalness: 0.08,
+      roughness: 0.24,
+      transmission: 0.98,
       thickness: 0.55,
       ior: 1.46,
 
@@ -105,8 +105,8 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       attenuationColor: new THREE.Color("#eef5ff"),
       attenuationDistance: 18,
 
-      clearcoat: 0.35,
-      clearcoatRoughness: 0.11,
+      clearcoat: 0.45,
+      clearcoatRoughness: 0.24,
 
       specularIntensity: 0.42,
       specularColor: new THREE.Color("#eaf2ff"),
