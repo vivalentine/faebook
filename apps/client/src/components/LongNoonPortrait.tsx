@@ -9,8 +9,143 @@ type Props = {
 
 const PRISM_Y = -0.7;
 const PRISM_SCALE = 0.62;
-const ROTATION_SPEED = 0.72;
-const GLASS_OPACITY = 0.68;
+const ROTATION_SPEED = 0.32;
+const GLASS_OPACITY = 0.26;
+const SPECTRAL_GLASS_OPACITY = 0.24;
+
+const SUN_TEXTURE_PATH = "/textures/sun.jpg";
+const SUN_RADIUS = 0.28;
+const SUN_ROTATION_SPEED = 0.25;
+
+function makeProceduralSunTexture(size = 512) {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const image = ctx.createImageData(size, size);
+  const data = image.data;
+
+  // Multi-scale pseudo-noise. This is only the fallback if sun.jpg is absent.
+  const rand = (x: number, y: number, scale: number) => {
+    const sx = Math.floor(x / scale);
+    const sy = Math.floor(y / scale);
+    const value = Math.sin(sx * 12.9898 + sy * 78.233) * 43758.5453;
+    return value - Math.floor(value);
+  };
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const i = (y * size + x) * 4;
+
+      const broad = rand(x, y, 28);
+      const medium = rand(x, y, 11);
+      const fine = rand(x, y, 4);
+      const waves =
+        Math.sin(x * 0.055 + Math.sin(y * 0.025) * 2.2) * 0.5 +
+        Math.sin(y * 0.075 + x * 0.012) * 0.25;
+
+      const v = Math.max(
+        0,
+        Math.min(1, broad * 0.34 + medium * 0.34 + fine * 0.22 + waves * 0.1 + 0.2),
+      );
+
+      // Warm photosphere palette, with brighter yellow-white granules.
+      data[i] = Math.round(210 + v * 45);
+      data[i + 1] = Math.round(82 + v * 150);
+      data[i + 2] = Math.round(18 + v * 62);
+      data[i + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(image, 0, 0);
+
+  // Add broad, irregular brighter bands so the fallback has readable solar texture.
+  ctx.globalCompositeOperation = "screen";
+  ctx.globalAlpha = 0.22;
+  for (let i = 0; i < 34; i += 1) {
+    const y = Math.random() * size;
+    const amplitude = 4 + Math.random() * 12;
+    const frequency = 0.008 + Math.random() * 0.018;
+
+    ctx.beginPath();
+    for (let x = 0; x <= size; x += 4) {
+      const py = y + Math.sin(x * frequency + i) * amplitude;
+      if (x === 0) ctx.moveTo(x, py);
+      else ctx.lineTo(x, py);
+    }
+    ctx.strokeStyle = i % 3 === 0 ? "#fff2a8" : "#ffb23c";
+    ctx.lineWidth = 1 + Math.random() * 2;
+    ctx.stroke();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+function makeGlowTexture() {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const gradient = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
+
+  gradient.addColorStop(0, "rgba(255,255,235,1)");
+  gradient.addColorStop(0.18, "rgba(255,224,122,0.9)");
+  gradient.addColorStop(0.42, "rgba(255,154,44,0.38)");
+  gradient.addColorStop(0.7, "rgba(255,103,24,0.1)");
+  gradient.addColorStop(1, "rgba(255,103,24,0)");
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+
+function addRainbowColors(geometry: THREE.BufferGeometry) {
+  const position = geometry.getAttribute("position");
+  const colors = new Float32Array(position.count * 3);
+  const color = new THREE.Color();
+
+  for (let i = 0; i < position.count; i += 1) {
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const z = position.getZ(i);
+
+    const angle = Math.atan2(z, x);
+    const hue = ((angle / (Math.PI * 2)) + 0.5 + y * 0.08 + 1) % 1;
+
+    color.setHSL(hue, 0.82, 0.62);
+
+    colors[i * 3] = color.r;
+    colors[i * 3 + 1] = color.g;
+    colors[i * 3 + 2] = color.b;
+  }
+
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
 
 export default function LongNoonPortrait({ className = "", name }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -49,30 +184,49 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     prism.rotation.set(0.28, -0.58, 0.055);
     scene.add(prism);
 
+    // Outer glass shell
     const geometry = new THREE.DodecahedronGeometry(1, 0);
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0.28,
-      roughness: 0.08,
+      metalness: 0,
+      roughness: 0.095,
       transmission: 1,
       thickness: 0.52,
       ior: 1.46,
       transparent: true,
       opacity: GLASS_OPACITY,
       depthWrite: false,
-      iridescence: 0.18,
-      iridescenceIOR: 1.2,
-      iridescenceThicknessRange: [110, 300],
+      iridescence: 0.82,
+      iridescenceIOR: 1.32,
+      iridescenceThicknessRange: [80, 620],
       attenuationColor: new THREE.Color("#eef5ff"),
       attenuationDistance: 20,
-      clearcoat: 0.32,
-      clearcoatRoughness: 0.11,
-      specularIntensity: 0.78,
+      clearcoat: 0.48,
+      clearcoatRoughness: 0.075,
+      specularIntensity: 0.55,
       specularColor: new THREE.Color("#eaf2ff"),
       side: THREE.FrontSide,
     });
     const glass = new THREE.Mesh(geometry, glassMaterial);
     prism.add(glass);
+
+    // Faint rainbow layer just inside the clear shell.
+    // This makes the dodecahedron visibly prismatic without turning it opaque.
+    const spectralGeometry = new THREE.DodecahedronGeometry(0.985, 0).toNonIndexed();
+    addRainbowColors(spectralGeometry);
+
+    const spectralMaterial = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: SPECTRAL_GLASS_OPACITY,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+
+    const spectralGlass = new THREE.Mesh(spectralGeometry, spectralMaterial);
+    prism.add(spectralGlass);
 
     const edgeGeometry = new THREE.EdgesGeometry(geometry, 10);
     const edgeMaterial = new THREE.LineBasicMaterial({
@@ -81,101 +235,107 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       opacity: 0.72,
       depthWrite: false,
     });
-    const edges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-    prism.add(edges);
+    prism.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
 
-    const coreGroup = new THREE.Group();
-    coreGroup.position.set(0, 0.04, 0);
-    prism.add(coreGroup);
+    // Miniature sun suspended inside the prism.
+    const sunGroup = new THREE.Group();
+    sunGroup.position.set(0, 0.035, 0);
+    prism.add(sunGroup);
 
-    const coreGeometry = new THREE.SphereGeometry(0.145, 32, 32);
-    const coreMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#fff6cf"),
-      transparent: true,
-      opacity: 0.98,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
+    const proceduralSunTexture = makeProceduralSunTexture();
+    const textureLoader = new THREE.TextureLoader();
+
+    const sunMaterial = new THREE.MeshStandardMaterial({
+      color: new THREE.Color("#ffb347"),
+      map: proceduralSunTexture,
+      emissiveMap: proceduralSunTexture,
+      emissive: new THREE.Color("#ff8a24"),
+      emissiveIntensity: 1.8,
+      roughness: 0.8,
+      metalness: 0,
+      toneMapped: false,
     });
-    const core = new THREE.Mesh(coreGeometry, coreMaterial);
-    coreGroup.add(core);
 
-    const innerGlowGeometry = new THREE.SphereGeometry(0.28, 32, 32);
-    const innerGlowMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ffd778"),
+    // If /public/textures/sun.jpg exists, it replaces the procedural fallback.
+    let loadedSunTexture: THREE.Texture | null = null;
+    textureLoader.load(
+      SUN_TEXTURE_PATH,
+      (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.needsUpdate = true;
+        loadedSunTexture = texture;
+        sunMaterial.map = texture;
+        sunMaterial.emissiveMap = texture;
+        sunMaterial.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        // The procedural texture remains active when no external sun texture exists.
+      },
+    );
+
+    const sunGeometry = new THREE.SphereGeometry(SUN_RADIUS, 64, 64);
+    const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+    sunGroup.add(sun);
+
+    // Slightly larger translucent photosphere softens the sphere edge.
+    const photosphereGeometry = new THREE.SphereGeometry(SUN_RADIUS * 1.08, 48, 48);
+    const photosphereMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color("#ffb13a"),
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.1,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.BackSide,
+      toneMapped: false,
     });
-    const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
-    coreGroup.add(innerGlow);
+    const photosphere = new THREE.Mesh(photosphereGeometry, photosphereMaterial);
+    sunGroup.add(photosphere);
 
-    const outerGlowGeometry = new THREE.SphereGeometry(0.42, 32, 32);
-    const outerGlowMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ffbf66"),
+    // Camera-facing glow sprites work well at NPC-card scale.
+    const glowTexture = makeGlowTexture();
+
+    const coronaMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: new THREE.Color("#ffb04a"),
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.58,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.BackSide,
+      toneMapped: false,
     });
-    const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
-    coreGroup.add(outerGlow);
+    const corona = new THREE.Sprite(coronaMaterial);
+    corona.scale.setScalar(0.62);
+    sunGroup.add(corona);
 
-    const spectralGlowGeometry = new THREE.SphereGeometry(0.56, 32, 32);
-    const spectralGlowMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#b9c3ff"),
+    const outerCoronaMaterial = new THREE.SpriteMaterial({
+      map: glowTexture,
+      color: new THREE.Color("#ffd27a"),
       transparent: true,
-      opacity: 0.035,
+      opacity: 0.22,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.BackSide,
+      toneMapped: false,
     });
-    const spectralGlow = new THREE.Mesh(spectralGlowGeometry, spectralGlowMaterial);
-    spectralGlow.scale.set(1.08, 0.95, 1.02);
-    coreGroup.add(spectralGlow);
+    const outerCorona = new THREE.Sprite(outerCoronaMaterial);
+    outerCorona.scale.setScalar(0.92);
+    sunGroup.add(outerCorona);
 
-    const rayMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color("#ffe7a8"),
-      transparent: true,
-      opacity: 0.075,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
+    // Soft scene illumination only. No point lights, which created white dots.
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    scene.add(new THREE.HemisphereLight(0xffedc9, 0x182446, 0.7));
 
-    const rayGeometries: THREE.BufferGeometry[] = [];
-    const rayMeshes: THREE.Mesh[] = [];
-    const rayData = [
-      { rotX: 0.0, rotY: 0.0, rotZ: 0.28, y: 0.02 },
-      { rotX: 0.65, rotY: 0.55, rotZ: -0.2, y: -0.01 },
-      { rotX: -0.52, rotY: 1.12, rotZ: 0.16, y: 0.05 },
-      { rotX: 0.38, rotY: -0.92, rotZ: -0.34, y: -0.04 },
-    ];
-
-    for (const ray of rayData) {
-      const rayGeometry = new THREE.CylinderGeometry(0.012, 0.04, 1.16, 10, 1, true);
-      const rayMesh = new THREE.Mesh(rayGeometry, rayMaterial);
-      rayMesh.position.y = ray.y;
-      rayMesh.rotation.set(ray.rotX, ray.rotY, ray.rotZ);
-      coreGroup.add(rayMesh);
-      rayGeometries.push(rayGeometry);
-      rayMeshes.push(rayMesh);
-    }
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.62));
-    scene.add(new THREE.HemisphereLight(0xffedc9, 0x182446, 0.72));
-
-    const amberLight = new THREE.DirectionalLight(0xffd18c, 0.95);
+    const amberLight = new THREE.DirectionalLight(0xffd18c, 0.9);
     amberLight.position.set(3.2, 3.5, 4.5);
     scene.add(amberLight);
 
-    const coolLight = new THREE.DirectionalLight(0xb8d2ff, 0.55);
+    const coolLight = new THREE.DirectionalLight(0xb8d2ff, 0.48);
     coolLight.position.set(-4.5, 1.2, 3.2);
     scene.add(coolLight);
 
-    const backLight = new THREE.DirectionalLight(0xf3d8ff, 0.22);
+    const backLight = new THREE.DirectionalLight(0xf3d8ff, 0.2);
     backLight.position.set(-2.5, -3.2, -2.2);
     scene.add(backLight);
 
@@ -200,25 +360,34 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       prism.rotation.x = 0.28 + Math.sin(time * 0.00014) * 0.018;
       prism.rotation.z = 0.055 + Math.sin(time * 0.0001) * 0.009;
 
-      const pulse = 0.92 + Math.sin(time * 0.0022) * 0.08;
-      const secondaryPulse = 0.94 + Math.sin(time * 0.00155 + 1.2) * 0.06;
-      core.scale.setScalar(pulse);
-      innerGlow.scale.setScalar(0.98 + Math.sin(time * 0.0019) * 0.06);
-      outerGlow.scale.setScalar(secondaryPulse);
-      spectralGlow.scale.set(
-        1.08 + Math.sin(time * 0.0013) * 0.03,
-        0.95 + Math.sin(time * 0.0015 + 0.7) * 0.025,
-        1.02 + Math.sin(time * 0.0011 + 1.4) * 0.025,
-      );
+      // Tiny independent drift keeps the rainbow tint moving across the glass.
+      spectralGlass.rotation.y = Math.sin(time * 0.00022) * 0.16;
+      spectralGlass.rotation.x = Math.sin(time * 0.00017 + 0.8) * 0.08;
 
-      coreMaterial.opacity = 0.9 + Math.sin(time * 0.0022) * 0.06;
-      innerGlowMaterial.opacity = 0.16 + Math.sin(time * 0.0019) * 0.035;
-      outerGlowMaterial.opacity = 0.075 + Math.sin(time * 0.0015 + 0.4) * 0.02;
-      spectralGlowMaterial.opacity = 0.03 + Math.sin(time * 0.0011 + 0.9) * 0.012;
+      // The sun moves independently inside the rotating prism.
+      sun.rotation.y = (sun.rotation.y + delta * SUN_ROTATION_SPEED) % (Math.PI * 2);
+      sun.rotation.x = (sun.rotation.x + delta * 0.025) % (Math.PI * 2);
 
-      rayMeshes.forEach((mesh, index) => {
-        mesh.rotation.y += delta * (0.04 + index * 0.012);
-      });
+      // Slowly drift the texture too, which gives the surface more life.
+      const activeTexture = loadedSunTexture ?? proceduralSunTexture;
+      if (activeTexture) {
+        activeTexture.offset.x = (activeTexture.offset.x + delta * 0.0075) % 1;
+      }
+
+      // Gentle breathing effect on the corona rather than the sun itself.
+      const pulse = Math.sin(time * 0.002);
+      const slowPulse = Math.sin(time * 0.00135 + 0.9);
+
+      photosphere.scale.setScalar(1 + pulse * 0.018);
+      photosphereMaterial.opacity = 0.09 + pulse * 0.018;
+
+      corona.scale.setScalar(0.62 + pulse * 0.025);
+      coronaMaterial.opacity = 0.55 + pulse * 0.08;
+
+      outerCorona.scale.setScalar(0.92 + slowPulse * 0.055);
+      outerCoronaMaterial.opacity = 0.2 + slowPulse * 0.045;
+
+      sunMaterial.emissiveIntensity = 1.75 + pulse * 0.18;
 
       render();
       frameId = window.requestAnimationFrame(animate);
@@ -240,6 +409,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     const resizeObserver = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (!width || !height) return;
+
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
@@ -258,6 +428,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     const handleMotionChange = () => {
       stopAnimation();
       prism.rotation.set(0.28, -0.58, 0.055);
+      sun.rotation.set(0, 0, 0);
       startAnimation();
     };
 
@@ -272,21 +443,25 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
 
       geometry.dispose();
       glassMaterial.dispose();
+      spectralGeometry.dispose();
+      spectralMaterial.dispose();
       edgeGeometry.dispose();
       edgeMaterial.dispose();
-      coreGeometry.dispose();
-      coreMaterial.dispose();
-      innerGlowGeometry.dispose();
-      innerGlowMaterial.dispose();
-      outerGlowGeometry.dispose();
-      outerGlowMaterial.dispose();
-      spectralGlowGeometry.dispose();
-      spectralGlowMaterial.dispose();
-      rayGeometries.forEach((g) => g.dispose());
-      rayMaterial.dispose();
+
+      sunGeometry.dispose();
+      sunMaterial.dispose();
+      photosphereGeometry.dispose();
+      photosphereMaterial.dispose();
+      coronaMaterial.dispose();
+      outerCoronaMaterial.dispose();
+
+      proceduralSunTexture?.dispose();
+      loadedSunTexture?.dispose();
+      glowTexture?.dispose();
 
       environmentTarget.dispose();
       pmremGenerator.dispose();
+
       roomEnvironment.traverse((object) => {
         const mesh = object as THREE.Mesh;
         if (mesh.geometry) mesh.geometry.dispose();
@@ -306,7 +481,7 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       ref={hostRef}
       className={`${className} long-noon-portrait`}
       role="img"
-      aria-label={`${name}, a radiant halo above a glass dodecahedron`}
+      aria-label={`${name}, a radiant halo above a glass dodecahedron containing a miniature sun`}
     >
       <div className="long-noon-radiance" aria-hidden="true" />
       <div className="long-noon-halo" aria-hidden="true" />
