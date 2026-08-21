@@ -588,18 +588,18 @@ export default function LongNoonPortrait({
 
       photosphere.scale.setScalar(1 + pulse * 0.018);
       photosphereMaterial.opacity =
-        0.045 + pulse * 0.012;
+        0.09 + pulse * 0.018;
 
       corona.scale.setScalar(0.62 + pulse * 0.025);
       coronaMaterial.opacity =
-        0.22 + pulse * 0.045;
+        0.55 + pulse * 0.08;
 
       outerCorona.scale.setScalar(
         0.92 + slowPulse * 0.055,
       );
 
       outerCoronaMaterial.opacity =
-        0.09 + slowPulse * 0.025;
+        0.12 + slowPulse * 0.045;
 
       render();
       frameId = window.requestAnimationFrame(animate);
