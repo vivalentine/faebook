@@ -17,9 +17,9 @@ const SUN_TEXTURE_PATH = "/textures/sun.jpg";
 const SUN_RADIUS = 0.16;
 const SUN_ROTATION_SPEED = 0.2;
 
-const HALO_Y = 0.92;
-const HALO_RADIUS = 1.28;
-const HALO_TUBE = 0.032;
+const HALO_Y = 0.80;
+const HALO_RADIUS = 1.12;
+const HALO_TUBE = 0.03;
 
 function makeProceduralSunTexture(size = 512) {
   const canvas = document.createElement("canvas");
@@ -562,7 +562,10 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
     <div
       ref={hostRef}
       className={`${className} long-noon-portrait`}
-      style={{ background: "#2a2f3a" }}
+      style={{
+        background:
+          "radial-gradient(circle at 12% -5%, #9f7cff2e, #0000 28%), radial-gradient(circle at 84% 10%, #5aa1961f, #0000 34%), linear-gradient(#0a0c15 0%, #10131e 52%, #0d1019 100%)",
+      }}
       role="img"
       aria-label={`${name}, a three-dimensional radiant halo above a rainbow-glass dodecahedron containing a miniature sun`}
     >
