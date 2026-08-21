@@ -8,18 +8,18 @@ type Props = {
 };
 
 const PRISM_Y = -0.6;
-const PRISM_SCALE = 0.52;
+const PRISM_SCALE = 0.48;
 const ROTATION_SPEED = 0.78;
-const GLASS_OPACITY = 0.46;
+const GLASS_OPACITY = 0.62;
 const SPECTRAL_GLASS_OPACITY = 0.08;
 
 const SUN_TEXTURE_PATH = "/textures/sun.jpg";
-const SUN_RADIUS = 0.28;
-const SUN_ROTATION_SPEED = 0.03;
+const SUN_RADIUS = 0.42;
+const SUN_ROTATION_SPEED = -0.06;
 
-const HALO_Y = 0.40;
-const HALO_RADIUS = 0.88;
-const HALO_TUBE = 0.014;
+const HALO_Y = 0.36;
+const HALO_RADIUS = 0.86;
+const HALO_TUBE = 0.018;
 
 const BOUNCE_AMOUNT = 0.024;
 const BOUNCE_SPEED = 0.001;
@@ -573,7 +573,7 @@ export default function LongNoonPortrait({
         (Math.PI * 2);
 
       sun.rotation.x =
-        (sun.rotation.x + delta * 0.025) %
+        (sun.rotation.x + delta * 0.005) %
         (Math.PI * 2);
 
       const activeTexture =
