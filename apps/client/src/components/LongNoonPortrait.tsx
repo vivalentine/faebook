@@ -16,6 +16,10 @@ const SPECTRAL_GLASS_OPACITY = 0.18;
 
 const SUN_RADIUS = 0.42;
 const SUN_ROTATION_SPEED = -0.06;
+const SUN_HOME_Y = 0.035;
+const SUN_BOUNCE_X = 0.075;
+const SUN_BOUNCE_Y = 0.052;
+const SUN_BOUNCE_Z = 0.062;
 
 const HALO_Y = 0.36;
 const HALO_RADIUS = 0.86;
@@ -359,7 +363,7 @@ export default function LongNoonPortrait({
     prism.add(new THREE.LineSegments(edgeGeometry, edgeMaterial));
 
     const sunGroup = new THREE.Group();
-    sunGroup.position.set(0, 0.035, 0);
+    sunGroup.position.set(0, SUN_HOME_Y, 0);
     prism.add(sunGroup);
 
     const proceduralSunTexture = makeProceduralSunTexture();
@@ -428,7 +432,7 @@ export default function LongNoonPortrait({
     const glowTexture = makeGlowTexture();
 
     const coronaMaterial = new THREE.SpriteMaterial({
-        map: glowTexture,
+      map: glowTexture,
       color: new THREE.Color("#df55ff"),
       transparent: true,
       opacity: 0.26,
@@ -488,6 +492,12 @@ export default function LongNoonPortrait({
     let isVisible = true;
     let frameId = 0;
     let previousTime = 0;
+    let sunWorldAngle = 0;
+
+    const prismWorldQuaternion = new THREE.Quaternion();
+    const inversePrismQuaternion = new THREE.Quaternion();
+    const desiredSunQuaternion = new THREE.Quaternion();
+    const sunAxis = new THREE.Vector3(0, 1, 0);
 
     const render = () => renderer.render(scene, camera);
 
@@ -567,13 +577,47 @@ export default function LongNoonPortrait({
       spectralGlass.rotation.x =
         Math.sin(time * 0.00017 + 0.8) * 0.08;
 
-      sun.rotation.y =
-        (sun.rotation.y + delta * SUN_ROTATION_SPEED) %
+      // The sun moves around inside the prism on a smooth, tightly bounded
+      // three-axis path. The mixed frequencies keep the motion organic
+      // without letting it drift anywhere near the glass shell.
+      const sunBounceX =
+        Math.sin(time * 0.00054) * SUN_BOUNCE_X +
+        Math.sin(time * 0.00107 + 0.7) * 0.014;
+
+      const sunBounceY =
+        Math.sin(time * 0.00069 + 1.15) * SUN_BOUNCE_Y +
+        Math.sin(time * 0.00131 + 2.0) * 0.01;
+
+      const sunBounceZ =
+        Math.sin(time * 0.00061 + 2.25) * SUN_BOUNCE_Z +
+        Math.sin(time * 0.00113 + 0.35) * 0.012;
+
+      sunGroup.position.set(
+        sunBounceX,
+        SUN_HOME_Y + sunBounceY,
+        sunBounceZ,
+      );
+
+      // Keep the miniature sun's rotation independent from the prism.
+      // Child world rotation = prism world rotation * child local rotation,
+      // so cancel the prism first, then apply the slow counterrotation.
+      sunWorldAngle =
+        (sunWorldAngle + delta * SUN_ROTATION_SPEED) %
         (Math.PI * 2);
 
-      sun.rotation.x =
-        (sun.rotation.x + delta * 0.005) %
-        (Math.PI * 2);
+      desiredSunQuaternion.setFromAxisAngle(
+        sunAxis,
+        sunWorldAngle,
+      );
+
+      prism.getWorldQuaternion(prismWorldQuaternion);
+      inversePrismQuaternion
+        .copy(prismWorldQuaternion)
+        .invert();
+
+      sunGroup.quaternion
+        .copy(inversePrismQuaternion)
+        .multiply(desiredSunQuaternion);
 
       const activeTexture =
         loadedSunTexture ?? proceduralSunTexture;
@@ -664,6 +708,9 @@ export default function LongNoonPortrait({
 
       prism.rotation.set(0.28, -0.58, 0.055);
       haloGroup.rotation.set(1.24, 0.03, -0.015);
+      sunWorldAngle = 0;
+      sunGroup.position.set(0, SUN_HOME_Y, 0);
+      sunGroup.quaternion.identity();
       sun.rotation.set(0, 0, 0);
 
       startAnimation();
