@@ -11,11 +11,11 @@ type Props = {
 const PRISM_Y = -0.6;
 const PRISM_SCALE = 0.48;
 const ROTATION_SPEED = 0.88;
-const GLASS_OPACITY = 0.22;
-const SPECTRAL_GLASS_OPACITY = 0.14;
+const GLASS_OPACITY = 0.28;
+const SPECTRAL_GLASS_OPACITY = 0.18;
 
 const SUN_RADIUS = 0.46;
-const SUN_ROTATION_SPEED = -0.16;
+const SUN_ROTATION_SPEED = -0.26;
 const SUN_HOME_Y = 0.035;
 const SUN_BOUNCE_X = 0.095;
 const SUN_BOUNCE_Y = 0.082;
@@ -26,7 +26,7 @@ const HALO_RADIUS = 0.86;
 const HALO_TUBE = 0.018;
 
 const BOUNCE_AMOUNT = 0.024;
-const BOUNCE_SPEED = 0.0015;
+const BOUNCE_SPEED = 0.0018;
 
 function makeProceduralSunTexture(size = 512) {
   const canvas = document.createElement("canvas");
