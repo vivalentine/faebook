@@ -1,3 +1,4 @@
+import sunTextureUrl from "../assets/sun.jpg";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
@@ -13,7 +14,6 @@ const ROTATION_SPEED = 0.78;
 const GLASS_OPACITY = 0.32;
 const SPECTRAL_GLASS_OPACITY = 0.18;
 
-const SUN_TEXTURE_PATH = "/textures/sun.jpg";
 const SUN_RADIUS = 0.42;
 const SUN_ROTATION_SPEED = -0.06;
 
@@ -195,7 +195,7 @@ export default function LongNoonPortrait({
     const roomEnvironment = new RoomEnvironment();
     const environmentTarget = pmremGenerator.fromScene(
       roomEnvironment,
-      0.08,
+      0.04,
     );
     scene.environment = environmentTarget.texture;
 
@@ -327,7 +327,7 @@ export default function LongNoonPortrait({
     const spectralGeometry = new THREE.DodecahedronGeometry(
       0.985,
       0,
-    ).toNonIndexed();
+    );
 
     addRainbowColors(spectralGeometry);
 
@@ -374,7 +374,7 @@ export default function LongNoonPortrait({
     let loadedSunTexture: THREE.Texture | null = null;
 
     textureLoader.load(
-      SUN_TEXTURE_PATH,
+      sunTextureUrl,
       (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.wrapS = THREE.RepeatWrapping;
@@ -386,11 +386,11 @@ export default function LongNoonPortrait({
         sunMaterial.map = texture;
         sunMaterial.needsUpdate = true;
 
-        console.log("Loaded Long Noon sun texture:", SUN_TEXTURE_PATH);
+        console.log("Loaded Long Noon sun texture:", sunTextureUrl);
       },
       undefined,
       (error) => {
-        console.error("FAILED to load Long Noon sun texture:", SUN_TEXTURE_PATH, error);
+        console.error("FAILED to load Long Noon sun texture:", sunTextureUrl, error);
       },
     );
 
