@@ -65,9 +65,9 @@ function makeProceduralSunTexture(size = 512) {
         ),
       );
 
-      data[i] = Math.round(210 + v * 45);
-      data[i + 1] = Math.round(82 + v * 150);
-      data[i + 2] = Math.round(18 + v * 62);
+      data[i] = Math.round(120 + v * 125);
+      data[i + 1] = Math.round(25 + v * 75);
+      data[i + 2] = Math.round(145 + v * 110);
       data[i + 3] = 255;
     }
   }
@@ -385,10 +385,13 @@ export default function LongNoonPortrait({
         loadedSunTexture = texture;
         sunMaterial.map = texture;
         sunMaterial.needsUpdate = true;
-        texture.colorSpace = THREE.SRGBColorSpace;
+
+        console.log("Loaded Long Noon sun texture:", SUN_TEXTURE_PATH);
       },
       undefined,
-      () => {},
+      (error) => {
+        console.error("FAILED to load Long Noon sun texture:", SUN_TEXTURE_PATH, error);
+      },
     );
 
     const sunGeometry = new THREE.SphereGeometry(
@@ -585,18 +588,18 @@ export default function LongNoonPortrait({
 
       photosphere.scale.setScalar(1 + pulse * 0.018);
       photosphereMaterial.opacity =
-        0.09 + pulse * 0.018;
+        0.045 + pulse * 0.012;
 
       corona.scale.setScalar(0.62 + pulse * 0.025);
       coronaMaterial.opacity =
-        0.55 + pulse * 0.08;
+        0.22 + pulse * 0.045;
 
       outerCorona.scale.setScalar(
         0.92 + slowPulse * 0.055,
       );
 
       outerCoronaMaterial.opacity =
-        0.2 + slowPulse * 0.045;
+        0.09 + slowPulse * 0.025;
 
       render();
       frameId = window.requestAnimationFrame(animate);
