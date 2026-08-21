@@ -271,9 +271,9 @@
   isolation: isolate;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 64%, rgba(239, 207, 132, 0.13), transparent 35%),
-    radial-gradient(circle at 50% 24%, rgba(255, 224, 146, 0.1), transparent 30%),
-    linear-gradient(180deg, #111522 0%, #171927 54%, #0c101a 100%);
+    radial-gradient(ellipse at 50% 66%, rgba(103, 126, 181, 0.12), transparent 34%),
+    radial-gradient(ellipse at 50% 22%, rgba(255, 224, 150, 0.08), transparent 34%),
+    linear-gradient(180deg, #0d1220 0%, #111725 52%, #080c15 100%);
 }
 
 .long-noon-canvas {
@@ -288,46 +288,87 @@
 
 .long-noon-radiance {
   position: absolute;
-  z-index: 0;
-  top: -8%;
-  left: 12%;
-  width: 76%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  opacity: 0.86;
+  z-index: 1;
+  top: 4%;
+  left: 5%;
+  width: 90%;
+  height: 38%;
+  opacity: 0.54;
   background:
-    repeating-conic-gradient(from 2deg, rgba(255, 226, 153, 0.28) 0 0.6deg, transparent 0.8deg 15deg),
-    radial-gradient(circle, rgba(255, 245, 205, 0.3), rgba(228, 166, 57, 0.05) 36%, transparent 68%);
-  filter: blur(0.7px);
-  mask-image: radial-gradient(circle, transparent 0 22%, #000 43%, transparent 72%);
-  animation: long-noon-pulse 9s ease-in-out infinite;
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(255, 226, 154, 0.22) 0deg 0.55deg,
+      transparent 0.8deg 13deg
+    );
+  filter: blur(0.45px);
+  mask-image: radial-gradient(
+    ellipse at center,
+    transparent 0 27%,
+    rgba(0, 0, 0, 0.92) 40%,
+    rgba(0, 0, 0, 0.45) 57%,
+    transparent 76%
+  );
+  animation: long-noon-radiance-pulse 12s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .long-noon-halo {
   position: absolute;
   z-index: 3;
-  top: 18%;
-  left: 19%;
-  width: 62%;
-  height: 15%;
+  top: 15.5%;
+  left: 10%;
+  width: 80%;
+  height: 14%;
   box-sizing: border-box;
-  border: clamp(2px, 1.4cqw, 5px) solid rgba(255, 251, 220, 0.98);
+  border: clamp(2px, 0.9cqw, 4px) solid rgba(255, 250, 218, 0.98);
   border-radius: 50%;
-  transform: perspective(300px) rotateX(63deg);
+  background: transparent;
   box-shadow:
-    0 0 3px #fff,
-    0 0 10px rgba(255, 238, 169, 0.95),
-    0 0 25px rgba(239, 179, 63, 0.72),
-    0 0 48px rgba(215, 133, 33, 0.4),
-    inset 0 0 8px rgba(255, 244, 193, 0.84);
-  animation: long-noon-pulse 9s ease-in-out infinite;
+    0 0 3px rgba(255, 255, 250, 0.98),
+    0 0 9px rgba(255, 239, 184, 0.9),
+    0 0 20px rgba(245, 199, 101, 0.56),
+    0 0 38px rgba(214, 151, 54, 0.24),
+    inset 0 0 5px rgba(255, 246, 205, 0.72);
+  animation: long-noon-halo-pulse 12s ease-in-out infinite;
   pointer-events: none;
 }
 
-@keyframes long-noon-pulse {
+.long-noon-halo::before,
+.long-noon-halo::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.long-noon-halo::before {
+  border: 1px solid rgba(255, 255, 245, 0.58);
+  filter: blur(1.6px);
+}
+
+.long-noon-halo::after {
+  inset: -18%;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 44%,
+    rgba(255, 228, 155, 0.12) 49%,
+    rgba(255, 197, 91, 0.08) 53%,
+    transparent 61%
+  );
+  filter: blur(5px);
+}
+
+@keyframes long-noon-halo-pulse {
   0%,
-  100% { opacity: 0.88; }
+  100% { opacity: 0.94; }
   50% { opacity: 1; }
+}
+
+@keyframes long-noon-radiance-pulse {
+  0%,
+  100% { opacity: 0.5; }
+  50% { opacity: 0.58; }
 }
 
 @media (prefers-reduced-motion: reduce) {
