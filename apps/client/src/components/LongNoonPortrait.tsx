@@ -16,10 +16,10 @@ type Props = {
  * - SPECTRAL_OPACITY: larger number = stronger rainbow tint
  */
 const PRISM_Y = -0.68;
-const PRISM_SCALE = 0.64;
-const ROTATION_SPEED = 0.32;
-const GLASS_OPACITY = 0.38;
-const SPECTRAL_OPACITY = 0.48;
+const PRISM_SCALE = 0.58;
+const ROTATION_SPEED = 0.42;
+const GLASS_OPACITY = 0.18;
+const SPECTRAL_OPACITY = 0.38;
 
 function addSpectralColors(geometry: THREE.BufferGeometry) {
   const position = geometry.getAttribute("position");
@@ -34,7 +34,7 @@ function addSpectralColors(geometry: THREE.BufferGeometry) {
     const angle = Math.atan2(z, x);
     const hue = ((angle / (Math.PI * 2)) + 0.5 + y * 0.055 + 1) % 1;
 
-    color.setHSL(hue, 0.68, 0.62);
+    color.setHSL(hue, 0.78, 0.62);
 
     colors[i * 3] = color.r;
     colors[i * 3 + 1] = color.g;
