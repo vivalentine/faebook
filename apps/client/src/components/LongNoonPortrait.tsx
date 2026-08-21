@@ -88,8 +88,8 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
 
     const glassMaterial = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color("#f4f8ff"),
-      metalness: 0.08,
-      roughness: 0.24,
+      metalness: 0.48,
+      roughness: 0.11,
       transmission: 0.98,
       thickness: 0.55,
       ior: 1.46,
@@ -105,8 +105,8 @@ export default function LongNoonPortrait({ className = "", name }: Props) {
       attenuationColor: new THREE.Color("#eef5ff"),
       attenuationDistance: 18,
 
-      clearcoat: 0.45,
-      clearcoatRoughness: 0.24,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.11,
 
       specularIntensity: 0.42,
       specularColor: new THREE.Color("#eaf2ff"),
