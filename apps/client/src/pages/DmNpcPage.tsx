@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import type { ChangeEvent, SubmitEventHandler } from "react";
 import { Link, useParams } from "react-router-dom";
 import FaeSelect from "../components/FaeSelect";
+import NpcPortrait from "../components/NpcPortrait";
 import WikiInlineText from "../components/WikiInlineText";
-import { apiFetch, apiUrl } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
 import { getFallbackReputation } from "../lib/npcReputation";
 import type { Npc, NpcAlias, NpcNote, NpcReputationDisplay } from "../types";
@@ -389,8 +390,6 @@ export default function DmNpcPage() {
     );
   }
 
-  const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
-
   return (
     <div className="app-shell">
       <div className="page-back-link">
@@ -401,11 +400,7 @@ export default function DmNpcPage() {
         <div className="detail-hero">
           <div className="detail-media-column">
             <div className="detail-image-wrap">
-              {imageUrl ? (
-                <img className="detail-image" src={imageUrl} alt={npc.name} />
-              ) : (
-                <div className="detail-image placeholder">No image</div>
-              )}
+              <NpcPortrait npc={npc} variant="detail" />
             </div>
             <section className="state-card small-card">
               <h3>Portrait management</h3>

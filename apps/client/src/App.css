@@ -266,6 +266,77 @@
   font-size: 14px;
 }
 
+.long-noon-portrait {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 64%, rgba(239, 207, 132, 0.13), transparent 35%),
+    radial-gradient(circle at 50% 24%, rgba(255, 224, 146, 0.1), transparent 30%),
+    linear-gradient(180deg, #111522 0%, #171927 54%, #0c101a 100%);
+}
+
+.long-noon-canvas {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.long-noon-radiance {
+  position: absolute;
+  z-index: 0;
+  top: -8%;
+  left: 12%;
+  width: 76%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0.86;
+  background:
+    repeating-conic-gradient(from 2deg, rgba(255, 226, 153, 0.28) 0 0.6deg, transparent 0.8deg 15deg),
+    radial-gradient(circle, rgba(255, 245, 205, 0.3), rgba(228, 166, 57, 0.05) 36%, transparent 68%);
+  filter: blur(0.7px);
+  mask-image: radial-gradient(circle, transparent 0 22%, #000 43%, transparent 72%);
+  animation: long-noon-pulse 9s ease-in-out infinite;
+}
+
+.long-noon-halo {
+  position: absolute;
+  z-index: 3;
+  top: 18%;
+  left: 19%;
+  width: 62%;
+  height: 15%;
+  box-sizing: border-box;
+  border: clamp(2px, 1.4cqw, 5px) solid rgba(255, 251, 220, 0.98);
+  border-radius: 50%;
+  transform: perspective(300px) rotateX(63deg);
+  box-shadow:
+    0 0 3px #fff,
+    0 0 10px rgba(255, 238, 169, 0.95),
+    0 0 25px rgba(239, 179, 63, 0.72),
+    0 0 48px rgba(215, 133, 33, 0.4),
+    inset 0 0 8px rgba(255, 244, 193, 0.84);
+  animation: long-noon-pulse 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes long-noon-pulse {
+  0%,
+  100% { opacity: 0.88; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .long-noon-halo,
+  .long-noon-radiance {
+    animation: none;
+  }
+}
+
 .npc-card-body {
   padding: 16px 18px 16px;
   display: flex;

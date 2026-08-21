@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { apiUrl } from "../lib/api";
 import { getFallbackReputation, getReputationIndicatorClassName } from "../lib/npcReputation";
 import type { Npc } from "../types";
+import NpcPortrait from "./NpcPortrait";
 
 type Props = {
   npc: Npc;
@@ -17,7 +17,6 @@ export default function NpcCard({
   savingSlug = "",
 }: Props) {
   const navigate = useNavigate();
-  const imageUrl = npc.portrait_path ? apiUrl(npc.portrait_path) : "";
   const detailsHref = `/directory/${npc.slug}`;
   const reputation = npc.reputation || getFallbackReputation();
 
@@ -71,11 +70,7 @@ export default function NpcCard({
           </span>
         ) : null}
 
-        {imageUrl ? (
-          <img className="npc-image" src={imageUrl} alt={npc.name} />
-        ) : (
-          <div className="npc-image placeholder">No image</div>
-        )}
+        <NpcPortrait npc={npc} />
       </div>
 
       <div className="npc-card-body">
