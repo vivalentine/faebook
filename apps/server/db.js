@@ -24,6 +24,17 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS user_secret_unlocks (
+    user_id INTEGER NOT NULL,
+    secret_key TEXT NOT NULL,
+    unlocked_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, secret_key),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_user_secret_unlocks_key_time
+  ON user_secret_unlocks(secret_key, unlocked_at);
+
   CREATE TABLE IF NOT EXISTS npcs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slug TEXT UNIQUE NOT NULL,
