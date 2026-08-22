@@ -2,72 +2,38 @@ import { useEffect, useState, type ReactNode } from "react";
 import NpcPortrait from "../components/NpcPortrait";
 import LumiSticker from "../features/lumi/LumiSticker";
 import { LUMI_POST_ASSETS } from "../features/lumi/lumiAssets";
-import { apiFetch, apiUrl } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import type { Npc } from "../types";
 
-type TopEightEntry = {
-  label: string;
-  kind: "npc" | "player";
-  identity: string;
-  fit: "contain" | "cover";
-};
-type LumiPlayerPortrait = {
-  username: string;
-  display_name: string;
-  profile_image_path: string | null;
-};
+const topEight = [
+  { label: "Lyra Glimmerthirst", src: "/lumi/top-8/lyra_top8.webp" },
+  { label: "Aoife Gealach", src: "/lumi/top-8/aoife_top8.webp" },
+  { label: "Usaq", src: "/lumi/top-8/usaq_top8.webp" },
+  { label: "Rin Tatari", src: "/lumi/top-8/rin_top8.webp" },
+  { label: "Mimi Xiao", src: "/lumi/top-8/mimi_top8.webp" },
+  { label: "Terry", src: "/lumi/top-8/terry_top8.webp" },
+  { label: "Hilton", src: "/lumi/top-8/hilton_top8.webp" },
+  { label: "Lirael Moonthorn", src: "/lumi/top-8/lirael_top8.webp" },
+] as const;
 
-const topEight: TopEightEntry[] = [
-  {
-    label: "Lyra Glimmerthirst",
-    kind: "npc",
-    identity: "lyra-glimmerthirst",
-    fit: "contain",
-  },
-  {
-    label: "Aoife Gealach",
-    kind: "npc",
-    identity: "aoife-gealach",
-    fit: "contain",
-  },
-  { label: "Usaq", kind: "player", identity: "usaq", fit: "contain" },
-  { label: "Rin Tatari", kind: "npc", identity: "rin", fit: "contain" },
-  { label: "Mimi Xiao", kind: "npc", identity: "mimi", fit: "contain" },
-  { label: "Terry", kind: "player", identity: "terry", fit: "contain" },
-  { label: "Hilton", kind: "player", identity: "hilton", fit: "contain" },
-  {
-    label: "Lirael Moonthorn",
-    kind: "npc",
-    identity: "lirael-moonthorn",
-    fit: "contain",
-  },
-];
-
-function TopEightPortrait({
-  entry,
-  src,
-}: {
-  entry: TopEightEntry;
-  src: string | null;
-}) {
+function TopEightPortrait({ label, src }: { label: string; src: string }) {
   const [failed, setFailed] = useState(false);
   return (
     <div className="lumi-top-eight-media">
-      {src && !failed ? (
+      {!failed ? (
         <img
           src={src}
-          alt={entry.label}
-          className={`lumi-fit-${entry.fit}`}
+          alt={label}
           onError={() => setFailed(true)}
         />
       ) : (
         <div
           className="lumi-broken-portrait"
           role="img"
-          aria-label={`${entry.label} image unavailable`}
+          aria-label={`${label} image unavailable`}
         >
           <span>▧ ×</span>
-          <small>{entry.label}</small>
+          <small>{label}</small>
         </div>
       )}
     </div>
@@ -120,25 +86,14 @@ function BlogPost({
 
 export default function LumiProfilePage() {
   const [npc, setNpc] = useState<Npc | null>(null);
-  const [npcs, setNpcs] = useState<Npc[]>([]);
-  const [playerPortraits, setPlayerPortraits] = useState<LumiPlayerPortrait[]>(
-    [],
-  );
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      apiFetch("/api/npcs/lumi-turnleaf"),
-      apiFetch("/api/npcs"),
-      apiFetch("/api/lumi/top-eight-players"),
-    ])
-      .then(async ([lumiResponse, npcsResponse, playersResponse]) => {
+    apiFetch("/api/npcs/lumi-turnleaf")
+      .then(async (lumiResponse) => {
         if (!lumiResponse.ok)
           throw new Error(`Failed to load NPC: ${lumiResponse.status}`);
         setNpc(await lumiResponse.json());
-        if (npcsResponse.ok) setNpcs(await npcsResponse.json());
-        if (playersResponse.ok)
-          setPlayerPortraits(await playersResponse.json());
       })
       .catch((reason: unknown) =>
         setError(
@@ -163,19 +118,6 @@ export default function LumiProfilePage() {
         </div>
       </div>
     );
-
-  const portraitFor = (entry: TopEightEntry) => {
-    const path =
-      entry.kind === "npc"
-        ? npcs.find((candidate) => candidate.slug === entry.identity)
-            ?.portrait_path
-        : playerPortraits.find(
-            (candidate) =>
-              candidate.username.toLocaleLowerCase() ===
-              entry.identity.toLocaleLowerCase(),
-          )?.profile_image_path;
-    return path ? apiUrl(path) : null;
-  };
 
   return (
     <div className="app-shell lumi-page-shell">
@@ -305,8 +247,8 @@ export default function LumiProfilePage() {
               <h2>TOP 8</h2>
               <ol>
                 {topEight.map((entry) => (
-                  <li key={`${entry.kind}-${entry.identity}`}>
-                    <TopEightPortrait entry={entry} src={portraitFor(entry)} />
+                  <li key={entry.label}>
+                    <TopEightPortrait label={entry.label} src={entry.src} />
                     <span>{entry.label}</span>
                   </li>
                 ))}

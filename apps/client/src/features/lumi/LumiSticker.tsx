@@ -1,5 +1,11 @@
 import type { CSSProperties } from "react";
-import { lumiStickerAssets, type LumiStickerName } from "./lumiStickers";
+import {
+  LUMI_STICKER_SHEET,
+  LUMI_STICKER_SHEET_HEIGHT,
+  LUMI_STICKER_SHEET_WIDTH,
+  lumiStickerAtlas,
+  type LumiStickerName,
+} from "./lumiStickers";
 
 type LumiStickerProps = {
   sticker: LumiStickerName;
@@ -24,9 +30,12 @@ export default function LumiSticker({
   duration = 1.1,
   className = "",
 }: LumiStickerProps) {
+  const crop = lumiStickerAtlas[sticker];
+  const scale = size / Math.max(crop.width, crop.height);
   const clampedRotation = Math.max(-12, Math.min(12, rotate));
   const style = {
-    "--sticker-size": `${size}px`,
+    "--sticker-width": `${crop.width * scale}px`,
+    "--sticker-height": `${crop.height * scale}px`,
     "--sticker-rotate": `${clampedRotation}deg`,
     "--sticker-flip": flip ? -1 : 1,
     "--sticker-duration": `${duration}s`,
@@ -35,14 +44,19 @@ export default function LumiSticker({
   } as CSSProperties;
 
   return (
-    <img
+    <svg
       className={`lumi-sticker${animated ? " lumi-sticker-twinkle" : ""} ${className}`.trim()}
       style={style}
-      src={lumiStickerAssets[sticker]}
-      alt=""
+      viewBox={`${crop.x} ${crop.y} ${crop.width} ${crop.height}`}
       aria-hidden="true"
-      draggable={false}
-    />
+      focusable="false"
+    >
+      <image
+        href={LUMI_STICKER_SHEET}
+        width={LUMI_STICKER_SHEET_WIDTH}
+        height={LUMI_STICKER_SHEET_HEIGHT}
+      />
+    </svg>
   );
 }
 

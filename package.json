@@ -9,7 +9,8 @@
     "build": "npm run maps:tiles && npm --prefix apps/client run build",
     "start": "npm --prefix apps/server run start",
     "seed:users": "npm --prefix apps/server run seed:users",
-    "maps:tiles": "node scripts/maps/generate-map-tiles.mjs"
+    "maps:tiles": "node scripts/maps/generate-map-tiles.mjs",
+    "validate:lumi-stickers": "node scripts/lumi/validate-lumi-sticker-atlas.mjs"
   },
   "keywords": [],
   "author": "",

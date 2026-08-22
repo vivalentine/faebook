@@ -29,6 +29,9 @@ echo "==> Validating server JavaScript syntax"
 node --check apps/server/index.js
 node --check apps/server/db.js
 
+echo "==> Validating Lumi sticker atlas"
+npm run validate:lumi-stickers
+
 if [[ -f "apps/server/seed-users.js" ]]; then
   node --check apps/server/seed-users.js
 fi
