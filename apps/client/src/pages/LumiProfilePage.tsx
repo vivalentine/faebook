@@ -237,9 +237,8 @@ export default function LumiProfilePage() {
               <p className="lumi-handle">@lumi_turnleaf</p>
               <p className="lumi-online">● online probably</p>
               <p>
-                hi!!!! i'm lumi. i write things, draw things, know things i
-                probably shouldn't, and have been informed that "editing the
-                production stylesheet for fun" is not an acceptable hobby. rude.
+                hi!!!! i'm lumi. i write things and draw things and know things i
+                probably shouldn't. don't judge my tastes. i have mommy issues.
               </p>
             </section>
 
@@ -326,7 +325,7 @@ export default function LumiProfilePage() {
               notes="69 notes"
             >
               <p>
-                okay but "crack ship" is a coward's phrase. if the chemistry
+                okay but saying "crackship" at all is so weak. if the chemistry
                 works, the chemistry works. i'm just saying.
               </p>
             </BlogPost>
@@ -375,10 +374,10 @@ export default function LumiProfilePage() {
               notes="17 notes"
             >
               <p>
-                usaq owns a kazoo and somehow this has never once stopped him
+                usaq owns a kazoo and somehow this has never once stopped her
                 from being taken seriously as a musician.
               </p>
-              <p>incredible. inspirational. devastating for the rest of us.</p>
+              <p>incredible and inspirational tbh.</p>
             </BlogPost>
             <BlogPost
               className="lumi-hilton-post"
@@ -395,18 +394,17 @@ export default function LumiProfilePage() {
               tags={[
                 "#terry",
                 "#tactical genius",
-                "#debatable",
-                "#fly behavior",
+                "#givehimtheantler",
+                "#fly king",
               ]}
               posted="posted 2:18 AM"
               edited="edited 3:16 AM"
               notes="7 notes"
             >
               <p>
-                watching terry solve problems is like watching someone shake a
-                locked door for ten minutes and then turn into a fly
+                watching the party squander terry's abilities drives me a lil crazy sometimes
               </p>
-              <p>and the worst part is sometimes this works</p>
+              <p>justice for terry</p>
             </BlogPost>
 
             <BlogPost
