@@ -145,7 +145,7 @@ export default function LumiProfilePage() {
             duration={1.4}
             className="lumi-masthead-sticker lumi-masthead-star"
           />
-          <h1>~*~ LUMI TURNLEAF'S EXTREMELY NORMAL FAEBOOK PAGE ~*~</h1>
+          <h1>~*~ LUMI TURNLEAF'S EXTREMELY NORMAL NPC PAGE ~*~</h1>
           <p className="lumi-subtitle">yes i changed the css. no you can't.</p>
           <div className="lumi-system">
             <span>profile permissions: don't worry about it</span>
@@ -157,7 +157,7 @@ export default function LumiProfilePage() {
           className="lumi-marquee"
           aria-label="welcome 2 my page ★ behave badly but interestingly"
         >
-          <span>welcome 2 my page ★ behave badly but interestingly</span>
+          <span>welcome 2 my page ★ please behave badly</span>
         </div>
         <div className="lumi-glitter-divider" aria-hidden="true">
           <span>★</span> ✦ <span>♥</span> ✦ <span>★</span>
