@@ -147,6 +147,14 @@ type NpcCleanupItem = {
   archived_at?: string | null;
 };
 
+type SecretUnlock = { user_id: number; username: string; display_name: string; secret_key: string; unlocked_at: string };
+
+function SecretPagesAdmin() {
+  const [unlocks, setUnlocks] = useState<SecretUnlock[]>([]);
+  useEffect(() => { void apiFetch("/api/dm/secret-unlocks").then(async (response) => { if (response.ok) setUnlocks((await response.json()).unlocks || []); }); }, []);
+  return <section className="state-card"><h2>Secret Pages</h2><p>DM bypass is active. Player unlocks show their first successful timestamp.</p>{[["FAEO3", "/secret/faeo3", "lumi_faeo3"], ["Pixie", "/secret/pixie", "lumi_pixie"]].map(([name, href, key]) => <article className="note-card" key={key}><div className="note-card-header"><strong>{name}</strong><Link className="action-button" to={href}>Open</Link></div>{unlocks.filter(item => item.secret_key === key).length ? <ul>{unlocks.filter(item => item.secret_key === key).map(item => <li key={`${item.user_id}-${key}`}>{item.display_name || item.username} ({item.username}) — {new Date(item.unlocked_at).toLocaleString()}</li>)}</ul> : <p>No player unlocks yet.</p>}</article>)}</section>;
+}
+
 export default function DmToolsPage() {
   const { refreshLiveState } = useLiveCampaignState();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -716,6 +724,8 @@ export default function DmToolsPage() {
       </header>
 
       <main className="main-content">
+        <SecretPagesAdmin />
+
         <section className="toolbar-card">
           <div className="toolbar-grid">
             <label className="toolbar-field">

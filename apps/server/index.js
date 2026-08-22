@@ -43,6 +43,7 @@ const {
 const { buildSummerCourtVisibilitySql, validateSummerCourtDateTime } = require("./summer-court-calendar");
 const { registerTacticalEncounterRoutes } = require("./tactical-encounters");
 const { createDatabaseRecoveryPoint } = require("./local-backup");
+const { isSecretKey, credentialsMatch, archivePayload } = require("./secret-archives");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -1829,6 +1830,53 @@ app.post("/api/auth/logout", requireAuth, (req, res) => {
     });
     res.json({ ok: true });
   });
+});
+
+function hasSecretAccess(req, secretKey) {
+  if (req.session.user.role === "dm") return true;
+  return Boolean(db.prepare(`SELECT 1 FROM user_secret_unlocks WHERE user_id = ? AND secret_key = ?`).get(req.session.user.id, secretKey));
+}
+
+app.get("/api/secrets/:secretKey/status", requireRole("player", "dm"), (req, res) => {
+  if (!isSecretKey(req.params.secretKey)) return res.status(404).json({ error: "Not found" });
+  return res.json({ unlocked: hasSecretAccess(req, req.params.secretKey), dm_bypass: req.session.user.role === "dm" });
+});
+
+app.post("/api/secrets/:secretKey/unlock", requireRole("player", "dm"), (req, res) => {
+  const { secretKey } = req.params;
+  if (!isSecretKey(secretKey)) return res.status(404).json({ error: "Not found" });
+  if (req.session.user.role === "dm") return res.json({ unlocked: true, dm_bypass: true });
+  if (!credentialsMatch(secretKey, req.body?.username, req.body?.password)) {
+    return res.status(401).json({ error: "Unable to unlock archive" });
+  }
+  const unlockedAt = new Date().toISOString();
+  db.prepare(`INSERT INTO user_secret_unlocks (user_id, secret_key, unlocked_at) VALUES (?, ?, ?) ON CONFLICT(user_id, secret_key) DO NOTHING`).run(req.session.user.id, secretKey, unlockedAt);
+  const row = db.prepare(`SELECT unlocked_at FROM user_secret_unlocks WHERE user_id = ? AND secret_key = ?`).get(req.session.user.id, secretKey);
+  return res.json({ unlocked: true, unlocked_at: row.unlocked_at });
+});
+
+app.get("/api/secrets/:secretKey/assets/:filename", requireRole("player", "dm"), (req, res) => {
+  const { secretKey, filename } = req.params;
+  if (secretKey !== "lumi_pixie" || !hasSecretAccess(req, secretKey) || !/^[a-z0-9-]+\.svg$/.test(filename)) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  const assetPath = path.join(__dirname, "secret-assets", filename);
+  if (!fs.existsSync(assetPath)) return res.status(404).json({ error: "Not found" });
+  res.setHeader("Cache-Control", "private, no-store");
+  return res.sendFile(assetPath);
+});
+
+app.get("/api/secrets/:secretKey/content", requireRole("player", "dm"), (req, res) => {
+  const { secretKey } = req.params;
+  if (!isSecretKey(secretKey)) return res.status(404).json({ error: "Not found" });
+  if (!hasSecretAccess(req, secretKey)) return res.status(403).json({ error: "Archive locked" });
+  res.setHeader("Cache-Control", "private, no-store");
+  return res.json(archivePayload(secretKey));
+});
+
+app.get("/api/dm/secret-unlocks", requireRole("dm"), (_req, res) => {
+  const rows = db.prepare(`SELECT u.id AS user_id, u.username, u.display_name, s.secret_key, s.unlocked_at FROM user_secret_unlocks s JOIN users u ON u.id = s.user_id ORDER BY s.secret_key, s.unlocked_at`).all();
+  return res.json({ unlocks: rows });
 });
 
 app.get("/api/dm/npcs", requireRole("dm"), (_req, res) => {

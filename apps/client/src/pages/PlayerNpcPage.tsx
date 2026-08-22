@@ -7,10 +7,17 @@ import { apiFetch } from "../lib/api";
 import { getFallbackReputation } from "../lib/npcReputation";
 import { useWikiEntityIndex } from "../lib/wikiLinks";
 import type { Npc, NpcAlias, NpcNote } from "../types";
+import LumiProfilePage from "./LumiProfilePage";
 
 export default function PlayerNpcPage() {
   const { slug = "" } = useParams();
 
+  if (slug === "lumi-turnleaf") return <LumiProfilePage />;
+
+  return <StandardPlayerNpcPage slug={slug} />;
+}
+
+function StandardPlayerNpcPage({ slug }: { slug: string }) {
   const [npc, setNpc] = useState<Npc | null>(null);
   const [canonicalAliases, setCanonicalAliases] = useState<NpcAlias[]>([]);
   const [personalAliases, setPersonalAliases] = useState<NpcAlias[]>([]);

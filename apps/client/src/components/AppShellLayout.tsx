@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function AppShellLayout() {
   const location = useLocation();
+  const isLumiProfile = location.pathname === "/directory/lumi-turnleaf";
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { winterInterferenceLevel } = useLiveCampaignState();
@@ -80,7 +81,7 @@ export default function AppShellLayout() {
         setSuggestions(nextSuggestions);
         setIsSuggestionOpen(nextSuggestions.length > 0);
         setActiveSuggestionIndex(-1);
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) {
           return;
         }
@@ -238,7 +239,7 @@ export default function AppShellLayout() {
 
   return (
     <div
-      className={`app-shell app-shell-layout ${isDrawerOpen ? "drawer-open" : ""}`.trim()}
+      className={`app-shell app-shell-layout ${isDrawerOpen ? "drawer-open" : ""} ${isLumiProfile ? "lumi-profile-route" : ""}`.trim()}
       data-winter-interference={playerWinterLevel}
     >
       <WinterInterferenceLayer level={playerWinterLevel} />
@@ -305,7 +306,15 @@ export default function AppShellLayout() {
       </aside>
 
       <div className="app-content-area">
-        <header className="shell-header">
+        {isLumiProfile ? <button
+          className="hamburger lumi-route-hamburger"
+          type="button"
+          aria-label="Open navigation"
+          onClick={() => setIsDrawerOpen((open) => !open)}
+        >
+          ☰
+        </button> : null}
+        {!isLumiProfile ? <header className="shell-header">
           <div className="shell-header-row">
             <button
               className="hamburger"
@@ -403,7 +412,7 @@ export default function AppShellLayout() {
               </button>
             </form>
           </div>
-        </header>
+        </header> : null}
 
         {logoutError ? (
           <div className="state-card error-card small-card shell-error-banner">
