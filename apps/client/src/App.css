@@ -5552,6 +5552,19 @@ body.prefers-reduced-motion *::after {
 
 /* Lumi's deliberately over-customized personal blog. */
 .lumi-profile { overflow-x:clip; }
+.lumi-sticker { display:block; flex:0 0 auto; overflow:visible; pointer-events:none; user-select:none; transform-origin:center; }
+.lumi-widget,.lumi-post,.pixie-feed-post,.pixie-login-modal { position:relative; }
+.lumi-widget-sticker,.lumi-post-sticker,.pixie-post-sticker { position:absolute; pointer-events:none; }
+.lumi-now-note { z-index:1; top:42px; right:12px; }
+.lumi-now-sparkle { z-index:1; top:7px; right:9px; }
+.lumi-now-playing strong,.lumi-now-playing p { position:relative; z-index:2; padding-right:48px; }
+.lumi-mood-face { z-index:1; right:7px; bottom:6px; }
+.lumi-mood p { position:relative; z-index:2; padding-right:54px; }
+.lumi-top-flower { z-index:2; top:3px; right:7px; }
+.lumi-top-star { z-index:2; bottom:5px; left:5px; }
+.lumi-post-sticker-right { z-index:1; top:14px; right:12px; }
+.lumi-image-post > .lumi-repost-label { padding-right:78px; }
+.lumi-sticker-divider { display:flex; align-items:center; justify-content:center; gap:clamp(10px,3vw,28px); min-height:36px; overflow:hidden; }
 .lumi-main-column { width:100%; max-width:1100px; justify-self:center; }
 .lumi-now-playing { background:linear-gradient(135deg,#1d1327,#352044); color:#d9fbff; }
 .lumi-now-playing h2 { background:linear-gradient(90deg,#1d7ea5,#b2238b); }
@@ -5627,7 +5640,8 @@ body.prefers-reduced-motion *::after {
 
 /* Locked Pixie website */
 .pixie-login-site { display:grid; place-items:center; box-sizing:border-box; padding:32px 16px; color:#222; background-color:#191c22; background-position:center; background-size:cover; background-repeat:no-repeat; font:16px/1.5 Inter,system-ui,sans-serif; }
-.pixie-login-modal { box-sizing:border-box; width:min(100%,400px); padding:clamp(26px,6vw,42px); border-radius:14px; background:#fff; box-shadow:0 20px 70px #0008; }
+.pixie-login-modal { box-sizing:border-box; width:min(100%,400px); padding:clamp(26px,6vw,42px); border-radius:14px; background:#fff; box-shadow:0 20px 70px #0008; overflow:hidden; }
+.pixie-login-brand { display:flex; align-items:center; justify-content:center; gap:8px; }
 .pixie-logo { color:#159fe5; font-size:2.6rem; font-weight:900; line-height:1; text-align:center; }
 .pixie-tagline { margin:5px 0 28px; color:#66717c; text-align:center; }
 .pixie-login-modal h1 { margin:0; font-size:1.5rem; text-align:center; }
@@ -5713,11 +5727,18 @@ body.prefers-reduced-motion *::after {
 .pixie-feed-header { position:sticky; z-index:2; top:0; display:flex; align-items:center; justify-content:space-between; gap:20px; box-sizing:border-box; width:100%; padding:16px max(18px,calc((100% - 760px)/2)); border-bottom:1px solid #e2e5e8; background:#fffc; backdrop-filter:blur(12px); }
 .pixie-feed-header strong { color:#159ed8; font-size:2rem; }
 .pixie-feed { display:grid; gap:22px; box-sizing:border-box; width:min(720px,calc(100% - 32px)); margin-inline:auto; padding-block:32px 64px; }
-.pixie-feed-post { min-width:0; padding:clamp(18px,4vw,28px); border:1px solid #dfe3e6; border-radius:10px; background:#fff; box-shadow:0 4px 18px #26333e12; font-size:1.05rem; line-height:1.6; }
+.pixie-feed-post { min-width:0; padding:clamp(18px,4vw,28px); border:1px solid #dfe3e6; border-radius:10px; background:#fff; box-shadow:0 4px 18px #26333e12; font-size:1.05rem; line-height:1.6; overflow:hidden; }
 .pixie-feed-post > img { display:block; width:100%; height:auto; margin-block:16px; }
-.pixie-repost-label { display:block; color:#61717c; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase; }
+.pixie-repost-label { display:flex; align-items:center; gap:7px; color:#61717c; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase; }
 .pixie-feed-tags { display:flex; flex-wrap:wrap; gap:7px 12px; margin-top:18px; color:#1686b9; }
 .pixie-ask { padding:16px; border-left:4px solid #159ed8; background:#edf8fd; }
+.pixie-profile-mark { display:flex; align-items:center; gap:8px; min-width:0; }
+.pixie-post-sticker { z-index:1; top:8px; }
+.pixie-post-sticker-right { right:9px; }
+.pixie-post-sticker-left { left:9px; }
+.pixie-feed-post:has(.pixie-post-sticker-right) > :not(.pixie-post-sticker):first-of-type { padding-right:54px; }
+.pixie-feed-post:has(.pixie-post-sticker-left) > :not(.pixie-post-sticker):first-of-type { padding-left:54px; }
+.pixie-sticker-footer { display:flex; align-items:end; justify-content:center; gap:12px; min-height:54px; overflow:hidden; }
 
 @media (max-width:760px) {
   .faeo3-archive-header { align-items:flex-start; flex-direction:column; }
