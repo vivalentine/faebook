@@ -5548,6 +5548,54 @@ body.prefers-reduced-motion *::after {
 .lumi-interests { display:flex; flex-wrap:wrap; gap:9px; padding:14px; }
 .lumi-interests span { padding:7px 10px; border:2px dashed #913576; color:#4a214e; background:#ffe7f6; font-weight:700; }
 
+/* Lumi's deliberately over-customized personal blog. */
+.lumi-page-shell,.lumi-profile { overflow-x:clip; }
+.lumi-main-column { width:100%; max-width:1100px; justify-self:center; }
+.lumi-now-playing { background:linear-gradient(135deg,#1d1327,#352044); color:#d9fbff; }
+.lumi-now-playing h2 { background:linear-gradient(90deg,#1d7ea5,#b2238b); }
+.lumi-now-playing strong { display:block; margin:14px 12px 4px; color:#ffb8ec; font-size:1.1rem; }
+.lumi-now-playing > p { margin-block:3px 10px; font:700 .78rem/1.3 monospace; }
+.lumi-mood > p { margin-block:10px; font-weight:700; }
+.lumi-elsewhere { box-sizing:border-box; margin:0; padding:12px; border:2px dashed #7d2e8c; background:#fff1fa; box-shadow:4px 4px 0 #f4a9db; }
+.lumi-top-eight ol { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:12px; list-style:none; counter-reset:top-eight; }
+.lumi-top-eight li { counter-increment:top-eight; display:grid; grid-template-rows:92px auto; position:relative; min-width:0; border:2px outset #edb7db; background:#ffe9f7; text-align:center; }
+.lumi-top-eight li::before { content:counter(top-eight); position:absolute; z-index:1; top:3px; left:3px; min-width:18px; color:#fff; background:#7d2e8c; font:700 11px/18px monospace; }
+.lumi-top-eight img { width:100%; height:92px; object-fit:cover; background:#24132e; }
+.lumi-top-eight li span { display:grid; place-items:center; min-height:38px; padding:4px; color:#611457; font:bold .72rem/1.2 Verdana,sans-serif; overflow-wrap:anywhere; }
+.lumi-top-eight > p { margin:0 12px 12px; color:#6e246f; font:italic .72rem/1.4 Verdana,sans-serif; }
+.lumi-post { min-width:0; padding:clamp(18px,3vw,30px); font-size:clamp(1rem,1.4vw,1.16rem); }
+.lumi-post p { margin-top:0; }
+.lumi-post p:last-of-type { margin-bottom:1.2rem; }
+.lumi-post:nth-of-type(3n) { border-style:double; border-width:5px; box-shadow:7px 7px 0 #9ce8ef; }
+.lumi-tags { align-items:center; padding-top:4px; border-top:1px dotted #d698c8; line-height:1.35; }
+.lumi-tags span { overflow-wrap:anywhere; }
+.lumi-post-meta { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px 16px; margin-top:14px; color:#6b596e; font:11px/1.3 monospace; }
+.lumi-repost-label { display:block; margin:-10px -10px 16px; padding:7px 10px; border:2px dashed #167e99; color:#155e75; background:#cbf8ff; font:800 .8rem/1 Verdana,sans-serif; text-transform:uppercase; letter-spacing:.16em; }
+.lumi-image-post img { display:block; width:100%; height:auto; max-height:780px; object-fit:contain; background:#25142f; }
+.lumi-lyra-post { border-width:5px; background:linear-gradient(#fff 0 75%,#fff2fb); }
+.lumi-image-caption { margin:16px 0!important; color:#861366; font:bold clamp(1.15rem,2.5vw,1.8rem)/1.25 "Trebuchet MS",sans-serif; text-align:center; }
+.lumi-paired-art { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; background:#7d2e8c; }
+.lumi-paired-art img { height:clamp(260px,38vw,620px); object-fit:cover; }
+.lumi-loud-tag { display:inline-block; padding:8px 10px; border:3px outset #f6e34b; color:#fff!important; background:#c21671; font-size:clamp(1.25rem,3vw,2rem); line-height:1.05; transform:rotate(-1deg); }
+.lumi-hilton-post { background:repeating-linear-gradient(-45deg,#fff 0 12px,#fff1f9 12px 24px); }
+.lumi-question { margin:-10px -10px 22px; padding:18px; border:3px solid #236e88; color:#133f56; background:#d6f8ff; box-shadow:5px 5px 0 #92dce8; }
+.lumi-question strong { display:block; margin-bottom:10px; font-family:Verdana,sans-serif; }
+.lumi-question p { margin:0; }
+.lumi-answer { padding-left:18px; border-left:5px solid #dc3a91; font-weight:700; }
+.lumi-personal-post { max-width:850px; justify-self:end; background:#fffafd; }
+.lumi-chain-post { border:7px ridge #f4df24; color:#410b52; background:repeating-conic-gradient(#fff153 0 5%,#ff92da 0 10%,#86f2ff 0 15%); text-align:center; animation:lumi-chain-glow 1.6s steps(2,end) infinite; }
+.lumi-chain-post > h2 { margin:0 0 18px; padding:16px; border:5px outset #fffd98; color:#fff; background:#ac116e; font:900 clamp(1.8rem,5vw,4rem)/1 "Arial Black",Impact,sans-serif; text-shadow:3px 3px #35114b; }
+.lumi-chain-post > p { padding:18px; background:#fffdeb; font-weight:800; }
+.lumi-chain-post .lumi-tags,.lumi-chain-post .lumi-post-meta { padding:12px; background:#fffdeb; }
+@keyframes lumi-chain-glow { 50% { filter:saturate(1.35); } }
+
+@media (max-width:900px) {
+  .lumi-layout { grid-template-columns:minmax(260px,300px) minmax(0,1fr); gap:12px; padding:12px; }
+  .lumi-top-eight ol { gap:5px; padding:8px; }
+  .lumi-top-eight li { grid-template-rows:74px auto; }
+  .lumi-top-eight img { height:74px; }
+}
+
 /* Locked FaeO3 website */
 .secret-loading,.faeo3-site,.pixie-site { min-height:100vh; }
 .faeo3-login-site { min-height:100vh; color:#2b2020; background:#fbf8f3; font:16px/1.5 Georgia,"Times New Roman",serif; }
@@ -5616,3 +5664,25 @@ body.prefers-reduced-motion *::after {
   .secret-site-header { align-items:flex-start; flex-direction:column; }
 }
 @media (prefers-reduced-motion:reduce) { .lumi-marquee span { animation:none; } }
+@media (max-width:760px) {
+  .lumi-profile { font-size:16px; }
+  .lumi-layout { gap:16px; }
+  .lumi-sidebar,.lumi-main-column { gap:16px; }
+  .lumi-profile-card,.lumi-widget,.lumi-post,.lumi-elsewhere { max-width:100%; }
+  .lumi-post { box-sizing:border-box; width:100%; padding:18px 16px; font-size:1rem; line-height:1.6; }
+  .lumi-top-eight ol { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .lumi-top-eight li { grid-template-rows:clamp(66px,21vw,96px) auto; }
+  .lumi-top-eight img { height:clamp(66px,21vw,96px); }
+  .lumi-top-eight li span { min-height:44px; font-size:.68rem; }
+  .lumi-paired-art img { height:60vw; }
+  .lumi-tags { gap:10px 12px; font-size:1rem; }
+  .lumi-loud-tag { min-height:44px; box-sizing:border-box; }
+}
+@media (max-width:430px) {
+  .lumi-top-eight ol { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .lumi-top-eight li { grid-template-rows:120px auto; }
+  .lumi-top-eight img { height:120px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .lumi-chain-post { animation:none; }
+}
