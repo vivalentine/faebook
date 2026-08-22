@@ -221,3 +221,7 @@ The documented deployment shape keeps the existing in-app FaeBook login model an
 ## Notes
 
 FaeBook is a campaign-specific app built around a custom world, a private player theory workflow, and a DM-controlled content model.
+
+### Lumi secret archives
+
+Configure `LUMI_FAEO3_PASSWORD` and `LUMI_PIXIE_PASSWORD` in the server environment to enable player unlocks. The passwords are never included in client configuration or archive payloads. Sprite hotspot rectangles are shown in Vite development by default for tuning; set `VITE_SPRITE_HOTSPOTS_DEBUG=0` to hide them while retaining the hotspots.
