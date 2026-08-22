@@ -5552,7 +5552,7 @@ body.prefers-reduced-motion *::after {
 
 /* Lumi's deliberately over-customized personal blog. */
 .lumi-profile { overflow-x:clip; }
-.lumi-sticker { display:block; flex:0 0 auto; width:min(var(--sticker-width),100%); max-width:100%; height:var(--sticker-height); overflow:visible; pointer-events:none; user-select:none; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)); transform-origin:center; }
+.lumi-sticker { display:block; flex:0 0 auto; width:min(var(--sticker-width),100%); max-width:100%; height:var(--sticker-height); overflow:hidden; pointer-events:none; user-select:none; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)); transform-origin:center; }
 .lumi-masthead-sticker,.lumi-profile-sticker { position:absolute; z-index:2; pointer-events:none; }
 .lumi-masthead-heart { left:clamp(18px,5vw,76px); top:20px; }
 .lumi-masthead-sparkle { right:clamp(18px,4vw,64px); top:15px; }
@@ -5618,7 +5618,7 @@ body.prefers-reduced-motion *::after {
 .lumi-glitter-divider span:nth-child(even) { animation:lumi-blink 1.3s steps(2,end) infinite reverse; }
 .lumi-online { animation:lumi-online-blink 1.4s steps(2,end) infinite; }
 .lumi-sticker-twinkle { animation:lumi-cheap-twinkle var(--sticker-duration) steps(2,end) infinite; }
-@keyframes lumi-cheap-twinkle { 0%,100% { opacity:.4; transform:scale(.85) rotate(-7deg); } 50% { opacity:1; transform:scale(1.12) rotate(7deg); } }
+@keyframes lumi-cheap-twinkle { 0%,100% { opacity:.4; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)) scale(.85) rotate(-7deg); } 50% { opacity:1; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)) scale(1.12) rotate(7deg); } }
 @keyframes lumi-blink { 50% { opacity:.25; } }
 @keyframes lumi-online-blink { 50% { opacity:.55; } }
 
