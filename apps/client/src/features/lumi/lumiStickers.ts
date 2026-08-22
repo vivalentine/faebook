@@ -1,4 +1,4 @@
-export const LUMI_STICKER_SHEET = "/lumi/posts/lumi_sticker_sheet.png";
+export const LUMI_STICKER_SHEET = "/lumi/posts/lumi_sticker_sheet.webp";
 export const LUMI_STICKER_SHEET_SIZE = 1254;
 
 export type LumiStickerName =
