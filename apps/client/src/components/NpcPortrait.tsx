@@ -18,7 +18,7 @@ export default function NpcPortrait({ npc, variant = "card" }: Props) {
 
   if (npc.portrait_path) {
     const hotspots = variant === "detail" ? npcSpriteHotspots[npc.slug] : undefined;
-    const debug = import.meta.env.DEV && import.meta.env.VITE_SPRITE_HOTSPOTS_DEBUG !== "0";
+    const debug = import.meta.env.DEV && import.meta.env.VITE_SPRITE_HOTSPOTS_DEBUG === "1";
     if (!hotspots) return <img className={className} src={apiUrl(npc.portrait_path)} alt={npc.name} />;
     return <div className="sprite-hotspot-image-wrap"><img className={className} src={apiUrl(npc.portrait_path)} alt={npc.name} /><SpriteHotspots hotspots={hotspots} debug={debug} /></div>;
   }
