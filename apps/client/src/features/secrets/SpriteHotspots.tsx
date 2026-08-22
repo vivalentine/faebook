@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import type { SpriteHotspot } from "./spriteHotspots";
+import type { SpriteHotspot } from "./npcSpriteHotspots";
 
-export default function SpriteHotspots({ hotspots, debug = false }: { hotspots: SpriteHotspot[]; debug?: boolean }) {
+export function SpriteHotspots({ hotspots, debug = false }: { hotspots: SpriteHotspot[]; debug?: boolean }) {
   const navigate = useNavigate();
   return <div className={`sprite-hotspots${debug ? " sprite-hotspots-debug" : ""}`} aria-label="Hidden details">
     {hotspots.map((spot) => <button key={spot.id} type="button" className="sprite-hotspot" aria-label={spot.ariaLabel || spot.id}
