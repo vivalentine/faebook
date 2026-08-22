@@ -28,11 +28,15 @@ const WhisperNetworkPage = lazy(() => import("./pages/WhisperNetworkPage"));
 const TacticalEncountersPage = lazy(() => import("./pages/TacticalEncountersPage"));
 const TacticalEncounterPage = lazy(() => import("./pages/TacticalEncounterPage"));
 const TacticalPresentationPage = lazy(() => import("./pages/TacticalPresentationPage"));
+<<<<<<< HEAD
 const FaeO3Page = lazy(() => import("./features/lumi/FaeO3Page"));
 const PixiePage = lazy(() => import("./features/lumi/PixiePage"));
 const LumiStickerAtlasPreview = import.meta.env.DEV
   ? lazy(() => import("./features/lumi/LumiStickerAtlasPreview"))
   : null;
+=======
+const SecretArchivePage = lazy(() => import("./pages/SecretArchivePage"));
+>>>>>>> origin/main
 
 function RouteLoadingFallback() {
   return (
@@ -67,12 +71,19 @@ export default function App() {
           <Suspense fallback={<RouteLoadingFallback />}>
             <Routes>
             <Route path="/login" element={<LoginPage />} />
+<<<<<<< HEAD
             {LumiStickerAtlasPreview && <Route path="/dev/lumi-stickers" element={<LumiStickerAtlasPreview />} />}
             <Route path="/secret/faeo3" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
             <Route path="/secret/faeo3/works/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
             <Route path="/secret/faeo3/works/:slug/chapters/:chapterNumber" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
             <Route path="/secret/faeo3/tales/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page legacy /></ProtectedRoute>} />
             <Route path="/secret/pixie" element={<ProtectedRoute allowRoles={["dm", "player"]}><PixiePage /></ProtectedRoute>} />
+=======
+            <Route path="/secret/faeo3" element={<ProtectedRoute allowRoles={["dm", "player"]}><SecretArchivePage kind="faeo3" /></ProtectedRoute>} />
+            <Route path="/secret/faeo3/tales/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><SecretArchivePage kind="faeo3" /></ProtectedRoute>} />
+            <Route path="/secret/pixie" element={<ProtectedRoute allowRoles={["dm", "player"]}><SecretArchivePage kind="pixie" /></ProtectedRoute>} />
+            <Route path="/secret/pixie/art/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><SecretArchivePage kind="pixie" /></ProtectedRoute>} />
+>>>>>>> origin/main
             <Route path="/dm/encounters/:encounterId/presentation" element={<ProtectedRoute allowRoles={["dm"]}><TacticalPresentationPage /></ProtectedRoute>} />
 
             <Route
