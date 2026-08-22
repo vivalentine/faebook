@@ -69,7 +69,9 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             {LumiStickerAtlasPreview && <Route path="/dev/lumi-stickers" element={<LumiStickerAtlasPreview />} />}
             <Route path="/secret/faeo3" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
-            <Route path="/secret/faeo3/tales/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
+            <Route path="/secret/faeo3/works/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
+            <Route path="/secret/faeo3/works/:slug/chapters/:chapterNumber" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
+            <Route path="/secret/faeo3/tales/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page legacy /></ProtectedRoute>} />
             <Route path="/secret/pixie" element={<ProtectedRoute allowRoles={["dm", "player"]}><PixiePage /></ProtectedRoute>} />
             <Route path="/dm/encounters/:encounterId/presentation" element={<ProtectedRoute allowRoles={["dm"]}><TacticalPresentationPage /></ProtectedRoute>} />
 
