@@ -1709,6 +1709,17 @@ app.get("/api/profile", requireRole("player", "dm"), (req, res) => {
   return res.json({ profile, can_manage_image: req.session.user.role === "dm" });
 });
 
+app.get("/api/lumi/top-eight-players", requireRole("player", "dm"), (_req, res) => {
+  const profiles = db.prepare(`
+    SELECT users.username, users.display_name, user_profiles.profile_image_path
+    FROM users
+    LEFT JOIN user_profiles ON user_profiles.user_id = users.id
+    WHERE users.role = 'player' AND users.username IN ('usaq', 'terry', 'hilton')
+    ORDER BY CASE users.username WHEN 'usaq' THEN 1 WHEN 'terry' THEN 2 WHEN 'hilton' THEN 3 END
+  `).all();
+  res.json(profiles);
+});
+
 app.patch("/api/profile", requireRole("player", "dm"), (req, res) => {
   const displayName = String(req.body.display_name || "").trim();
   const bio = String(req.body.bio || "").trim();
