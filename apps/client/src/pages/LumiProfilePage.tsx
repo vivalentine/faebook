@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import NpcPortrait from "../components/NpcPortrait";
+import LumiSticker, { LumiStickerDivider } from "../features/lumi/LumiSticker";
 import { apiFetch, apiUrl } from "../lib/api";
 import type { Npc } from "../types";
 
@@ -75,9 +76,11 @@ export default function LumiProfilePage() {
           </section>
 
           <section className="lumi-widget lumi-now-playing">
+            <LumiSticker sticker="music-note" size={48} rotate={-7} className="lumi-widget-sticker lumi-now-note" />
+            <LumiSticker sticker="sparkle" size={31} rotate={8} className="lumi-widget-sticker lumi-now-sparkle" />
             <h2>NOW PLAYING</h2><strong>Lyra Glimmerthirst</strong><p>volume: irresponsible</p><p>repeat: obviously</p>
           </section>
-          <section className="lumi-widget lumi-mood"><h2>MOOD</h2><p>(✿ ♥‿♥) experiencing art normally</p></section>
+          <section className="lumi-widget lumi-mood"><LumiSticker sticker="blush" size={54} rotate={5} className="lumi-widget-sticker lumi-mood-face" /><h2>MOOD</h2><p>(✿ ♥‿♥) experiencing art normally</p></section>
           <section className="lumi-widget">
             <h2>CURRENTLY</h2>
             <p>currently obsessed with: Lyra Glimmerthirst</p>
@@ -89,6 +92,8 @@ export default function LumiProfilePage() {
           </section>
           <p className="lumi-elsewhere">find me elsewhere: xX_LumiLuvsYuri_Xx</p>
           <section className="lumi-widget lumi-top-eight">
+            <LumiSticker sticker="flower" size={42} rotate={-9} className="lumi-widget-sticker lumi-top-flower" />
+            <LumiSticker sticker="star" size={32} rotate={7} className="lumi-widget-sticker lumi-top-star" />
             <h2>TOP 8</h2>
             <ol>{topEightNames.map((name) => {
               const friend = findNpc(name);
@@ -104,8 +109,10 @@ export default function LumiProfilePage() {
             <p>okay but "crack ship" is a coward's phrase. if the chemistry works, the chemistry works. i'm just saying.</p>
           </BlogPost>
 
+          <LumiStickerDivider />
+
           {lyra?.portrait_path && <BlogPost className="lumi-image-post lumi-lyra-post" tags={["#lyra glimmerthirst", "#divine muse of summer", "#normal amount of admiration", "#i am looking respectfully", "#lying"]} posted="posted 1:07 AM" edited="last edited 4:51 AM" notes="42 notes">
-            <strong className="lumi-repost-label">reposted</strong><p>important cultural preservation work happening on this blog</p>
+            <LumiSticker sticker="big-heart" size={72} rotate={-8} className="lumi-post-sticker lumi-post-sticker-right" /><strong className="lumi-repost-label">reposted</strong><p>important cultural preservation work happening on this blog</p>
             <img src={apiUrl(lyra.portrait_path)} alt="Lyra Glimmerthirst" /><p className="lumi-image-caption">look at her. LOOK AT HER.</p>
           </BlogPost>}
 
@@ -120,12 +127,12 @@ export default function LumiProfilePage() {
           </BlogPost>
 
           {rin?.portrait_path && mimi?.portrait_path && <BlogPost className="lumi-image-post" tags={["#rin", "#mimi", "#yuri goggles permanently installed", "#research"]} posted="posted 3:14 AM" notes="17 notes">
-            <strong className="lumi-repost-label">reposted</strong><div className="lumi-paired-art"><img src={apiUrl(rin.portrait_path)} alt="Rin" /><img src={apiUrl(mimi.portrait_path)} alt="Mimi" /></div>
+            <LumiSticker sticker="purple-heart" size={58} rotate={7} className="lumi-post-sticker lumi-post-sticker-right" /><strong className="lumi-repost-label">reposted</strong><div className="lumi-paired-art"><img src={apiUrl(rin.portrait_path)} alt="Rin" /><img src={apiUrl(mimi.portrait_path)} alt="Mimi" /></div>
             <p className="lumi-image-caption">girls can literally just stand next to each other and suddenly i have seventeen tabs open</p>
           </BlogPost>}
 
-          <BlogPost tags={["#aoife gealach", "#summer court", "#girlboss derogatory affectionate"]} posted="posted 1:07 AM" notes="42 notes">
-            <p>aoife has the energy of someone who would kick open the door to her own coronation fifteen minutes late with blood on her shirt and immediately ask who wants a drink</p><p>this is a compliment.</p>
+          <BlogPost className="lumi-reaction-post" tags={["#aoife gealach", "#summer court", "#girlboss derogatory affectionate"]} posted="posted 1:07 AM" notes="42 notes">
+            <LumiSticker sticker="angry" size={52} rotate={6} className="lumi-post-sticker lumi-post-sticker-right" /><p>aoife has the energy of someone who would kick open the door to her own coronation fifteen minutes late with blood on her shirt and immediately ask who wants a drink</p><p>this is a compliment.</p>
           </BlogPost>
           <BlogPost className="lumi-ask-post" tags={["#asks", "#faebook", "#skill issue"]} posted="posted 4:42 AM" notes="23 notes">
             <div className="lumi-question"><strong>anonymous asked:</strong><p>why do you have access to the production stylesheet</p></div><p className="lumi-answer">because nobody stopped me early enough</p>
