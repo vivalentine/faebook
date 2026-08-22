@@ -5,7 +5,7 @@ import { apiFetch } from "../lib/api";
 type ArchiveKind = "faeo3" | "pixie";
 type Work = { id: string; slug: string; title: string };
 
-const accountNames: Record<ArchiveKind, string> = { faeo3: "faeO3", pixie: "pixie" };
+const secretSiteUsername = "xX_LumiLuvsYuri_Xx";
 const pixieLoginBackgrounds: string[] = [];
 
 function SecretLogin({ kind, onUnlock }: { kind: ArchiveKind; onUnlock: () => void }) {
@@ -19,7 +19,7 @@ function SecretLogin({ kind, onUnlock }: { kind: ArchiveKind; onUnlock: () => vo
     setMessage("");
     const response = await apiFetch(`/api/secrets/lumi_${kind}/unlock`, {
       method: "POST",
-      body: JSON.stringify({ username: accountNames[kind], password }),
+      body: JSON.stringify({ username: secretSiteUsername, password }),
     });
     if (response.ok) onUnlock();
     else {
@@ -31,7 +31,7 @@ function SecretLogin({ kind, onUnlock }: { kind: ArchiveKind; onUnlock: () => vo
 
   return <form className="secret-login-form" onSubmit={submit}>
     {message ? <p className="secret-login-error" role="alert">{message}</p> : null}
-    <label>Username<input name="username" value={accountNames[kind]} autoComplete="username" readOnly /></label>
+    <label>Username<input name="username" value={secretSiteUsername} autoComplete="username" readOnly /></label>
     <label>Password<input name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required autoFocus /></label>
     <button type="submit" disabled={busy}>{busy ? "Logging in…" : "Log In"}</button>
   </form>;
@@ -41,9 +41,14 @@ function Faeo3Login({ onUnlock }: { onUnlock: () => void }) {
   const categories = ["All Fandoms", "Anime & Manga", "Books & Literature", "Music & Performers", "Original Works", "Other Media"];
   return <main className="faeo3-login-site">
     <header className="faeo3-login-header">
-      <div className="faeo3-logo"><strong>FaeO3</strong><span>Fae Archive of Our Own</span></div>
-      <nav aria-label="Archive navigation"><span>Fandoms</span><span>Browse</span><span>Search</span><span>About</span></nav>
-      <label className="faeo3-search"><span className="sr-only">Search</span><input type="search" /></label>
+      <div className="faeo3-identity-row">
+        <div className="faeo3-logo"><strong>FaeO3</strong><span>Fae Archive of Our Own</span></div>
+        <span className="faeo3-login-context">Log in to FaeO3</span>
+      </div>
+      <div className="faeo3-navigation-row">
+        <nav aria-label="Archive navigation"><span>Fandoms</span><span>Browse</span><span>Search</span><span>About</span></nav>
+        <label className="faeo3-search"><span className="sr-only">Search</span><input type="search" /></label>
+      </div>
     </header>
     <div className="faeo3-login-layout">
       <aside className="faeo3-categories"><h2>Find your favorites</h2><ul>{categories.map((category) => <li key={category}>{category}</li>)}</ul></aside>

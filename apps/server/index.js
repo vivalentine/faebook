@@ -7,7 +7,6 @@ const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
-const { createHash, timingSafeEqual } = require("node:crypto");
 const db = require("./db");
 const { createArchiveRecord, createAuditLog, getRestoreStrategy } = require("./archive");
 const {
@@ -44,7 +43,7 @@ const {
 const { buildSummerCourtVisibilitySql, validateSummerCourtDateTime } = require("./summer-court-calendar");
 const { registerTacticalEncounterRoutes } = require("./tactical-encounters");
 const { createDatabaseRecoveryPoint } = require("./local-backup");
-const { isSecretKey, configuredPassword, expectedUsername, archivePayload } = require("./secret-archives");
+const { isSecretKey, credentialsMatch, archivePayload } = require("./secret-archives");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -1847,12 +1846,7 @@ app.post("/api/secrets/:secretKey/unlock", requireRole("player", "dm"), (req, re
   const { secretKey } = req.params;
   if (!isSecretKey(secretKey)) return res.status(404).json({ error: "Not found" });
   if (req.session.user.role === "dm") return res.json({ unlocked: true, dm_bypass: true });
-  const expected = configuredPassword(secretKey);
-  const username = String(req.body?.username || "").trim().toLowerCase();
-  const supplied = String(req.body?.password || "");
-  const suppliedDigest = createHash("sha256").update(supplied).digest();
-  const expectedDigest = createHash("sha256").update(expected).digest();
-  if (username !== expectedUsername(secretKey) || !expected || supplied.length > 200 || !timingSafeEqual(suppliedDigest, expectedDigest)) {
+  if (!credentialsMatch(secretKey, req.body?.username, req.body?.password)) {
     return res.status(401).json({ error: "Unable to unlock archive" });
   }
   const unlockedAt = new Date().toISOString();

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import NpcPortrait from "../components/NpcPortrait";
 import { apiFetch } from "../lib/api";
 import type { Npc } from "../types";
@@ -32,7 +31,6 @@ export default function LumiProfilePage() {
   if (!npc) return <div className="app-shell"><div className="state-card"><p>Loading NPC page...</p></div></div>;
 
   return <div className="app-shell lumi-page-shell">
-    <div className="page-back-link"><Link to="/directory">← Back to directory</Link></div>
     <main className="lumi-profile">
       <header className="lumi-masthead">
         <h1>~*~ LUMI TURNLEAF'S EXTREMELY NORMAL FAEBOOK PAGE ~*~</h1>
@@ -48,6 +46,7 @@ export default function LumiProfilePage() {
             <div className="lumi-portrait"><NpcPortrait npc={npc} variant="detail" /></div>
             <h2>Lumi Turnleaf</h2>
             <p className="lumi-handle">@lumi_turnleaf</p>
+            <p className="lumi-elsewhere">find me elsewhere: xX_LumiLuvsYuri_Xx</p>
             <p className="lumi-online">● online probably</p>
             <p>hi!!!! i'm lumi. i write things, draw things, know things i probably shouldn't, and have been informed that "editing the production stylesheet for fun" is not an acceptable hobby. rude.</p>
           </section>
