@@ -145,7 +145,7 @@ export default function LumiProfilePage() {
             duration={1.4}
             className="lumi-masthead-sticker lumi-masthead-star"
           />
-          <h1>~*~ LUMI TURNLEAF'S EXTREMELY NORMAL NPC PAGE ~*~</h1>
+          <h1>~*~ LUMI TURNLEAF IS VERY NORMAL ~*~</h1>
           <p className="lumi-subtitle">yes i changed the css. no you can't.</p>
           <div className="lumi-system">
             <span>profile permissions: don't worry about it</span>
@@ -222,7 +222,7 @@ export default function LumiProfilePage() {
             </section>
             <section className="lumi-widget lumi-art-folder">
               <h2>CURRENT ART FOLDER</h2>
-              <code>~/art/DO_NOT_POST/</code>
+              <code>~/art/donotpost/</code>
               <small>seriously.</small>
             </section>
             <p className="lumi-elsewhere">
@@ -316,7 +316,7 @@ export default function LumiProfilePage() {
               notes="17 notes"
             >
               <p>
-                usaq owns a kazoo and somehow this has never once stopped her
+                usaq owns a kazoo and somehow this has never stopped her
                 from being taken seriously as a musician.
               </p>
               <p>incredible and inspirational tbh.</p>
@@ -336,7 +336,7 @@ export default function LumiProfilePage() {
               tags={[
                 "#terry",
                 "#tactical genius",
-                "#givehimtheantler",
+                "#give him the antler",
                 "#fly king",
               ]}
               posted="posted 2:18 AM"
@@ -380,7 +380,7 @@ export default function LumiProfilePage() {
                 loading="lazy"
               />
               <p className="lumi-image-caption">
-                girls can literally just stand next to each other and suddenly i
+                girls can literally just sit next to each other and suddenly i
                 have seventeen tabs open
               </p>
             </BlogPost>
@@ -390,7 +390,8 @@ export default function LumiProfilePage() {
               tags={[
                 "#aoife gealach",
                 "#summer court",
-                "#girlboss derogatory affectionate",
+                "#girlboss derogatory",
+                "#girlboss affectionate",
               ]}
               posted="posted 1:07 AM"
               notes="42 notes"
@@ -403,8 +404,7 @@ export default function LumiProfilePage() {
               />
               <p>
                 aoife has the energy of someone who would kick open the door to
-                her own coronation fifteen minutes late with blood on her shirt
-                and immediately ask who wants a drink
+                her own coronation fifteen minutes late
               </p>
               <p>this is a compliment.</p>
             </BlogPost>
