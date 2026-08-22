@@ -15,5 +15,3 @@ Thumbs.db
 apps/client/public/maps/tiles/**/*.dzi
 apps/client/public/maps/tiles/**/*_files/
 apps/client/public/maps/tiles/**/*_files/**
-# Generated locally by scripts/lumi/extract-lumi-stickers.mjs.
-apps/client/public/lumi/stickers/*.webp

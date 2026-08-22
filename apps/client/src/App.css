@@ -5552,7 +5552,7 @@ body.prefers-reduced-motion *::after {
 
 /* Lumi's deliberately over-customized personal blog. */
 .lumi-profile { overflow-x:clip; }
-.lumi-sticker { display:block; flex:0 0 auto; width:var(--sticker-size); max-width:none; height:auto; pointer-events:none; user-select:none; -webkit-user-drag:none; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)); transform-origin:center; }
+.lumi-sticker { display:block; flex:0 0 auto; width:min(var(--sticker-width),100%); max-width:100%; height:var(--sticker-height); overflow:visible; pointer-events:none; user-select:none; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)); transform-origin:center; }
 .lumi-masthead-sticker,.lumi-profile-sticker { position:absolute; z-index:2; pointer-events:none; }
 .lumi-masthead-heart { left:clamp(18px,5vw,76px); top:20px; }
 .lumi-masthead-sparkle { right:clamp(18px,4vw,64px); top:15px; }
@@ -5582,9 +5582,7 @@ body.prefers-reduced-motion *::after {
 .lumi-top-eight li { counter-increment:top-eight; display:grid; grid-template-rows:auto auto; position:relative; min-width:0; border:2px outset #edb7db; background:#ffe9f7; text-align:center; }
 .lumi-top-eight li::before { content:counter(top-eight); position:absolute; z-index:1; top:3px; left:3px; min-width:18px; color:#fff; background:#7d2e8c; font:700 11px/18px monospace; }
 .lumi-top-eight-media { display:grid; aspect-ratio:1; min-width:0; overflow:hidden; place-items:center; background:radial-gradient(circle,#65266c,#1c1026 72%); }
-.lumi-top-eight img { display:block; width:100%; height:100%; background:#24132e; }
-.lumi-top-eight img.lumi-fit-contain { object-fit:contain; }
-.lumi-top-eight img.lumi-fit-cover { object-fit:cover; }
+.lumi-top-eight-media img { display:block; width:100%; height:100%; object-fit:cover; object-position:center; background:#24132e; }
 .lumi-broken-portrait { display:grid; width:100%; height:100%; place-content:center; gap:5px; padding:8px; box-sizing:border-box; color:#ffbce8; background:repeating-linear-gradient(135deg,#24132e 0 8px,#47184d 8px 16px); font:700 .65rem/1.15 monospace; overflow-wrap:anywhere; }
 .lumi-broken-portrait span { color:#53e5f4; font-size:1.4rem; }
 .lumi-top-eight li span { display:grid; place-items:center; min-height:38px; padding:4px; color:#611457; font:bold .72rem/1.2 Verdana,sans-serif; overflow-wrap:anywhere; }
@@ -5761,3 +5759,13 @@ body.prefers-reduced-motion *::after {
   .faeo3-reading dt { border-bottom:0; }
   .pixie-feed-header { padding-inline:16px; }
 }
+
+/* Development-only atlas inspection route. */
+.lumi-atlas-preview { min-height:100vh; padding:24px; color:#f8edf8; background:#160d1c; }
+.lumi-atlas-preview h1,.lumi-atlas-preview h2 { color:#ffc9ee; }
+.lumi-atlas-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; }
+.lumi-atlas-grid figure { display:grid; min-height:210px; margin:0; padding:12px; place-items:center; border:1px solid #815478; background:repeating-conic-gradient(#eee 0 25%,#ccc 0 50%) 0/20px 20px; color:#26122a; }
+.lumi-atlas-grid figcaption { display:grid; width:100%; padding:6px; background:#f6eaf4dd; }
+.lumi-atlas-sheet svg { display:block; width:min(100%,900px); height:auto; background:repeating-conic-gradient(#eee 0 25%,#ccc 0 50%) 0/20px 20px; }
+.lumi-atlas-sheet rect { fill:none; stroke:#00f5ff; stroke-width:3px; }
+.lumi-atlas-sheet text { fill:#111; stroke:#fff; stroke-width:3px; paint-order:stroke; font:700 14px monospace; }
