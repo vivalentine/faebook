@@ -5727,6 +5727,11 @@ body.prefers-reduced-motion *::after {
 .faeo3-listing h2 { margin-top:0; }
 .faeo3-listing a,.faeo3-reading a { color:#801b2a; }
 .faeo3-byline { font-style:italic; }
+.faeo3-tag-groups { display:grid; gap:7px; margin:16px 0; padding:0; list-style:none; }
+.faeo3-tag { display:inline-block; margin:2px 5px; padding:2px 7px; border-radius:3px; color:#fff; background:#7f1827; font-size:.9rem; }
+.faeo3-listing-summary { margin:18px 0; padding:12px 18px; border-left:4px solid #bd8c91; }
+.faeo3-stats { display:flex; justify-content:flex-end; gap:24px; font-weight:700; }
+.faeo3-empty,.faeo3-prose-state { padding:28px; border:1px solid #b7a9a1; background:#fff; text-align:center; }
 .charm-list { display:flex; flex-wrap:wrap; gap:8px; padding:0; list-style:none; }
 .charm-list li { padding:4px 8px; border:1px solid #aaa; background:#eee; }
 .faeo3-reading dl { display:grid; grid-template-columns:minmax(120px,180px) minmax(0,1fr); border:1px solid #aaa; background:#fff; }
@@ -5735,6 +5740,11 @@ body.prefers-reduced-motion *::after {
 .faeo3-summary { margin-block:28px; padding:20px; border:1px solid #aaa; background:#fff; }
 .faeo3-summary aside { padding:14px; background:#eee; }
 .faeo3-prose { margin-block:28px; padding:clamp(20px,4vw,48px); background:#fff; font-size:1.12rem; line-height:1.8; }
+.faeo3-prose + .faeo3-prose { border-top:5px double #bd8c91; }
+.faeo3-prose h2 { margin-bottom:2em; color:#731724; text-align:center; }
+.faeo3-prose blockquote { margin-inline:1.5em; padding-left:1em; border-left:3px solid #aaa; }
+.faeo3-chapter-nav { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:16px; margin:24px 0; padding:14px; border:1px solid #aaa; background:#e7e3df; }
+.faeo3-chapter-nav select { min-height:40px; margin-left:8px; font:inherit; }
 
 .pixie-feed-header { position:sticky; z-index:2; top:0; display:flex; align-items:center; justify-content:space-between; gap:20px; box-sizing:border-box; width:100%; padding:16px max(18px,calc((100% - 760px)/2)); border-bottom:1px solid #e2e5e8; background:#fffc; backdrop-filter:blur(12px); }
 .pixie-feed-header strong { color:#159ed8; font-size:2rem; }
@@ -5751,6 +5761,17 @@ body.prefers-reduced-motion *::after {
 .pixie-feed-post:has(.pixie-post-sticker-right) > :not(.pixie-post-sticker):first-of-type { padding-right:54px; }
 .pixie-feed-post:has(.pixie-post-sticker-left) > :not(.pixie-post-sticker):first-of-type { padding-left:54px; }
 .pixie-sticker-footer { display:flex; align-items:end; justify-content:center; gap:12px; min-height:54px; overflow:hidden; }
+.pixie-gallery { column-count:4; column-gap:16px; box-sizing:border-box; width:min(1440px,100%); margin:auto; padding:24px; }
+.pixie-gallery-item { display:block; width:100%; margin:0 0 16px; padding:0; border:0; border-radius:9px; background:#fff; box-shadow:0 3px 14px #26333e1c; cursor:zoom-in; break-inside:avoid; overflow:hidden; text-align:left; }
+.pixie-gallery-item img { display:block; width:100%; height:auto; }
+.pixie-gallery-item span { display:block; padding:10px 12px; color:#20252b; font-weight:700; }
+.pixie-gallery-state { column-span:all; padding:60px 20px; color:#66717c; text-align:center; }
+.pixie-lightbox { position:fixed; z-index:50; inset:0; display:grid; place-items:center; padding:20px; background:#111d; cursor:zoom-out; }
+.pixie-lightbox article { position:relative; display:flex; flex-direction:column; max-width:min(94vw,1400px); max-height:94vh; border-radius:9px; background:#fff; box-shadow:0 20px 80px #000b; cursor:default; overflow:auto; }
+.pixie-lightbox img { display:block; max-width:100%; max-height:80vh; width:auto; height:auto; margin:auto; object-fit:contain; }
+.pixie-lightbox-close { position:absolute; z-index:1; top:8px; right:8px; width:42px; height:42px; border:0; border-radius:50%; color:#fff; background:#111b; font-size:2rem; line-height:1; cursor:pointer; }
+.pixie-art-details { padding:14px 20px 20px; }
+.pixie-art-details h1 { margin:0; font-size:1.3rem; }
 
 @media (max-width:760px) {
   .faeo3-archive-header { align-items:flex-start; flex-direction:column; }
@@ -5758,7 +5779,10 @@ body.prefers-reduced-motion *::after {
   .faeo3-reading dl { grid-template-columns:1fr; }
   .faeo3-reading dt { border-bottom:0; }
   .pixie-feed-header { padding-inline:16px; }
+  .pixie-gallery { column-count:2; padding:12px; column-gap:12px; }
 }
+
+@media (min-width:641px) and (max-width:1000px) { .pixie-gallery { column-count:3; } }
 
 /* Development-only atlas inspection route. */
 .lumi-atlas-preview { min-height:100vh; padding:24px; color:#f8edf8; background:#160d1c; }
