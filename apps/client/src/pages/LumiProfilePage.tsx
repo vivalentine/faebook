@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import NpcPortrait from "../components/NpcPortrait";
-import LumiSticker, { LumiStickerDivider } from "../features/lumi/LumiSticker";
+import LumiSticker from "../features/lumi/LumiSticker";
 import { LUMI_POST_ASSETS } from "../features/lumi/lumiAssets";
 import { apiFetch, apiUrl } from "../lib/api";
 import type { Npc } from "../types";
@@ -30,12 +30,17 @@ const topEight: TopEightEntry[] = [
     identity: "aoife-gealach",
     fit: "contain",
   },
-  { label: "Rin", kind: "npc", identity: "rin", fit: "contain" },
-  { label: "Mimi", kind: "npc", identity: "mimi", fit: "contain" },
   { label: "Usaq", kind: "player", identity: "usaq", fit: "contain" },
+  { label: "Rin Tatari", kind: "npc", identity: "rin", fit: "contain" },
+  { label: "Mimi Xiao", kind: "npc", identity: "mimi", fit: "contain" },
   { label: "Terry", kind: "player", identity: "terry", fit: "contain" },
   { label: "Hilton", kind: "player", identity: "hilton", fit: "contain" },
-  { label: "Sable", kind: "npc", identity: "sable", fit: "contain" },
+  {
+    label: "Lirael Moonthorn",
+    kind: "npc",
+    identity: "lirael-moonthorn",
+    fit: "contain",
+  },
 ];
 
 function TopEightPortrait({
@@ -165,7 +170,9 @@ export default function LumiProfilePage() {
         ? npcs.find((candidate) => candidate.slug === entry.identity)
             ?.portrait_path
         : playerPortraits.find(
-            (candidate) => candidate.username === entry.identity,
+            (candidate) =>
+              candidate.username.toLocaleLowerCase() ===
+              entry.identity.toLocaleLowerCase(),
           )?.profile_image_path;
     return path ? apiUrl(path) : null;
   };
@@ -175,28 +182,26 @@ export default function LumiProfilePage() {
       <main className="lumi-profile">
         <header className="lumi-masthead">
           <LumiSticker
-            sticker="big-heart"
-            size={49}
+            sticker="big-pink-heart"
+            size={42}
             rotate={-9}
             className="lumi-masthead-sticker lumi-masthead-heart"
           />
           <LumiSticker
-            sticker="sparkle"
-            size={45}
+            sticker="cyan-sparkle"
+            size={34}
             rotate={8}
-            className="lumi-masthead-sticker lumi-masthead-sparkle lumi-twinkle-fast"
+            animated
+            duration={0.8}
+            className="lumi-masthead-sticker lumi-masthead-sparkle"
           />
           <LumiSticker
-            sticker="star"
-            size={37}
+            sticker="black-star"
+            size={26}
             rotate={-6}
+            animated
+            duration={1.4}
             className="lumi-masthead-sticker lumi-masthead-star"
-          />
-          <LumiSticker
-            sticker="flower"
-            size={39}
-            rotate={7}
-            className="lumi-masthead-sticker lumi-masthead-flower"
           />
           <h1>~*~ LUMI TURNLEAF'S EXTREMELY NORMAL FAEBOOK PAGE ~*~</h1>
           <p className="lumi-subtitle">yes i changed the css. no you can't.</p>
@@ -220,16 +225,10 @@ export default function LumiProfilePage() {
           <aside className="lumi-sidebar" aria-label="Lumi's profile sidebar">
             <section className="lumi-profile-card">
               <LumiSticker
-                sticker="sparkle"
-                size={34}
-                rotate={-7}
-                className="lumi-profile-sticker lumi-profile-sparkle lumi-twinkle-medium"
-              />
-              <LumiSticker
-                sticker="moth"
-                size={54}
-                rotate={8}
-                className="lumi-profile-sticker lumi-profile-moth"
+                sticker="purple-heart"
+                size={30}
+                rotate={7}
+                className="lumi-profile-sticker lumi-profile-heart"
               />
               <div className="lumi-portrait">
                 <NpcPortrait npc={npc} variant="detail" />
@@ -246,21 +245,17 @@ export default function LumiProfilePage() {
 
             <section className="lumi-widget lumi-now-playing">
               <LumiSticker
-                sticker="music-note"
-                size={48}
-                rotate={-7}
-                className="lumi-widget-sticker lumi-now-note"
-              />
-              <LumiSticker
                 sticker="kazoo"
-                size={47}
+                size={42}
                 rotate={6}
                 className="lumi-widget-sticker lumi-now-kazoo"
               />
               <LumiSticker
-                sticker="sparkle"
-                size={31}
+                sticker="cyan-sparkle"
+                size={24}
                 rotate={8}
+                animated
+                duration={1.1}
                 className="lumi-widget-sticker lumi-now-sparkle"
               />
               <h2>NOW PLAYING</h2>
@@ -270,8 +265,8 @@ export default function LumiProfilePage() {
             </section>
             <section className="lumi-widget lumi-mood">
               <LumiSticker
-                sticker="blush"
-                size={54}
+                sticker="big-pink-heart"
+                size={36}
                 rotate={5}
                 className="lumi-widget-sticker lumi-mood-face"
               />
@@ -294,15 +289,17 @@ export default function LumiProfilePage() {
             </p>
             <section className="lumi-widget lumi-top-eight">
               <LumiSticker
-                sticker="flower"
-                size={42}
+                sticker="pink-flower"
+                size={28}
                 rotate={-9}
                 className="lumi-widget-sticker lumi-top-flower"
               />
               <LumiSticker
-                sticker="star"
-                size={32}
+                sticker="black-star"
+                size={24}
                 rotate={7}
+                animated
+                duration={1.4}
                 className="lumi-widget-sticker lumi-top-star"
               />
               <h2>TOP 8</h2>
@@ -334,8 +331,6 @@ export default function LumiProfilePage() {
               </p>
             </BlogPost>
 
-            <LumiStickerDivider />
-
             <BlogPost
               className="lumi-image-post lumi-lyra-post"
               tags={[
@@ -350,10 +345,18 @@ export default function LumiProfilePage() {
               notes="42 notes"
             >
               <LumiSticker
-                sticker="big-heart"
-                size={72}
+                sticker="big-pink-heart"
+                size={46}
                 rotate={-8}
                 className="lumi-post-sticker lumi-post-sticker-right"
+              />
+              <LumiSticker
+                sticker="cyan-sparkle"
+                size={28}
+                rotate={7}
+                animated
+                duration={0.8}
+                className="lumi-post-sticker lumi-post-sticker-left"
               />
               <strong className="lumi-repost-label">reposted</strong>
               <p>important cultural preservation work happening on this blog</p>
@@ -419,9 +422,15 @@ export default function LumiProfilePage() {
             >
               <LumiSticker
                 sticker="purple-heart"
-                size={58}
+                size={34}
                 rotate={7}
                 className="lumi-post-sticker lumi-post-sticker-right"
+              />
+              <LumiSticker
+                sticker="heart-bubble"
+                size={38}
+                rotate={-6}
+                className="lumi-post-sticker lumi-post-sticker-left"
               />
               <strong className="lumi-repost-label">reposted</strong>
               <img
@@ -446,12 +455,6 @@ export default function LumiProfilePage() {
               posted="posted 1:07 AM"
               notes="42 notes"
             >
-              <LumiSticker
-                sticker="angry"
-                size={52}
-                rotate={6}
-                className="lumi-post-sticker lumi-post-sticker-right"
-              />
               <img
                 className="lumi-post-media"
                 src={LUMI_POST_ASSETS.aoife}
@@ -472,8 +475,8 @@ export default function LumiProfilePage() {
               notes="17 notes"
             >
               <LumiSticker
-                sticker="speech-question"
-                size={49}
+                sticker="question"
+                size={34}
                 rotate={-6}
                 className="lumi-post-sticker lumi-post-sticker-right"
               />
@@ -491,8 +494,8 @@ export default function LumiProfilePage() {
               notes="42 notes"
             >
               <LumiSticker
-                sticker="sweat-drops"
-                size={52}
+                sticker="angry"
+                size={38}
                 rotate={7}
                 className="lumi-post-sticker lumi-post-sticker-right"
               />

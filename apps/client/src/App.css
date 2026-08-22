@@ -5552,18 +5552,15 @@ body.prefers-reduced-motion *::after {
 
 /* Lumi's deliberately over-customized personal blog. */
 .lumi-profile { overflow-x:clip; }
-.lumi-sticker { display:block; flex:0 0 auto; overflow:visible; pointer-events:none; user-select:none; transform-origin:center; }
+.lumi-sticker { display:block; flex:0 0 auto; width:var(--sticker-size); max-width:none; height:auto; pointer-events:none; user-select:none; -webkit-user-drag:none; transform:rotate(var(--sticker-rotate)) scaleX(var(--sticker-flip)); transform-origin:center; }
 .lumi-masthead-sticker,.lumi-profile-sticker { position:absolute; z-index:2; pointer-events:none; }
 .lumi-masthead-heart { left:clamp(18px,5vw,76px); top:20px; }
 .lumi-masthead-sparkle { right:clamp(18px,4vw,64px); top:15px; }
 .lumi-masthead-star { right:clamp(70px,10vw,150px); bottom:14px; }
-.lumi-masthead-flower { left:clamp(74px,11vw,170px); bottom:11px; }
-.lumi-profile-sparkle { top:7px; right:7px; }
-.lumi-profile-moth { top:clamp(150px,16vw,205px); left:5px; }
+.lumi-profile-heart { top:calc(min(100%, 330px)); right:8px; }
 .lumi-widget,.lumi-post,.pixie-feed-post,.pixie-login-modal { position:relative; }
 .lumi-widget-sticker,.lumi-post-sticker,.pixie-post-sticker { position:absolute; pointer-events:none; }
-.lumi-now-note { z-index:1; top:42px; right:12px; }
-.lumi-now-kazoo { z-index:1; right:45px; bottom:6px; }
+.lumi-now-kazoo { z-index:1; right:10px; bottom:5px; }
 .lumi-now-sparkle { z-index:1; top:7px; right:9px; }
 .lumi-now-playing strong,.lumi-now-playing p { position:relative; z-index:2; padding-right:48px; }
 .lumi-mood-face { z-index:1; right:7px; bottom:6px; }
@@ -5571,6 +5568,7 @@ body.prefers-reduced-motion *::after {
 .lumi-top-flower { z-index:2; top:3px; right:7px; }
 .lumi-top-star { z-index:2; bottom:5px; left:5px; }
 .lumi-post-sticker-right { z-index:1; top:14px; right:12px; }
+.lumi-post-sticker-left { z-index:1; top:54px; left:10px; }
 .lumi-image-post > .lumi-repost-label { padding-right:78px; }
 .lumi-sticker-divider { display:flex; align-items:center; justify-content:center; gap:clamp(10px,3vw,28px); min-height:36px; overflow:hidden; }
 .lumi-main-column { width:100%; min-width:0; }
@@ -5621,9 +5619,8 @@ body.prefers-reduced-motion *::after {
 .lumi-glitter-divider span:nth-child(odd) { animation:lumi-blink .9s steps(2,end) infinite; }
 .lumi-glitter-divider span:nth-child(even) { animation:lumi-blink 1.3s steps(2,end) infinite reverse; }
 .lumi-online { animation:lumi-online-blink 1.4s steps(2,end) infinite; }
-.lumi-twinkle-fast,.lumi-now-sparkle { animation:lumi-twinkle .8s steps(2,end) infinite; }
-.lumi-twinkle-medium { animation:lumi-twinkle 1.1s steps(2,end) infinite; }
-@keyframes lumi-twinkle { 0%,100% { opacity:.25; transform:scale(.8) rotate(-8deg); } 50% { opacity:1; transform:scale(1.15) rotate(8deg); } }
+.lumi-sticker-twinkle { animation:lumi-cheap-twinkle var(--sticker-duration) steps(2,end) infinite; }
+@keyframes lumi-cheap-twinkle { 0%,100% { opacity:.4; transform:scale(.85) rotate(-7deg); } 50% { opacity:1; transform:scale(1.12) rotate(7deg); } }
 @keyframes lumi-blink { 50% { opacity:.25; } }
 @keyframes lumi-online-blink { 50% { opacity:.55; } }
 
@@ -5687,6 +5684,7 @@ body.prefers-reduced-motion *::after {
   .lumi-route-hamburger { display:block; position:absolute; top:10px; left:10px; z-index:10; border-color:#f7b9e6; background:#5f176f; color:#fff; box-shadow:2px 2px 0 #e72f98; }
   .lumi-layout { grid-template-columns:1fr; padding:10px; }
   .lumi-masthead { padding:72px 48px 24px; }
+  .lumi-masthead-star,.lumi-top-flower,.lumi-top-star,.lumi-post-sticker-left { display:none; }
   .lumi-marquee { white-space:normal; text-align:center; }
   .lumi-marquee span { animation:none; }
   .faeo3-identity-row { min-height:0; padding-block:18px; }
@@ -5700,7 +5698,7 @@ body.prefers-reduced-motion *::after {
   .pixie-login-modal { width:calc(100vw - 32px); margin:auto 0; }
   .secret-site-header { align-items:flex-start; flex-direction:column; }
 }
-@media (prefers-reduced-motion:reduce) { .lumi-marquee span,.lumi-chain-post,.lumi-glitter-divider span,.lumi-online,.lumi-twinkle-fast,.lumi-twinkle-medium,.lumi-now-sparkle { animation:none; } }
+@media (prefers-reduced-motion:reduce) { .lumi-marquee span,.lumi-chain-post,.lumi-glitter-divider span,.lumi-online,.lumi-sticker { animation:none!important; } }
 @media (max-width:760px) {
   .lumi-profile { font-size:16px; }
   .lumi-layout { gap:16px; }
