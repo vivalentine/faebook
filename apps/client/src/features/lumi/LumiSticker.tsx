@@ -39,6 +39,7 @@ export default function LumiSticker({
     "--sticker-rotate": `${clampedRotation}deg`,
     "--sticker-flip": flip ? -1 : 1,
     "--sticker-duration": `${duration}s`,
+    overflow: "hidden",
     opacity,
     zIndex,
   } as CSSProperties;
