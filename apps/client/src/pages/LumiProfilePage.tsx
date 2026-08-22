@@ -480,8 +480,8 @@ export default function LumiProfilePage() {
             >
               <h2>REPOST IF U SUPPORT WOMEN'S WRONGS</h2>
               <p>
-                ignore for 7 petals and a beautiful woman will make an extremely
-                questionable decision in your vicinity
+                nothing better than beautiful women doing the
+                worst things you can imagine
               </p>
             </BlogPost>
           </section>
