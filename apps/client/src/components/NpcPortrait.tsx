@@ -1,8 +1,8 @@
 import { apiUrl } from "../lib/api";
 import type { Npc } from "../types";
 import LongNoonPortrait from "./LongNoonPortrait";
-import SpriteHotspots from "../features/secrets/SpriteHotspots";
-import { npcSpriteHotspots } from "../features/secrets/spriteHotspots";
+import { SpriteHotspots } from "../features/secrets/SpriteHotspots";
+import { npcSpriteHotspots } from "../features/secrets/npcSpriteHotspots";
 
 type Props = {
   npc: Npc;
