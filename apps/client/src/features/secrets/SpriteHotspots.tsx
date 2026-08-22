@@ -3,9 +3,24 @@ import type { SpriteHotspot } from "./npcSpriteHotspots";
 
 export function SpriteHotspots({ hotspots, debug = false }: { hotspots: SpriteHotspot[]; debug?: boolean }) {
   const navigate = useNavigate();
-  return <div className={`sprite-hotspots${debug ? " sprite-hotspots-debug" : ""}`} aria-label="Hidden details">
-    {hotspots.map((spot) => <button key={spot.id} type="button" className="sprite-hotspot" aria-label={spot.ariaLabel || spot.id}
-      style={{ left: `${spot.x}%`, top: `${spot.y}%`, width: `${spot.width}%`, height: `${spot.height}%` }}
-      onClick={() => navigate(spot.action.href)} />)}
-  </div>;
+  return <svg
+    className={`sprite-hotspot-overlay${debug ? " sprite-hotspots-debug" : ""}`}
+    viewBox="0 0 1536 1536"
+    preserveAspectRatio="xMidYMid meet"
+    aria-label="Hidden details"
+  >
+    {hotspots.map((spot) => <a
+      key={spot.id}
+      href={spot.href}
+      aria-label={spot.label}
+      onClick={(event) => {
+        if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          navigate(spot.href);
+        }
+      }}
+    >
+      <path className="sprite-hotspot" d={spot.path} />
+    </a>)}
+  </svg>;
 }
