@@ -145,7 +145,7 @@ export default function LumiProfilePage() {
             duration={1.4}
             className="lumi-masthead-sticker lumi-masthead-star"
           />
-          <h1>~*~ LUMI TURNLEAF IS VERY NORMAL ~*~</h1>
+          <h1>~*~ LUMI IS VERY NORMAL ~*~</h1>
           <p className="lumi-subtitle">yes i changed the css. no you can't.</p>
           <div className="lumi-system">
             <span>profile permissions: don't worry about it</span>
@@ -219,11 +219,6 @@ export default function LumiProfilePage() {
               <p>currently obsessed with: Lyra Glimmerthirst</p>
               <p>currently writing: NONE OF YOUR BUSINESS</p>
               <p>currently drawing: ALSO NONE OF YOUR BUSINESS</p>
-            </section>
-            <section className="lumi-widget lumi-art-folder">
-              <h2>CURRENT ART FOLDER</h2>
-              <code>~/art/donotpost/</code>
-              <small>seriously.</small>
             </section>
             <p className="lumi-elsewhere">
               find me elsewhere: xX_LumiLuvsYuri_Xx
@@ -346,7 +341,7 @@ export default function LumiProfilePage() {
               <p>
                 watching the party squander terry's abilities drives me a lil crazy sometimes
               </p>
-              <p>justice for terry</p>
+              <p>justice for fly boy</p>
             </BlogPost>
 
             <BlogPost
@@ -410,7 +405,12 @@ export default function LumiProfilePage() {
             </BlogPost>
             <BlogPost
               className="lumi-image-post"
-              tags={[]}
+              tags={[
+                "#pip foxglove",
+                "#thalanor gealach",
+                "#sometimes guys are hot too",
+                "#the boys are back in town",
+              ]}
               posted="posted 3:14 AM"
               notes="17 notes"
             >
@@ -424,25 +424,6 @@ export default function LumiProfilePage() {
                 className="lumi-post-media"
                 src={LUMI_POST_ASSETS.thalanorAndPip}
                 alt="Fan art of Thalanor and Pip"
-                loading="lazy"
-              />
-            </BlogPost>
-            <BlogPost
-              className="lumi-image-post"
-              tags={[]}
-              posted="posted 1:07 AM"
-              notes="42 notes"
-            >
-              <LumiSticker
-                sticker="angry"
-                size={38}
-                rotate={7}
-                className="lumi-post-sticker lumi-post-sticker-right"
-              />
-              <img
-                className="lumi-post-media"
-                src={LUMI_POST_ASSETS.titaniaAndWinterQueen}
-                alt="Human alternate-universe fan art of Titania and the Winter Queen"
                 loading="lazy"
               />
             </BlogPost>
