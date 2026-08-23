@@ -1855,17 +1855,6 @@ app.post("/api/secrets/:secretKey/unlock", requireRole("player", "dm"), (req, re
   return res.json({ unlocked: true, unlocked_at: row.unlocked_at });
 });
 
-app.get("/api/secrets/:secretKey/assets/:filename", requireRole("player", "dm"), (req, res) => {
-  const { secretKey, filename } = req.params;
-  if (secretKey !== "lumi_pixie" || !hasSecretAccess(req, secretKey) || !/^[a-z0-9-]+\.svg$/.test(filename)) {
-    return res.status(404).json({ error: "Not found" });
-  }
-  const assetPath = path.join(__dirname, "secret-assets", filename);
-  if (!fs.existsSync(assetPath)) return res.status(404).json({ error: "Not found" });
-  res.setHeader("Cache-Control", "private, no-store");
-  return res.sendFile(assetPath);
-});
-
 app.get("/api/secrets/:secretKey/content", requireRole("player", "dm"), (req, res) => {
   const { secretKey } = req.params;
   if (!isSecretKey(secretKey)) return res.status(404).json({ error: "Not found" });

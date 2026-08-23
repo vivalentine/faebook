@@ -29,7 +29,6 @@ const TacticalEncountersPage = lazy(() => import("./pages/TacticalEncountersPage
 const TacticalEncounterPage = lazy(() => import("./pages/TacticalEncounterPage"));
 const TacticalPresentationPage = lazy(() => import("./pages/TacticalPresentationPage"));
 const FaeO3Page = lazy(() => import("./features/lumi/FaeO3Page"));
-const PixiePage = lazy(() => import("./features/lumi/PixiePage"));
 const LumiStickerAtlasPreview = import.meta.env.DEV
   ? lazy(() => import("./features/lumi/LumiStickerAtlasPreview"))
   : null;
@@ -72,7 +71,6 @@ export default function App() {
             <Route path="/secret/faeo3/works/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
             <Route path="/secret/faeo3/works/:slug/chapters/:chapterNumber" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page /></ProtectedRoute>} />
             <Route path="/secret/faeo3/tales/:slug" element={<ProtectedRoute allowRoles={["dm", "player"]}><FaeO3Page legacy /></ProtectedRoute>} />
-            <Route path="/secret/pixie" element={<ProtectedRoute allowRoles={["dm", "player"]}><PixiePage /></ProtectedRoute>} />
             <Route path="/dm/encounters/:encounterId/presentation" element={<ProtectedRoute allowRoles={["dm"]}><TacticalPresentationPage /></ProtectedRoute>} />
 
             <Route

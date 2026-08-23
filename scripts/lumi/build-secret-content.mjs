@@ -2,13 +2,8 @@ import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const IMAGE_EXTENSIONS = new Set([".webp", ".png", ".jpg", ".jpeg", ".gif"]);
 const STORY_EXTENSIONS = new Set([".md", ".txt"]);
 const REQUIRED_WORK_FIELDS = ["slug", "title", "author", "rating", "archiveWarnings", "category", "fandoms", "relationships", "characters", "additionalTags", "language", "status", "summary", "chapters"];
-
-function titleFromFilename(filename) {
-  return path.basename(filename, path.extname(filename)).replace(/^\d+[\s_-]*/, "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 async function readJson(filename, label) {
   try {
@@ -24,28 +19,9 @@ async function exists(filename) {
 
 export async function buildSecretContent({ publicRoot, warn = console.warn } = {}) {
   const root = publicRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../apps/client/public");
-  const pixieDir = path.join(root, "lumi/nsfw-pixie");
   const faeo3Dir = path.join(root, "lumi/faeo3");
   const worksDir = path.join(faeo3Dir, "works");
-  await Promise.all([mkdir(pixieDir, { recursive: true }), mkdir(worksDir, { recursive: true })]);
-
-  const pixieFiles = (await readdir(pixieDir, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && !entry.name.startsWith(".") && IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
-    .map((entry) => entry.name)
-    .sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
-  const metadataFile = path.join(pixieDir, "gallery.json");
-  const metadata = (await exists(metadataFile)) ? await readJson(metadataFile, "Pixie gallery") : {};
-  if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") throw new Error(`Pixie gallery: ${metadataFile} must contain a JSON object`);
-  for (const filename of Object.keys(metadata)) {
-    if (!pixieFiles.includes(filename)) warn(`[Lumi content] Pixie metadata references missing image: ${filename}`);
-  }
-  const gallery = pixieFiles.map((filename) => {
-    const authored = metadata[filename];
-    if (authored != null && (Array.isArray(authored) || typeof authored !== "object")) warn(`[Lumi content] Ignoring malformed metadata entry for ${filename}`);
-    const safe = authored && !Array.isArray(authored) && typeof authored === "object" ? authored : {};
-    return { id: path.basename(filename, path.extname(filename)), filename, src: `/lumi/nsfw-pixie/${encodeURIComponent(filename)}`, title: typeof safe.title === "string" && safe.title.trim() ? safe.title : titleFromFilename(filename), ...(typeof safe.caption === "string" ? { caption: safe.caption } : {}), ...(Array.isArray(safe.tags) ? { tags: safe.tags.filter((tag) => typeof tag === "string") } : {}) };
-  });
-  await writeFile(path.join(pixieDir, "gallery-manifest.json"), `${JSON.stringify(gallery, null, 2)}\n`);
+  await mkdir(worksDir, { recursive: true });
 
   const entries = (await readdir(worksDir, { withFileTypes: true })).filter((entry) => entry.isDirectory() && !entry.name.startsWith(".")).sort((a, b) => a.name.localeCompare(b.name));
   const works = [];
@@ -85,9 +61,9 @@ export async function buildSecretContent({ publicRoot, warn = console.warn } = {
   }
   works.sort((a, b) => (b.published ?? "").localeCompare(a.published ?? "") || a.title.localeCompare(b.title));
   await writeFile(path.join(faeo3Dir, "works-manifest.json"), `${JSON.stringify(works, null, 2)}\n`);
-  return { gallery, works };
+  return { works };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  buildSecretContent().then(({ gallery, works }) => console.log(`[Lumi content] Generated ${gallery.length} Pixie image(s) and ${works.length} FaeO3 work(s).`)).catch((error) => { console.error(`[Lumi content] ${error.message}`); process.exitCode = 1; });
+  buildSecretContent().then(({ works }) => console.log(`[Lumi content] Generated ${works.length} FaeO3 work(s).`)).catch((error) => { console.error(`[Lumi content] ${error.message}`); process.exitCode = 1; });
 }

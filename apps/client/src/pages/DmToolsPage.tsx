@@ -152,7 +152,8 @@ type SecretUnlock = { user_id: number; username: string; display_name: string; s
 function SecretPagesAdmin() {
   const [unlocks, setUnlocks] = useState<SecretUnlock[]>([]);
   useEffect(() => { void apiFetch("/api/dm/secret-unlocks").then(async (response) => { if (response.ok) setUnlocks((await response.json()).unlocks || []); }); }, []);
-  return <section className="state-card"><h2>Secret Pages</h2><p>DM bypass is active. Player unlocks show their first successful timestamp.</p>{[["FAEO3", "/secret/faeo3", "lumi_faeo3"], ["Pixie", "/secret/pixie", "lumi_pixie"]].map(([name, href, key]) => <article className="note-card" key={key}><div className="note-card-header"><strong>{name}</strong><Link className="action-button" to={href}>Open</Link></div>{unlocks.filter(item => item.secret_key === key).length ? <ul>{unlocks.filter(item => item.secret_key === key).map(item => <li key={`${item.user_id}-${key}`}>{item.display_name || item.username} ({item.username}) — {new Date(item.unlocked_at).toLocaleString()}</li>)}</ul> : <p>No player unlocks yet.</p>}</article>)}</section>;
+  const faeo3Unlocks = unlocks.filter((item) => item.secret_key === "lumi_faeo3");
+  return <section className="state-card"><h2>Secret Pages</h2><p>DM bypass is active. Player unlocks show their first successful timestamp.</p><article className="note-card"><div className="note-card-header"><strong>FaeO3</strong><Link className="action-button" to="/secret/faeo3">Open</Link></div>{faeo3Unlocks.length ? <ul>{faeo3Unlocks.map((item) => <li key={`${item.user_id}-lumi_faeo3`}>{item.display_name || item.username} ({item.username}) — {new Date(item.unlocked_at).toLocaleString()}</li>)}</ul> : <p>No player unlocks yet.</p>}</article></section>;
 }
 
 export default function DmToolsPage() {
