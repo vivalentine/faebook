@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import NpcPortrait from "../components/NpcPortrait";
 import LumiSticker from "../features/lumi/LumiSticker";
 import { LUMI_POST_ASSETS } from "../features/lumi/lumiAssets";
@@ -6,20 +12,94 @@ import { apiFetch } from "../lib/api";
 import type { Npc } from "../types";
 
 const topEight = [
-  { label: "Lyra Glimmerthirst", src: "/lumi/top-8/lyra_top8.webp" },
-  { label: "Aoife Gealach", src: "/lumi/top-8/aoife_top8.webp" },
-  { label: "Princess Cerelune", src: "/lumi/top-8/cerelune_top8.webp" },
-  { label: "Lirael Moonthorn", src: "/lumi/top-8/lirael_top8.webp" },
-  { label: "Rin Tatari", src: "/lumi/top-8/rin_top8.webp" },
-  { label: "Mimi Xiao", src: "/lumi/top-8/mimi_top8.webp" },
-  { label: "Thalanor Gealach", src: "/lumi/top-8/thalanor_top8.webp" },
-  { label: "Pip Foxglove", src: "/lumi/top-8/pip_top8.webp" },
+  {
+    label: "Lyra Glimmerthirst",
+    src: "/lumi/top-8/lyra_top8.webp",
+    zoom: 1.55,
+    x: 50,
+    y: 18,
+  },
+  {
+    label: "Aoife Gealach",
+    src: "/lumi/top-8/aoife_top8.webp",
+    zoom: 1.55,
+    x: 50,
+    y: 18,
+  },
+  {
+    label: "Princess Cerelune",
+    src: "/lumi/top-8/cerelune_top8.webp",
+    zoom: 1.5,
+    x: 54,
+    y: 18,
+  },
+  {
+    label: "Lirael Moonthorn",
+    src: "/lumi/top-8/lirael_top8.webp",
+    zoom: 1.58,
+    x: 51,
+    y: 16,
+  },
+  {
+    label: "Rin Tatari",
+    src: "/lumi/top-8/rin_top8.webp",
+    zoom: 1.6,
+    x: 51,
+    y: 17,
+  },
+  {
+    label: "Mimi Xiao",
+    src: "/lumi/top-8/mimi_top8.webp",
+    zoom: 1.52,
+    x: 50,
+    y: 18,
+  },
+  {
+    label: "Thalanor Gealach",
+    src: "/lumi/top-8/thalanor_top8.webp",
+    zoom: 1.48,
+    x: 52,
+    y: 15,
+  },
+  {
+    label: "Pip Foxglove",
+    src: "/lumi/top-8/pip_top8.webp",
+    zoom: 1.5,
+    x: 57,
+    y: 16,
+  },
 ] as const;
 
-function TopEightPortrait({ label, src }: { label: string; src: string }) {
+type TopEightPortraitProps = {
+  label: string;
+  src: string;
+  zoom?: number;
+  x?: number;
+  y?: number;
+};
+
+type TopEightCropStyle = CSSProperties & {
+  "--top8-zoom": number;
+  "--top8-x": `${number}%`;
+  "--top8-y": `${number}%`;
+};
+
+function TopEightPortrait({
+  label,
+  src,
+  zoom = 1.5,
+  x = 50,
+  y = 20,
+}: TopEightPortraitProps) {
   const [failed, setFailed] = useState(false);
+  const cropStyle: TopEightCropStyle = {
+    "--top8-zoom": zoom,
+    "--top8-x": `${x}%`,
+    "--top8-y": `${y}%`,
+  };
+
   return (
-    <div className="lumi-top-eight-media">
+    <div className="lumi-top-eight-media" style={cropStyle}>
       {!failed ? (
         <img
           src={src}
@@ -317,7 +397,7 @@ export default function LumiProfilePage() {
               <ol>
                 {topEight.map((entry) => (
                   <li key={entry.label}>
-                    <TopEightPortrait label={entry.label} src={entry.src} />
+                    <TopEightPortrait {...entry} />
                     <span>{entry.label}</span>
                   </li>
                 ))}
