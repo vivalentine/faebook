@@ -8,12 +8,12 @@ import type { Npc } from "../types";
 const topEight = [
   { label: "Lyra Glimmerthirst", src: "/lumi/top-8/lyra_top8.webp" },
   { label: "Aoife Gealach", src: "/lumi/top-8/aoife_top8.webp" },
-  { label: "Usaq", src: "/lumi/top-8/usaq_top8.webp" },
+  { label: "Princess Cerelune", src: "/lumi/top-8/cerelune_top8.webp" },
+  { label: "Lirael Moonthorn", src: "/lumi/top-8/lirael_top8.webp" },
   { label: "Rin Tatari", src: "/lumi/top-8/rin_top8.webp" },
   { label: "Mimi Xiao", src: "/lumi/top-8/mimi_top8.webp" },
-  { label: "Terry", src: "/lumi/top-8/terry_top8.webp" },
-  { label: "Hilton", src: "/lumi/top-8/hilton_top8.webp" },
-  { label: "Lirael Moonthorn", src: "/lumi/top-8/lirael_top8.webp" },
+  { label: "Thalanor Gealach", src: "/lumi/top-8/thalanor_top8.webp" },
+  { label: "Pip Foxglove", src: "/lumi/top-8/pip_top8.webp" },
 ] as const;
 
 function TopEightPortrait({ label, src }: { label: string; src: string }) {
