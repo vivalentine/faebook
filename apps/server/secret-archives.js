@@ -2,15 +2,12 @@ const { createHash, timingSafeEqual } = require("node:crypto");
 
 const SECRET_KEYS = Object.freeze({
   lumi_faeo3: "LUMI_FAEO3_PASSWORD",
-  lumi_pixie: "LUMI_PIXIE_PASSWORD",
 });
 const SECRET_ACCOUNTS = Object.freeze({
   lumi_faeo3: { username: "xX_LumiLuvsYuri_Xx", password: "crackship" },
-  lumi_pixie: { username: "xX_LumiLuvsYuri_Xx", password: "donotpost" },
 });
 
 const faeo3Works = [];
-const pixieWorks = [];
 
 function isSecretKey(value) { return Object.prototype.hasOwnProperty.call(SECRET_KEYS, value); }
 function configuredPassword(secretKey) { return process.env[SECRET_KEYS[secretKey]] || SECRET_ACCOUNTS[secretKey]?.password || ""; }
@@ -27,7 +24,7 @@ function credentialsMatch(secretKey, usernameValue, passwordValue) {
     && supplied.length <= 200
     && timingSafeEqual(suppliedDigest, expectedDigest);
 }
-function archivePayload(secretKey) {
-  return secretKey === "lumi_faeo3" ? { works: faeo3Works } : { works: pixieWorks };
+function archivePayload() {
+  return { works: faeo3Works };
 }
 module.exports = { SECRET_KEYS, isSecretKey, configuredPassword, expectedUsername, credentialsMatch, archivePayload };
