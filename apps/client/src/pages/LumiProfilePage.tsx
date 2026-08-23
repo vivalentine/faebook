@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import NpcPortrait from "../components/NpcPortrait";
 import LumiSticker from "../features/lumi/LumiSticker";
 import { LUMI_POST_ASSETS } from "../features/lumi/lumiAssets";
@@ -87,6 +87,9 @@ function BlogPost({
 export default function LumiProfilePage() {
   const [npc, setNpc] = useState<Npc | null>(null);
   const [error, setError] = useState("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioError, setAudioError] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/npcs/lumi-turnleaf")
@@ -101,6 +104,36 @@ export default function LumiProfilePage() {
         ),
       );
   }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.volume = 0.8;
+
+    return () => {
+      audio.pause();
+    };
+  }, [npc]);
+
+  const toggleLyra = async () => {
+    const audio = audioRef.current;
+    if (!audio || audioError) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      await audio.play();
+      setIsPlaying(true);
+    } catch {
+      setIsPlaying(false);
+      setAudioError(true);
+    }
+  };
 
   if (error)
     return (
@@ -200,9 +233,51 @@ export default function LumiProfilePage() {
                 className="lumi-widget-sticker lumi-now-sparkle"
               />
               <h2>NOW PLAYING</h2>
-              <strong>Lyra Glimmerthirst</strong>
-              <p>volume: irresponsible</p>
-              <p>repeat: obviously</p>
+              <div className="lumi-player">
+                <audio
+                  ref={audioRef}
+                  src="/lumi/lyra_official_theme_FINAL_REAL.ogg"
+                  loop
+                  preload="metadata"
+                  onError={() => {
+                    setIsPlaying(false);
+                    setAudioError(true);
+                  }}
+                />
+                <div className="lumi-player-track">
+                  <strong>♫ Lyra Glimmerthirst</strong>
+                  {isPlaying && (
+                    <span className="lumi-player-equalizer" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )}
+                  <span>lyra_official_theme_FINAL_REAL.ogg</span>
+                </div>
+                <button
+                  type="button"
+                  className="lumi-player-button"
+                  onClick={toggleLyra}
+                  disabled={audioError}
+                  aria-label={`${isPlaying ? "Pause" : "Play"} Lyra Glimmerthirst`}
+                >
+                  {isPlaying ? "❚❚ PAUSE" : "▶ PLAY"}
+                </button>
+                <div className="lumi-player-status" aria-live="polite">
+                  {audioError ? (
+                    <strong>LYRA HAS BEEN SILENCED BY TECHNICAL DIFFICULTIES</strong>
+                  ) : (
+                    <>
+                      <p>volume: irresponsible</p>
+                      <p>repeat: obviously</p>
+                      <p>status: {isPlaying ? "LYRA HOURS" : "tragically silent"}</p>
+                    </>
+                  )}
+                </div>
+              </div>
             </section>
             <section className="lumi-widget lumi-mood">
               <LumiSticker
