@@ -5598,8 +5598,8 @@ body.prefers-reduced-motion *::after {
 .lumi-top-eight ol { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:12px; list-style:none; counter-reset:top-eight; }
 .lumi-top-eight li { counter-increment:top-eight; display:grid; grid-template-rows:auto auto; position:relative; min-width:0; border:2px outset #edb7db; background:#ffe9f7; text-align:center; }
 .lumi-top-eight li::before { content:counter(top-eight); position:absolute; z-index:1; top:3px; left:3px; min-width:18px; color:#fff; background:#7d2e8c; font:700 11px/18px monospace; }
-.lumi-top-eight-media { display:grid; aspect-ratio:1; min-width:0; overflow:hidden; place-items:center; background:radial-gradient(circle,#65266c,#1c1026 72%); }
-.lumi-top-eight-media img { display:block; width:100%; height:100%; object-fit:cover; object-position:center; background:#24132e; }
+.lumi-top-eight-media { position:relative; display:grid; aspect-ratio:1; min-width:0; overflow:hidden; place-items:center; background:radial-gradient(circle,#65266c,#1c1026 72%); }
+.lumi-top-eight-media img { display:block; width:100%; height:100%; object-fit:cover; object-position:var(--top8-x,50%) var(--top8-y,20%); background:#24132e; transform:scale(var(--top8-zoom,1.5)); transform-origin:var(--top8-x,50%) var(--top8-y,20%); }
 .lumi-broken-portrait { display:grid; width:100%; height:100%; place-content:center; gap:5px; padding:8px; box-sizing:border-box; color:#ffbce8; background:repeating-linear-gradient(135deg,#24132e 0 8px,#47184d 8px 16px); font:700 .65rem/1.15 monospace; overflow-wrap:anywhere; }
 .lumi-broken-portrait span { color:#53e5f4; font-size:1.4rem; }
 .lumi-top-eight li span { display:grid; place-items:center; min-height:38px; padding:4px; color:#611457; font:bold .72rem/1.2 Verdana,sans-serif; overflow-wrap:anywhere; }
