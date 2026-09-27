@@ -4,10 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "lumi:content": "node ../../scripts/lumi/build-secret-content.mjs",
-    "test:lumi-content": "node --test ../../scripts/lumi/build-secret-content.test.mjs",
-    "dev": "npm run lumi:content && vite",
-    "build": "npm run lumi:content && tsc -b && vite build",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
