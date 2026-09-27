@@ -253,44 +253,6 @@ export default function LumiProfilePage() {
           <section className="lumi-main-column" aria-label="Lumi's blog feed">
             <h2 className="sr-only">Lumi's blog feed</h2>
             <BlogPost
-              className="lumi-image-post lumi-lyra-post"
-              tags={[
-                "#lyra glimmerthirst",
-                "#divine muse of summer",
-                "#normal amount of admiration",
-                "#i am looking respectfully",
-                "#lying",
-              ]}
-              posted="posted 1:07 AM"
-              edited="last edited 4:51 AM"
-              notes="42 notes"
-            >
-              <LumiSticker
-                sticker="big-pink-heart"
-                size={46}
-                rotate={-8}
-                className="lumi-post-sticker lumi-post-sticker-right"
-              />
-              <LumiSticker
-                sticker="cyan-sparkle"
-                size={28}
-                rotate={7}
-                animated
-                duration={0.8}
-                className="lumi-post-sticker lumi-post-sticker-left"
-              />
-              <strong className="lumi-repost-label">reposted</strong>
-              <p>important cultural preservation work happening on this blog</p>
-              <img
-                className="lumi-post-media"
-                src={LUMI_POST_ASSETS.lyra}
-                alt="Fan art of Lyra Glimmerthirst"
-                loading="lazy"
-              />
-              <p className="lumi-image-caption">look at her. LOOK AT HER.</p>
-            </BlogPost>
-
-            <BlogPost
               tags={["#usaq", "#bardposting", "#the kazoo has seen things"]}
               posted="posted 4:42 AM"
               notes="17 notes"
