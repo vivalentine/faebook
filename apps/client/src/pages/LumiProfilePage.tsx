@@ -370,25 +370,6 @@ export default function LumiProfilePage() {
               />
             </BlogPost>
             <BlogPost
-              className="lumi-image-post"
-              tags={[]}
-              posted="posted 1:07 AM"
-              notes="42 notes"
-            >
-              <LumiSticker
-                sticker="angry"
-                size={38}
-                rotate={7}
-                className="lumi-post-sticker lumi-post-sticker-right"
-              />
-              <img
-                className="lumi-post-media"
-                src={LUMI_POST_ASSETS.titaniaAndWinterQueen}
-                alt="Human alternate-universe fan art of Titania and the Winter Queen"
-                loading="lazy"
-              />
-            </BlogPost>
-            <BlogPost
               className="lumi-ask-post"
               tags={["#asks", "#faebook", "#skill issue"]}
               posted="posted 4:42 AM"
