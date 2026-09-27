@@ -220,14 +220,6 @@ export default function LumiProfilePage() {
               <p>currently writing: NONE OF YOUR BUSINESS</p>
               <p>currently drawing: ALSO NONE OF YOUR BUSINESS</p>
             </section>
-            <section className="lumi-widget lumi-art-folder">
-              <h2>CURRENT ART FOLDER</h2>
-              <code>~/art/donotpost/</code>
-              <small>seriously.</small>
-            </section>
-            <p className="lumi-elsewhere">
-              find me elsewhere: xX_LumiLuvsYuri_Xx
-            </p>
             <section className="lumi-widget lumi-top-eight">
               <LumiSticker
                 sticker="pink-flower"
@@ -260,18 +252,6 @@ export default function LumiProfilePage() {
 
           <section className="lumi-main-column" aria-label="Lumi's blog feed">
             <h2 className="sr-only">Lumi's blog feed</h2>
-            <BlogPost
-              tags={["#fanfic", "#shipping", "#crackship", "#i can explain"]}
-              posted="posted 3:14 AM"
-              edited="edited again 3:19 AM"
-              notes="69 notes"
-            >
-              <p>
-                okay but saying "crackship" at all is so weak. if the chemistry
-                works, the chemistry works. i'm just saying.
-              </p>
-            </BlogPost>
-
             <BlogPost
               className="lumi-image-post lumi-lyra-post"
               tags={[
