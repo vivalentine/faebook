@@ -53,7 +53,7 @@ http://app.fae-book.live {
 http://shadowbanfilms.com {
 	encode zstd gzip
 
-	root * C:\Users\viole\Projects\shadowban-films\dist
+	root * C:\Users\viole\Projects\shadowban-films\shadowban-films\dist
 	try_files {path} /index.html
 	file_server
 }
