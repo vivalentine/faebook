@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "faeo3:content": "node ../../scripts/lumi/build-faeo3-content.mjs",
+    "dev": "npm run faeo3:content && vite",
+    "build": "npm run faeo3:content && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
