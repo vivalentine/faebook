@@ -1,13 +1,13 @@
-{$FAEBOOK_SITE_ADDRESS::80} {
+http://app.fae-book.live {
 	encode zstd gzip
 
 	@api path /api/*
-    handle @api {
-	reverse_proxy 127.0.0.1:3001 {
-		header_up X-Forwarded-Proto https
-		header_up X-Forwarded-Host {host}
+	handle @api {
+		reverse_proxy 127.0.0.1:3001 {
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+		}
 	}
-    }
 
 	@uploads path /uploads/*
 	handle @uploads {
@@ -48,4 +48,28 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+http://shadowbanfilms.com {
+	encode zstd gzip
+
+	root * C:\Users\viole\Projects\shadowban-films\dist
+	try_files {path} /index.html
+	file_server
+}
+
+http://tesscsylvan.com {
+	encode zstd gzip
+
+	root * C:\Users\viole\Projects\tess-sylvan\dist
+	try_files {path} /index.html
+	file_server
+}
+
+http://violetvalentine.blog {
+	encode zstd gzip
+
+	root * C:\Users\viole\Projects\violet-valentine\dist
+	try_files {path} /index.html
+	file_server
 }
