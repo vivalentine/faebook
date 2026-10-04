@@ -61,9 +61,19 @@ http://shadowbanfilms.com {
 http://tesscsylvan.com {
 	encode zstd gzip
 
-	root * C:\Users\viole\Projects\tess-sylvan\dist
-	try_files {path} /index.html
-	file_server
+	@storyboard path /_storyboard/*
+	handle @storyboard {
+		reverse_proxy 127.0.0.1:4173 {
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Host {host}
+		}
+	}
+
+	handle {
+		root * C:\Users\viole\Projects\tess-sylvan\dist
+		try_files {path} /index.html
+		file_server
+	}
 }
 
 http://violetvalentine.blog {
