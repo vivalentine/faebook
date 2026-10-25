@@ -54,8 +54,41 @@ http://shadowbanfilms.com {
 	encode zstd gzip
 
 	root * C:\Users\viole\Projects\shadowban-films\shadowban-films\dist
-	try_files {path} /index.html
-	file_server
+
+	# Serve each Vite page's HTML to both browsers and link preview bots.
+	# A generic SPA fallback otherwise serves homepage metadata for these URLs.
+	@aftercare path /aftercare /aftercare/
+	handle @aftercare {
+		rewrite * /aftercare/index.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	@auditions path /aftercare-auditions /aftercare-auditions/
+	handle @auditions {
+		rewrite * /aftercare-auditions/index.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	@projects path /projects /projects/
+	handle @projects {
+		rewrite * /projects/index.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	@heroStage path /hero-stage /hero-stage/
+	handle @heroStage {
+		rewrite * /hero-stage/index.html
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 }
 
 http://tesscsylvan.com {
